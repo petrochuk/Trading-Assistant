@@ -1,12 +1,7 @@
-# Trading-Assistant
+# Trading Assistant
 
-## Pre-requisites
+<img src="docs/media/ta-logo.jfif" alt="Logo" width="128" height="128" align="left" style="margin-right: 10px;">
 
-- Install Java from [official website](https://www.java.com/en/download/)
-- Install Interactive Brokers [Client Portal API Gateway](https://www.interactivebrokers.com/campus/ibkr-api-page/cpapi-v1/#gw-step-one)
+Trading Assistant is an application that provides a user-friendly interface for managing and executing trades 
+on the [Interactive Brokers (IBKR)](https://www.interactivebrokers.com/) via [REST API](https://www.interactivebrokers.com/campus/ibkr-api-page/webapi-ref/).
 
-## Running the Application
-
-- Run API Gateway and login to your IBKR account
-	- Go to `clientportal.gw` directory and run the following command:
-``` .\bin\run.bat .\root\conf.yaml ```
