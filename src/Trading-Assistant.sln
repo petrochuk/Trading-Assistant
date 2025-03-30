@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trading-Assistant", "Trading-Assistant.csproj", "{279BE82C-9E16-40F0-82FD-6BFEFEE9918A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trading-Assistant", "App\Trading-Assistant.csproj", "{279BE82C-9E16-40F0-82FD-6BFEFEE9918A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteractiveBrokers", "..\InteractiveBrokers\InteractiveBrokers.csproj", "{38B1EA23-0D90-4A07-862E-402173539F6B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteractiveBrokers", "InteractiveBrokers\InteractiveBrokers.csproj", "{38B1EA23-0D90-4A07-862E-402173539F6B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
