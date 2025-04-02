@@ -1,42 +1,41 @@
 ﻿using InteractiveBrokers;
-using System.Windows;
+using Microsoft.UI.Xaml;
 
-namespace Trading_Assistant;
+namespace TradingAssistant;
 
 /// <summary>
-/// Interaction logic for App.xaml
+/// Provides application-specific behavior to supplement the default Application class.
 /// </summary>
 public partial class App : Application
 {
+    private Window? _window;
+
     private readonly IBClient _ibClient = new IBClient();
-    private System.Timers.Timer _tickleTimer = new System.Timers.Timer(TimeSpan.FromMinutes(1)) {
-        AutoReset = true,
-        Enabled = true
-    };
 
-    override protected void OnStartup(StartupEventArgs e) {
-        base.OnStartup(e);
-
-        // Set up the tickle timer
-        _tickleTimer.Elapsed += async (s, args) => {
-            await _ibClient.Tickle();
-        };
-        _tickleTimer.Start();
-
-        // Workaround for light theme flashing on startup
-        var mainWindow = new MainWindow();
-        mainWindow.Loaded += (s, args) => {
-            mainWindow.WindowState = WindowState.Maximized;
-        };
-        mainWindow.Show();
+    
+    /// <summary>
+    /// Initializes the singleton application object.
+    /// </summary>
+    public App()
+    {
+        InitializeComponent();
     }
 
-    override protected void OnExit(ExitEventArgs e) {
-        base.OnExit(e);
-        _ibClient.Dispose();
+    /// <summary>
+    /// Invoked when the application is launched.
+    /// </summary>
+    /// <param name="args">Details about the launch request and process.</param>
+    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        _window = new MainWindow();
+        _window.Activate();
     }
+
+    #region Properties
 
     public IBClient IBClient => _ibClient;
 
     public static App Instance => (App)Current;
+
+    #endregion
 }

@@ -1,4 +1,7 @@
-﻿namespace InteractiveBrokers;
+﻿using System.Net;
+using System.Text.Json;
+
+namespace InteractiveBrokers;
 
 public class IBClient : IDisposable
 {
@@ -10,6 +13,11 @@ public class IBClient : IDisposable
     private bool _isDisposed;
     private readonly Thread _mainThread;
 
+    private System.Timers.Timer _tickleTimer = new(TimeSpan.FromMinutes(1)) {
+        AutoReset = true,
+        Enabled = true
+    };
+
     #endregion
 
     #region Constructors
@@ -18,6 +26,11 @@ public class IBClient : IDisposable
 
         _host = string.IsNullOrWhiteSpace(host) ? "localhost" : host;
         _port = port <= 0 ? 5000 : port;
+
+        // Set up the tickle timer
+        _tickleTimer.Elapsed += async (s, args) => {
+            await Tickle();
+        };
 
         // Disable SSL certificate validation IB Client Portal API Gateway
         var handler = new HttpClientHandler {
@@ -49,6 +62,22 @@ public class IBClient : IDisposable
         response.EnsureSuccessStatusCode();
 
         var responseContent = await response.Content.ReadAsStringAsync();
+        var tickleResponse = JsonSerializer.Deserialize<Responses.Tickle>(responseContent);
+        if (tickleResponse == null || !tickleResponse.iserver.authStatus.connected) {
+            throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) not connected");
+        }
+    }
+
+    /// <summary>
+    /// Connects to the IB client.
+    /// </summary>
+    public async Task Connect() {
+        // Immediately send a tickle request to the IB client
+        // which will test the connection
+        await Tickle();
+
+        // Start the tickle timer if connection is successful to keep the connection alive
+        _tickleTimer.Start();
     }
 
     #endregion
