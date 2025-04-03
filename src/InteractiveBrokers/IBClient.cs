@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace InteractiveBrokers;
 
@@ -12,6 +11,11 @@ public class IBClient : IDisposable
     private HttpClient _httpClient;
     private bool _isDisposed;
     private readonly Thread _mainThread;
+    private readonly JsonSerializerOptions _jsonSerializerOptions = new() {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        AllowTrailingCommas = true
+    };
 
     private System.Timers.Timer _tickleTimer = new(TimeSpan.FromMinutes(1)) {
         AutoReset = true,
@@ -62,8 +66,14 @@ public class IBClient : IDisposable
         response.EnsureSuccessStatusCode();
 
         var responseContent = await response.Content.ReadAsStringAsync();
-        var tickleResponse = JsonSerializer.Deserialize<Responses.Tickle>(responseContent);
-        if (tickleResponse == null || !tickleResponse.iserver.authStatus.connected) {
+        var tickleResponse = JsonSerializer.Deserialize<Responses.Tickle>(responseContent, _jsonSerializerOptions);
+        if (tickleResponse == null) {
+            throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) provided invalid response");
+        }
+        if (!string.IsNullOrWhiteSpace(tickleResponse.Error)) {
+            throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) response: {tickleResponse.Error}");
+        }
+        if (tickleResponse.IServer == null || !tickleResponse.IServer.AuthStatus.connected) {
             throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) not connected");
         }
     }

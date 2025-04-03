@@ -2,37 +2,38 @@
 
 public class Tickle
 {
-    public string session { get; set; }
-    public Hmds hmds { get; set; }
-    public Iserver iserver { get; set; }
+    public string? Session { get; set; }
+    public HMDS? HMDS { get; set; }
+    public IServer? IServer { get; set; }
     public long lastTickle { get; set; }
     public int ssoExpires { get; set; }
-    public bool collission { get; set; }
-    public int userId { get; set; }
+    public bool Collission { get; set; }
+    public int? UserId { get; set; }
+    public string? Error { get; set; }
 }
 
-public class Hmds
+public class HMDS
 {
-    public string error { get; set; }
+    public string? Error { get; set; }
 }
 
-public class Iserver
+public class IServer
 {
-    public Authstatus authStatus { get; set; }
+    public AuthStatus AuthStatus { get; set; }
 }
 
-public class Authstatus
+public class AuthStatus
 {
     public bool authenticated { get; set; }
     public bool competing { get; set; }
     public bool connected { get; set; }
     public string message { get; set; }
     public string MAC { get; set; }
-    public Serverinfo serverInfo { get; set; }
+    public ServerInfo? ServerInfo { get; set; }
 }
 
-public class Serverinfo
+public class ServerInfo
 {
-    public string serverName { get; set; }
-    public string serverVersion { get; set; }
+    public required string ServerName { get; set; }
+    public required string ServerVersion { get; set; }
 }
