@@ -22,6 +22,7 @@
     <Content Include="Resources\*.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Remove="RiskGraph.xaml" />
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -42,6 +43,12 @@
   <ItemGroup>
     <ProjectReference Include="..\AppCore\AppCore.csproj" />
     <ProjectReference Include="..\InteractiveBrokers\InteractiveBrokers.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="RiskGraph.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
 
   <!-- Publish Properties -->

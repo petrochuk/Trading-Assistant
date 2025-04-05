@@ -1,5 +1,7 @@
 using AppCore;
 using InteractiveBrokers.Args;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -12,6 +14,7 @@ public sealed partial class MainWindow : Window
 {
     #region Fields
 
+    private readonly ILogger<MainWindow> _logger;
     private string _accountId = string.Empty;
 
     private System.Timers.Timer _positionsTimer = new(TimeSpan.FromMinutes(1)) {
@@ -25,9 +28,11 @@ public sealed partial class MainWindow : Window
 
     #region Constructors
 
-    public MainWindow()
+    public MainWindow(ILogger<MainWindow> logger)
     {
-        this.InitializeComponent();
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        InitializeComponent();
 
         AppWindow.SetIcon("Resources/icons8-bell-curve-office-xs.ico");
 
@@ -41,6 +46,7 @@ public sealed partial class MainWindow : Window
             App.Instance.IBClient.RequestAccountPositions(_accountId);
         };
         _positionsTimer.Start();
+        RiskGraphControl.Positions = _positions;
 
         // Subscribe to client events
         App.Instance.IBClient.OnConnected += IBClient_Connected;
@@ -55,6 +61,7 @@ public sealed partial class MainWindow : Window
     private async void Play_Click(object sender, RoutedEventArgs e) {
         try {
             ConnectButton.IsEnabled = false;
+            _logger.LogInformation("Connecting to IBKR...");
             App.Instance.IBClient.Connect();
         }
         catch (Exception ex) {
@@ -79,6 +86,7 @@ public sealed partial class MainWindow : Window
     private void IBClient_Connected(object? sender, EventArgs e) {
         // Change the button text to "Connected" on main thread
         DispatcherQueue.TryEnqueue(() => {
+            _logger.LogInformation("Connected to IBKR");
             ConnectButton.IsEnabled = true;
             ConnectButton.Label = "Connected";
             ConnectButton.Icon = new FontIcon() {

@@ -30,5 +30,7 @@
                 </AppBarButton>
             </CommandBar>
         </StackPanel>
+        <local:RiskGraph Grid.Column="0" Grid.Row="1" x:Name="RiskGraphControl">
+        </local:RiskGraph>
     </Grid>
 </Window>

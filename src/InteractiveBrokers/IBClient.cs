@@ -103,7 +103,8 @@ public class IBClient : IDisposable
     public void RequestAccounts() {
         var request = new Requests.Accounts(OnAccountConnected);
 
-        if(!_channel.Writer.TryWrite(request)) {
+        _logger.LogInformation($"Requesting accounts");
+        if (!_channel.Writer.TryWrite(request)) {
             throw new IBClientException("Failed to request accounts");
         }
     }
@@ -115,7 +116,8 @@ public class IBClient : IDisposable
 
         var request = new Requests.AccountPositions(account, OnAccountPositions);
 
-        if(!_channel.Writer.TryWrite(request)) {
+        _logger.LogInformation($"Requesting account positions for account {account}");
+        if (!_channel.Writer.TryWrite(request)) {
             throw new IBClientException("Failed to request accounts");
         }
     }

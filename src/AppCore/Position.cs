@@ -6,13 +6,13 @@ namespace AppCore;
 [DebuggerDisplay("{ContractDesciption} {PositionSize}")]
 public class Position
 {
-    public required string AcctId { get; set; }
+    public string AcctId { get; set; } = string.Empty;
 
     [JsonPropertyName("conid")]
     public int ContractId { get; set; }
 
     [JsonPropertyName("contractDesc")]
-    public required string ContractDesciption { get; set; }
+    public string ContractDesciption { get; set; } = string.Empty;
 
     [JsonPropertyName("position")]
     public float PositionSize { get; set; }

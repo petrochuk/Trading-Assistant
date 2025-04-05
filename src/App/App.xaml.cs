@@ -48,6 +48,9 @@ public partial class App : Application
                    opt.AddSerilog(dispose: true, logger: Logger);
                });
 
+        // Views
+        serviceCollection.AddSingleton<MainWindow>();
+
         serviceCollection.AddInteractiveBrokers();
 
         AppCore.ServiceProvider.Build(serviceCollection);
@@ -59,7 +62,7 @@ public partial class App : Application
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        _window = new MainWindow();
+        _window = AppCore.ServiceProvider.Instance.GetRequiredService<MainWindow>();
         _window.Activate();
         _window.Closed += (s, e) => {
             _ibClient.Dispose();
