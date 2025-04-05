@@ -29,12 +29,8 @@ public class IBClient : IDisposable
         AutoReset = true,
         Enabled = true
     };
-    private readonly Requests.Tickle _tickleRequest = new();
+    private Requests.Tickle? _tickleRequest;
     private ILogger<IBClient> _logger;
-
-    #endregion
-
-    #region Constructors
 
     public IBClient(ILogger<IBClient> logger, string host = "localhost", int port = 5000) {
 
@@ -54,7 +50,7 @@ public class IBClient : IDisposable
 
         // Set up the tickle timer
         _tickleTimer.Elapsed += (s, args) => {
-            _tickleRequest.Execute(_httpClient);
+            _tickleRequest?.Execute(_httpClient);
         };
 
         // Initialize the main thread
@@ -70,12 +66,23 @@ public class IBClient : IDisposable
     #region Public Events
 
     /// <summary>
-    /// Connected event.
+    /// IB client connected event.
     /// </summary>
     public event EventHandler? OnConnected;
 
+    /// <summary>
+    /// On tickle event.
+    /// </summary>
+    public event EventHandler<TickleArgs>? OnTickle;
+
+    /// <summary>
+    /// On account connected event.
+    /// </summary>
     public event EventHandler<AccountConnectedArgs>? OnAccountConnected;
 
+    /// <summary>
+    /// On account positions event.
+    /// </summary>
     public event EventHandler<AccountPositionsArgs>? OnAccountPositions;
 
     #endregion
@@ -86,6 +93,9 @@ public class IBClient : IDisposable
     /// Connects to the IB client.
     /// </summary>
     public void Connect() {
+        // Initialize the tickle request
+        _tickleRequest = new Requests.Tickle(OnTickle);
+
         // Immediately send a tickle request to the IB client
         // which will test the connection
         _tickleRequest.Execute(_httpClient);

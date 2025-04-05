@@ -16,6 +16,7 @@ public sealed partial class MainWindow : Window
 
     private readonly ILogger<MainWindow> _logger;
     private string _accountId = string.Empty;
+    private string _ibClientSession = string.Empty;
 
     private System.Timers.Timer _positionsTimer = new(TimeSpan.FromMinutes(1)) {
         AutoReset = true,
@@ -50,6 +51,7 @@ public sealed partial class MainWindow : Window
 
         // Subscribe to client events
         App.Instance.IBClient.OnConnected += IBClient_Connected;
+        App.Instance.IBClient.OnTickle += IBClient_Tickle;
         App.Instance.IBClient.OnAccountConnected += IBClient_AccountConnected;
         App.Instance.IBClient.OnAccountPositions += IBClient_AccountPositions;
     }
@@ -111,6 +113,10 @@ public sealed partial class MainWindow : Window
             _positions.Reconcile(e.Positions);
             RiskGraphControl.Redraw();
         });
+    }
+
+    private void IBClient_Tickle(object? sender, TickleArgs e) {
+        _ibClientSession = e.Session;
     }
 
     #endregion

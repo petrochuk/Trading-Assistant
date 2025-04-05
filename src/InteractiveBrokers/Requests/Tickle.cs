@@ -5,9 +5,12 @@ namespace InteractiveBrokers.Requests;
 
 internal class Tickle : Request
 {
+    private EventHandler<Args.TickleArgs>? _responseHandler;
+
     [SetsRequiredMembers]
-    public Tickle() {
+    public Tickle(EventHandler<Args.TickleArgs>? responseHandler) {
         Uri = "tickle";
+        _responseHandler = responseHandler;
     }
 
     public override void Execute(HttpClient httpClient) {
@@ -31,5 +34,9 @@ internal class Tickle : Request
         if (!tickleResponse.IServer.AuthStatus.authenticated) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) not authenticated");
         }
+
+        _responseHandler?.Invoke(this, new Args.TickleArgs {
+            Session = tickleResponse.Session
+        });
     }
 }

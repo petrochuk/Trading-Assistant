@@ -9,9 +9,9 @@ internal class Accounts : Request
     EventHandler<AccountConnectedArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public Accounts(EventHandler<AccountConnectedArgs>? reresponseHandler) {
+    public Accounts(EventHandler<AccountConnectedArgs>? responseHandler) {
         Uri = "portfolio/accounts";
-        _responseHandler = reresponseHandler;
+        _responseHandler = responseHandler;
     }
 
     public override void Execute(HttpClient httpClient) {
