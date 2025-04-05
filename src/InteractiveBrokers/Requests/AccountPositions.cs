@@ -1,4 +1,5 @@
-﻿using InteractiveBrokers.Args;
+﻿using AppCore;
+using InteractiveBrokers.Args;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
@@ -25,9 +26,14 @@ internal class AccountPositions : Request
         if (string.IsNullOrWhiteSpace(responseContent)) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty account positions response");
         }
-        var positionsResponse = JsonSerializer.Deserialize<Responses.Position[]>(responseContent, JsonSerializerOptions);
+        var positionsResponse = JsonSerializer.Deserialize<List<Position>>(responseContent, JsonSerializerOptions);
         if (positionsResponse == null) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid accounts response");
         }
+
+        var args = new AccountPositionsArgs {
+            Positions = positionsResponse.ToDictionary(x => x.ContractId, x => x),
+        };
+        _responseHandler?.Invoke(this, args);
     }
 }

@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App", "App\App.csproj", "{6
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteractiveBrokers", "InteractiveBrokers\InteractiveBrokers.csproj", "{6C189466-BAE8-450C-AA40-BB20DF4A14A3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppCore", "AppCore\AppCore.csproj", "{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -61,6 +63,18 @@ Global
 		{6C189466-BAE8-450C-AA40-BB20DF4A14A3}.Release|x64.Build.0 = Release|Any CPU
 		{6C189466-BAE8-450C-AA40-BB20DF4A14A3}.Release|x86.ActiveCfg = Release|Any CPU
 		{6C189466-BAE8-450C-AA40-BB20DF4A14A3}.Release|x86.Build.0 = Release|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Debug|x64.Build.0 = Debug|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Debug|x86.Build.0 = Debug|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Release|ARM64.Build.0 = Release|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Release|x64.ActiveCfg = Release|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Release|x64.Build.0 = Release|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Release|x86.ActiveCfg = Release|Any CPU
+		{4F7D3596-26BE-4023-9825-9B1AD43DAFE2}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

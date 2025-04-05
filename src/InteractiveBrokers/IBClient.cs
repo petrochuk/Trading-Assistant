@@ -1,4 +1,6 @@
 ﻿using InteractiveBrokers.Args;
+using Microsoft.Extensions.Logging;
+using Serilog.Core;
 using System.Threading.Channels;
 
 namespace InteractiveBrokers;
@@ -28,13 +30,15 @@ public class IBClient : IDisposable
         Enabled = true
     };
     private readonly Requests.Tickle _tickleRequest = new();
+    private ILogger<IBClient> _logger;
 
     #endregion
 
     #region Constructors
 
-    public IBClient(string host = "localhost", int port = 5000) {
+    public IBClient(ILogger<IBClient> logger, string host = "localhost", int port = 5000) {
 
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _host = string.IsNullOrWhiteSpace(host) ? "localhost" : host;
         _port = port <= 0 ? 5000 : port;
 
@@ -121,15 +125,19 @@ public class IBClient : IDisposable
     #region Main Thread
 
     private void MainThread() {
+        _logger.LogInformation("Main thread started");
         while (_channel.Reader.WaitToReadAsync().AsTask().Result) {
             while (_channel.Reader.TryRead(out var request)) {
                 try {
+                    _logger.LogInformation($"Execute: {request.Uri}");
                     request.Execute(_httpClient);
                 }
-                catch (Exception) {
+                catch (Exception ex) {
+                    _logger.LogError(ex, $"Error executing request: {request.Uri}");
                 }
             }
         }
+        _logger.LogInformation("Main thread exiting");
     }
 
     #endregion

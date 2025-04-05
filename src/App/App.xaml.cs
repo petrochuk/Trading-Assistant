@@ -1,7 +1,8 @@
 ﻿using InteractiveBrokers;
-using Microsoft.UI.Windowing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
-using Windows.UI.Core.Preview;
+using Serilog;
 
 namespace TradingAssistant;
 
@@ -12,15 +13,44 @@ public partial class App : Application
 {
     private Window? _window;
 
-    private readonly IBClient _ibClient = new IBClient();
-
-    
+    private readonly IBClient _ibClient;
+   
     /// <summary>
     /// Initializes the singleton application object.
     /// </summary>
     public App()
     {
         InitializeComponent();
+
+        InitializeDI();
+
+        _ibClient = AppCore.ServiceProvider.Instance.GetRequiredService<IBClient>();
+    }
+
+    private void InitializeDI() {
+        var serviceCollection = new ServiceCollection();
+
+        // App configuration
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", false, true)
+#if DEBUG
+            .AddJsonFile("appsettings.Debug.json", true, true)
+#endif
+            .Build();
+
+        // Logging
+        var Logger = new LoggerConfiguration()
+            .ReadFrom.Configuration(configuration)
+            .CreateLogger();
+        serviceCollection.AddLogging(
+               opt => {
+                   opt.AddSerilog(dispose: true, logger: Logger);
+               });
+
+        serviceCollection.AddInteractiveBrokers();
+
+        AppCore.ServiceProvider.Build(serviceCollection);
     }
 
     /// <summary>

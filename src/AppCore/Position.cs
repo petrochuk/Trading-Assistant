@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text.Json.Serialization;
 
-namespace InteractiveBrokers.Responses;
+namespace AppCore;
 
 [DebuggerDisplay("{ContractDesciption} {PositionSize}")]
 public class Position
@@ -34,8 +34,8 @@ public class Position
     public string assetClass { get; set; }
     public int undConid { get; set; }
     public string model { get; set; }
-    public Incrementrule[] incrementRules { get; set; }
-    public Displayrule displayRule { get; set; }
+    public IncrementRule[] incrementRules { get; set; }
+    public DisplayRule displayRule { get; set; }
     public bool crossCurrency { get; set; }
     public int time { get; set; }
     public string allExchanges { get; set; }
@@ -56,22 +56,34 @@ public class Position
     public int pageSize { get; set; }
     public bool isUS { get; set; }
     public string underExchange { get; set; }
+
+    /// <summary>
+    /// Update the position with the values from another position.
+    /// </summary>
+    /// <param name="value">The position to update from.</param>
+    /// <exception cref="ArgumentNullException"></exception>
+    public void UpdateFrom(Position value) {
+        if (value == null) {
+            throw new ArgumentNullException(nameof(value));
+        }
+        PositionSize = value.PositionSize;
+    }
 }
 
-public class Displayrule
+public class DisplayRule
 {
     public int magnification { get; set; }
-    public Displayrulestep[] displayRuleStep { get; set; }
+    public DisplayRuleStep[] displayRuleStep { get; set; }
 }
 
-public class Displayrulestep
+public class DisplayRuleStep
 {
     public int decimalDigits { get; set; }
     public float lowerEdge { get; set; }
     public int wholeDigits { get; set; }
 }
 
-public class Incrementrule
+public class IncrementRule
 {
     public float lowerEdge { get; set; }
     public float increment { get; set; }

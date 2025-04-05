@@ -1,3 +1,4 @@
+using AppCore;
 using InteractiveBrokers.Args;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -17,6 +18,8 @@ public sealed partial class MainWindow : Window
         AutoReset = true,
         Enabled = true
     };
+
+    PositionsCollection _positions = new();
 
     #endregion
 
@@ -42,6 +45,7 @@ public sealed partial class MainWindow : Window
         // Subscribe to client events
         App.Instance.IBClient.OnConnected += IBClient_Connected;
         App.Instance.IBClient.OnAccountConnected += IBClient_AccountConnected;
+        App.Instance.IBClient.OnAccountPositions += IBClient_AccountPositions;
     }
 
     #endregion
@@ -68,6 +72,10 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    #endregion
+
+    #region IBClient Event Handlers
+
     private void IBClient_Connected(object? sender, EventArgs e) {
         // Change the button text to "Connected" on main thread
         DispatcherQueue.TryEnqueue(() => {
@@ -88,6 +96,12 @@ public sealed partial class MainWindow : Window
 
         // Request account positions
         App.Instance.IBClient.RequestAccountPositions(_accountId);
+    }
+
+    private void IBClient_AccountPositions(object? sender, AccountPositionsArgs e) {
+        DispatcherQueue?.TryEnqueue(() => {
+            _positions.Reconcile(e.Positions);
+        });
     }
 
     #endregion
