@@ -23,8 +23,17 @@ public class Position
     [JsonPropertyName("undSym")]
     public string UnderlyingSymbol { get; set; } = string.Empty;
 
-    public float mktPrice { get; set; }
-    public float mktValue { get; set; }
+    [JsonPropertyName("mktPrice")]
+    public float MarketPrice { get; set; }
+
+    [JsonPropertyName("mktValue")]
+    public float MarketValue { get; set; }
+
+    public float? Delta { get; set; }
+    public float? Gamma { get; set; }
+    public float? Vega { get; set; }
+    public float? Theta { get; set; }
+
     public string currency { get; set; }
     public float avgCost { get; set; }
     public float avgPrice { get; set; }
@@ -61,6 +70,10 @@ public class Position
     public bool isUS { get; set; }
     public string underExchange { get; set; }
 
+    #region Updates
+
+    private Lock _lock = new();
+
     /// <summary>
     /// Update the position with the values from another position.
     /// </summary>
@@ -70,8 +83,24 @@ public class Position
         if (value == null) {
             throw new ArgumentNullException(nameof(value));
         }
-        PositionSize = value.PositionSize;
+
+        lock (_lock) {
+            PositionSize = value.PositionSize;
+            MarketPrice = value.MarketPrice;
+            MarketValue = value.MarketValue;
+        }
     }
+
+    public void UpdateGreeks(float? delta, float? gamma, float? theta, float? vega) {
+        lock (_lock) {
+            Delta = delta;
+            Gamma = gamma;
+            Theta = theta;
+            Vega = vega;
+        }
+    }
+
+    #endregion
 }
 
 public class DisplayRule

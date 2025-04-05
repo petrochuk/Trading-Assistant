@@ -111,12 +111,14 @@ public sealed partial class MainWindow : Window
     private void IBClient_AccountPositions(object? sender, AccountPositionsArgs e) {
         DispatcherQueue?.TryEnqueue(() => {
             _positions.Reconcile(e.Positions);
+            App.Instance.IBWebSocket.RequestPositionMarketData(_positions);
             RiskGraphControl.Redraw();
         });
     }
 
     private void IBClient_Tickle(object? sender, TickleArgs e) {
         _ibClientSession = e.Session;
+        App.Instance.IBWebSocket.ClientSession = _ibClientSession;
     }
 
     #endregion

@@ -17,6 +17,7 @@ public partial class App : Application
     private Window? _window;
 
     private readonly IBClient _ibClient;
+    private readonly IBWebSocket _ibWebSocket;
     private readonly ILogger<App> _logger;
 
     /// <summary>
@@ -33,6 +34,7 @@ public partial class App : Application
         _logger.LogInformation("******* Application started *******");
 
         _ibClient = AppCore.ServiceProvider.Instance.GetRequiredService<IBClient>();
+        _ibWebSocket = AppCore.ServiceProvider.Instance.GetRequiredService<IBWebSocket>();
     }
 
     private void InitializeDI() {
@@ -78,6 +80,7 @@ public partial class App : Application
         _window.Activate();
         _window.Closed += (s, e) => {
             _logger.LogInformation("Main window closed");
+            _ibWebSocket.Dispose();
             _ibClient.Dispose();
         };
     }
@@ -85,6 +88,8 @@ public partial class App : Application
     #region Properties
 
     public IBClient IBClient => _ibClient;
+
+    public IBWebSocket IBWebSocket => _ibWebSocket;
 
     public static App Instance => (App)Current;
 

@@ -1,8 +1,10 @@
 ﻿
 
+using System.Collections.Concurrent;
+
 namespace AppCore;
 
-public class PositionsCollection : Dictionary<int, Position>
+public class PositionsCollection : ConcurrentDictionary<int, Position>
 {
     public SortedList<string, AssetClass> Underlyings { get; set; } = new();
 
@@ -12,7 +14,7 @@ public class PositionsCollection : Dictionary<int, Position>
         // Remove positions that are not in the new list
         foreach (var key in Keys.ToList()) {
             if (!positions.ContainsKey(key)) {
-                Remove(key);
+               TryRemove(key, out var _);
             }
         }
 
@@ -22,7 +24,7 @@ public class PositionsCollection : Dictionary<int, Position>
                 existingPosition.UpdateFrom(position.Value);
             }
             else {
-                Add(position.Key, position.Value);
+                TryAdd(position.Key, position.Value);
             }
         }
 

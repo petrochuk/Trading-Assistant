@@ -8,7 +8,8 @@ public static class IServiceCollectionExtension
     public static IServiceCollection AddInteractiveBrokers(this IServiceCollection services) {
 
         services
-            .AddSingleton<IBClient>();
+            .AddSingleton<IBClient>()
+            .AddSingleton<IBWebSocket>();
 
         return services;
     }
