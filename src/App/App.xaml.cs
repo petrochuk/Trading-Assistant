@@ -1,8 +1,11 @@
 ﻿using InteractiveBrokers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Serilog;
+using System.Diagnostics;
+using System.IO;
 
 namespace TradingAssistant;
 
@@ -14,7 +17,8 @@ public partial class App : Application
     private Window? _window;
 
     private readonly IBClient _ibClient;
-   
+    private readonly ILogger<App> _logger;
+
     /// <summary>
     /// Initializes the singleton application object.
     /// </summary>
@@ -23,6 +27,10 @@ public partial class App : Application
         InitializeComponent();
 
         InitializeDI();
+
+        _logger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<App>>();
+        _logger.LogInformation("");
+        _logger.LogInformation("******* Application started *******");
 
         _ibClient = AppCore.ServiceProvider.Instance.GetRequiredService<IBClient>();
     }
@@ -38,10 +46,12 @@ public partial class App : Application
             .AddJsonFile("appsettings.Debug.json", true, true)
 #endif
             .Build();
+        Serilog.Debugging.SelfLog.Enable(msg => Debug.WriteLine(msg));
 
         // Logging
         var Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(configuration)
+            .WriteTo.RollingFile(Path.Combine(AppContext.BaseDirectory, @"..\..\logs\{Date}.log"), shared: true)
             .CreateLogger();
         serviceCollection.AddLogging(
                opt => {
@@ -65,6 +75,7 @@ public partial class App : Application
         _window = AppCore.ServiceProvider.Instance.GetRequiredService<MainWindow>();
         _window.Activate();
         _window.Closed += (s, e) => {
+            _logger.LogInformation("Main window closed");
             _ibClient.Dispose();
         };
     }
