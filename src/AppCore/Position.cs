@@ -17,6 +17,12 @@ public class Position
     [JsonPropertyName("position")]
     public float PositionSize { get; set; }
 
+    [JsonPropertyName("assetClass")]
+    public AssetClass AssetClass { get; set; }
+
+    [JsonPropertyName("undSym")]
+    public string UnderlyingSymbol { get; set; } = string.Empty;
+
     public float mktPrice { get; set; }
     public float mktValue { get; set; }
     public string currency { get; set; }
@@ -31,7 +37,6 @@ public class Position
     public string strike { get; set; }
     public object exerciseStyle { get; set; }
     public object[] conExchMap { get; set; }
-    public string assetClass { get; set; }
     public int undConid { get; set; }
     public string model { get; set; }
     public IncrementRule[] incrementRules { get; set; }
@@ -49,7 +54,6 @@ public class Position
     public string ticker { get; set; }
     public string type { get; set; }
     public string undComp { get; set; }
-    public string undSym { get; set; }
     public bool hasOptions { get; set; }
     public string fullName { get; set; }
     public bool isEventContract { get; set; }

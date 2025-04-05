@@ -109,6 +109,7 @@ public sealed partial class MainWindow : Window
     private void IBClient_AccountPositions(object? sender, AccountPositionsArgs e) {
         DispatcherQueue?.TryEnqueue(() => {
             _positions.Reconcile(e.Positions);
+            RiskGraphControl.Redraw();
         });
     }
 

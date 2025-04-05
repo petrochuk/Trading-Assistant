@@ -10,7 +10,29 @@
     SizeChanged="OnSizeChanged"
     >
 
-    <Canvas x:Name="Canvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Visibility="Collapsed" Grid.Column="0" Grid.Row="0" Background="{ThemeResource CommandBarBackgroundOpen}" >
+            <CommandBar DefaultLabelPosition="Right" IsOpen="True" IsSticky="True" 
+                        Background="{ThemeResource CommandBarBackgroundOpen}"
+                        BorderBrush="{ThemeResource CommandBarBackgroundOpen}"
+                        HorizontalAlignment="Left"
+                >
+                <AppBarButton Label="Connect" x:Name="ConnectButton">
+                    <AppBarButton.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE703;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar>
+        </StackPanel>
+        <Canvas x:Name="Canvas" Grid.Column="0" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        </Canvas>
+    </Grid>
 
-    </Canvas>
 </UserControl>

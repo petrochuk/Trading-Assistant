@@ -46,7 +46,9 @@ public partial class App : Application
             .AddJsonFile("appsettings.Debug.json", true, true)
 #endif
             .Build();
-        Serilog.Debugging.SelfLog.Enable(msg => Debug.WriteLine(msg));
+
+        // Uncomment to enable SelfLog self diagnostics
+        // Serilog.Debugging.SelfLog.Enable(msg => Debug.WriteLine(msg));
 
         // Logging
         var Logger = new LoggerConfiguration()
