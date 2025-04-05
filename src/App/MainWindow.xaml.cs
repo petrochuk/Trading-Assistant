@@ -1,3 +1,4 @@
+using InteractiveBrokers.Args;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.UI.Popups;
@@ -9,6 +10,12 @@ namespace TradingAssistant;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    #region Fields
+
+    private string _accountId = string.Empty;
+
+    #endregion
+
     public MainWindow()
     {
         this.InitializeComponent();
@@ -17,12 +24,17 @@ public sealed partial class MainWindow : Window
 
         // Set the background color of the title bar to system color for current theme
         AppWindow.TitleBar.BackgroundColor = (Windows.UI.Color)App.Current.Resources["SystemAccentColorDark3"];
+
+        // Subscribe to client events
+        App.Instance.IBClient.Connected += IBClient_Connected;
+        App.Instance.IBClient.AccountConnected += IBClient_AccountConnected;
     }
 
     #region Event Handlers
 
     private async void Play_Click(object sender, RoutedEventArgs e) {
         try {
+            ConnectButton.IsEnabled = false;
             await App.Instance.IBClient.Connect();
         }
         catch (Exception ex) {
@@ -36,7 +48,27 @@ public sealed partial class MainWindow : Window
             };
 
             await contentDialog.ShowAsync();
+            ConnectButton.IsEnabled = true;
         }
+    }
+
+    private void IBClient_Connected(object? sender, EventArgs e) {
+        // Change the button text to "Connected" on main thread
+        DispatcherQueue.TryEnqueue(() => {
+            ConnectButton.IsEnabled = true;
+            ConnectButton.Label = "Connected";
+            ConnectButton.Icon = new FontIcon() {
+                Glyph = "\uF785", // DeliveryOptimization
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons"),
+            };
+
+            // Request accounts
+            App.Instance.IBClient.RequestAccounts();
+        });
+    }
+
+    private void IBClient_AccountConnected(object? sender, AccountConnectedArgs e) {
+        _accountId = e.AccountId;
     }
 
     #endregion

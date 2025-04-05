@@ -1,5 +1,7 @@
 ﻿using InteractiveBrokers;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Windows.UI.Core.Preview;
 
 namespace TradingAssistant;
 
@@ -29,6 +31,9 @@ public partial class App : Application
     {
         _window = new MainWindow();
         _window.Activate();
+        _window.Closed += (s, e) => {
+            _ibClient.Dispose();
+        };
     }
 
     #region Properties

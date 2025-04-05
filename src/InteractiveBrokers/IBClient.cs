@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using System.Reflection.PortableExecutable;
+using System.Text.Json;
+using System.Threading.Channels;
 
 namespace InteractiveBrokers;
 
@@ -11,6 +13,14 @@ public class IBClient : IDisposable
     private HttpClient _httpClient;
     private bool _isDisposed;
     private readonly Thread _mainThread;
+    private readonly Channel<Request> _channel = Channel.CreateUnbounded<Request>(
+        new UnboundedChannelOptions {
+            SingleReader = true,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false,
+        }
+    );
+
     private readonly JsonSerializerOptions _jsonSerializerOptions = new() {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
@@ -56,6 +66,17 @@ public class IBClient : IDisposable
 
     #endregion
 
+    #region Public Events
+
+    /// <summary>
+    /// Connected event.
+    /// </summary>
+    public event EventHandler? Connected;
+
+    public event EventHandler<Args.AccountConnectedArgs> AccountConnected;
+
+    #endregion
+
     #region Public Methods
 
     /// <summary>
@@ -73,9 +94,17 @@ public class IBClient : IDisposable
         if (!string.IsNullOrWhiteSpace(tickleResponse.Error)) {
             throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) response: {tickleResponse.Error}");
         }
-        if (tickleResponse.IServer == null || !tickleResponse.IServer.AuthStatus.connected) {
+        if (tickleResponse.IServer == null) {
+            throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) not connected to local server");
+        }
+        if (!tickleResponse.IServer.AuthStatus.connected) {
             throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) not connected");
         }
+        if (!tickleResponse.IServer.AuthStatus.authenticated) {
+            throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) not authenticated");
+        }
+
+        Connected?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -92,9 +121,60 @@ public class IBClient : IDisposable
 
     #endregion
 
+    #region Account management
+
+    public void RequestAccounts() {
+        var request = new Request {
+            Uri = "portfolio/accounts",
+        };
+
+        if(!_channel.Writer.TryWrite(request)) {
+            throw new IBClientException("Failed to request accounts");
+        }
+    }
+
+    #endregion
+
     #region Main Thread
 
     private void MainThread() {
+        while (_channel.Reader.WaitToReadAsync().AsTask().Result) {
+            while (_channel.Reader.TryRead(out var request)) {
+                try {
+                    switch (request.Uri) {
+                        case "portfolio/accounts":
+                            RequestAccountsInternal();
+                            break;
+                        default:
+                            throw new IBClientException($"Unknown request: {request.Uri}");
+                    }
+                }
+                catch (Exception) {
+                }
+            }
+        }
+    }
+
+    private void RequestAccountsInternal() {
+        var response = _httpClient.GetAsync("portfolio/accounts").ConfigureAwait(true).GetAwaiter().GetResult();
+        response.EnsureSuccessStatusCode();
+
+        var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
+        if (string.IsNullOrWhiteSpace(responseContent)) {
+            throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) provided empty accounts response");
+        }
+        var accountsResponse = JsonSerializer.Deserialize<Responses.Account[]>(responseContent, _jsonSerializerOptions);
+        if (accountsResponse == null) {
+            throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) provided invalid accounts response");
+        }
+        if (accountsResponse.Length != 1) {
+            throw new IBClientException($"IB Client ({_httpClient.BaseAddress}) provided {accountsResponse.Length} accounts response");
+        }
+        var accountsArgs = new Args.AccountConnectedArgs {
+            AccountId = accountsResponse[0].AccountId
+        };
+
+        AccountConnected?.Invoke(this, accountsArgs);
     }
 
     #endregion
@@ -104,6 +184,7 @@ public class IBClient : IDisposable
     protected virtual void Dispose(bool disposing) {
         if (!_isDisposed) {
             if (disposing) {
+                _channel.Writer.Complete();
                 _mainThread.Join();
                 _httpClient?.Dispose();
             }

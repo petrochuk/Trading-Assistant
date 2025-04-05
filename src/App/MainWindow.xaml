@@ -23,7 +23,11 @@
                         BorderBrush="{ThemeResource CommandBarBackgroundOpen}"
                         HorizontalAlignment="Left"
                 >
-                <AppBarButton Icon="Play" Label="Connect" Click="Play_Click" />
+                <AppBarButton Label="Connect" Click="Play_Click" x:Name="ConnectButton">
+                    <AppBarButton.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE703;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
             </CommandBar>
         </StackPanel>
     </Grid>
