@@ -14,6 +14,11 @@ public sealed partial class MainWindow : Window
 
     private string _accountId = string.Empty;
 
+    private System.Timers.Timer _positionsTimer = new(TimeSpan.FromMinutes(1)) {
+        AutoReset = true,
+        Enabled = true
+    };
+
     #endregion
 
     public MainWindow()
@@ -25,6 +30,14 @@ public sealed partial class MainWindow : Window
         // Set the background color of the title bar to system color for current theme
         AppWindow.TitleBar.BackgroundColor = (Windows.UI.Color)App.Current.Resources["SystemAccentColorDark3"];
 
+        _positionsTimer.Elapsed += (s, args) => {
+            if (string.IsNullOrWhiteSpace(_accountId)) {
+                return;
+            }
+            App.Instance.IBClient.RequestAccountPositions(_accountId);
+        };
+        _positionsTimer.Start();
+
         // Subscribe to client events
         App.Instance.IBClient.Connected += IBClient_Connected;
         App.Instance.IBClient.AccountConnected += IBClient_AccountConnected;
@@ -35,7 +48,7 @@ public sealed partial class MainWindow : Window
     private async void Play_Click(object sender, RoutedEventArgs e) {
         try {
             ConnectButton.IsEnabled = false;
-            await App.Instance.IBClient.Connect();
+            App.Instance.IBClient.Connect();
         }
         catch (Exception ex) {
             var contentDialog = new ContentDialog() {
@@ -67,8 +80,8 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    private void IBClient_AccountConnected(object? sender, AccountConnectedArgs e) {
-        _accountId = e.AccountId;
+    private void IBClient_AccountConnected(object? sender, EventArgs e) {
+        _accountId = ((AccountConnectedArgs)e).AccountId;
     }
 
     #endregion
