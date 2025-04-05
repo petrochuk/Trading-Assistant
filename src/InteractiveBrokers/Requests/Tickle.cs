@@ -6,7 +6,7 @@ namespace InteractiveBrokers.Requests;
 internal class Tickle : Request
 {
     [SetsRequiredMembers]
-    public Tickle() : base (null) {
+    public Tickle() {
         Uri = "tickle";
     }
 

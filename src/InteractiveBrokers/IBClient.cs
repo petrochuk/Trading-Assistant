@@ -1,8 +1,11 @@
-﻿using System.Text.Json;
+﻿using InteractiveBrokers.Args;
 using System.Threading.Channels;
 
 namespace InteractiveBrokers;
 
+/// <summary>
+/// Interactive Brokers Client. It handles the connection to the IB client portal API.
+/// </summary>
 public class IBClient : IDisposable
 {
     #region Fields
@@ -65,9 +68,11 @@ public class IBClient : IDisposable
     /// <summary>
     /// Connected event.
     /// </summary>
-    public event EventHandler? Connected;
+    public event EventHandler? OnConnected;
 
-    public event EventHandler? AccountConnected;
+    public event EventHandler<AccountConnectedArgs>? OnAccountConnected;
+
+    public event EventHandler<AccountPositionsArgs>? OnAccountPositions;
 
     #endregion
 
@@ -81,7 +86,7 @@ public class IBClient : IDisposable
         // which will test the connection
         _tickleRequest.Execute(_httpClient);
 
-        Connected?.Invoke(this, EventArgs.Empty);
+        OnConnected?.Invoke(this, EventArgs.Empty);
 
         // Start the tickle timer if connection is successful to keep the connection alive
         _tickleTimer.Start();
@@ -92,7 +97,7 @@ public class IBClient : IDisposable
     #region Account management
 
     public void RequestAccounts() {
-        var request = new Requests.Accounts(AccountConnected);
+        var request = new Requests.Accounts(OnAccountConnected);
 
         if(!_channel.Writer.TryWrite(request)) {
             throw new IBClientException("Failed to request accounts");
@@ -104,7 +109,7 @@ public class IBClient : IDisposable
             throw new IBClientException("Account ID cannot be null or empty");
         }
 
-        var request = new Requests.AccountPositions(account, null);
+        var request = new Requests.AccountPositions(account, OnAccountPositions);
 
         if(!_channel.Writer.TryWrite(request)) {
             throw new IBClientException("Failed to request accounts");

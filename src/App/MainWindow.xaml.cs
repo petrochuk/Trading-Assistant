@@ -1,7 +1,6 @@
 using InteractiveBrokers.Args;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Windows.UI.Popups;
 
 namespace TradingAssistant;
 
@@ -21,6 +20,8 @@ public sealed partial class MainWindow : Window
 
     #endregion
 
+    #region Constructors
+
     public MainWindow()
     {
         this.InitializeComponent();
@@ -39,9 +40,11 @@ public sealed partial class MainWindow : Window
         _positionsTimer.Start();
 
         // Subscribe to client events
-        App.Instance.IBClient.Connected += IBClient_Connected;
-        App.Instance.IBClient.AccountConnected += IBClient_AccountConnected;
+        App.Instance.IBClient.OnConnected += IBClient_Connected;
+        App.Instance.IBClient.OnAccountConnected += IBClient_AccountConnected;
     }
+
+    #endregion
 
     #region Event Handlers
 
@@ -80,8 +83,11 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    private void IBClient_AccountConnected(object? sender, EventArgs e) {
-        _accountId = ((AccountConnectedArgs)e).AccountId;
+    private void IBClient_AccountConnected(object? sender, AccountConnectedArgs e) {
+        _accountId = e.AccountId;
+
+        // Request account positions
+        App.Instance.IBClient.RequestAccountPositions(_accountId);
     }
 
     #endregion

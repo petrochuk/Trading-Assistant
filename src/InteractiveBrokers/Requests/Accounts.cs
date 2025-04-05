@@ -1,13 +1,17 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using InteractiveBrokers.Args;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace InteractiveBrokers.Requests;
 
 internal class Accounts : Request
 {
+    EventHandler<AccountConnectedArgs>? _responseHandler;
+
     [SetsRequiredMembers]
-    public Accounts(EventHandler? responseHandler) : base(responseHandler) {
+    public Accounts(EventHandler<AccountConnectedArgs>? reresponseHandler) {
         Uri = "portfolio/accounts";
+        _responseHandler = reresponseHandler;
     }
 
     public override void Execute(HttpClient httpClient) {

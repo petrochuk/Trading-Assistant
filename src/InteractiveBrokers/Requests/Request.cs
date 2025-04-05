@@ -10,10 +10,7 @@ internal abstract class Request
         AllowTrailingCommas = true
     };
 
-    protected readonly EventHandler? _responseHandler;
-
-    public Request(EventHandler? responseHandler) {
-        _responseHandler = responseHandler;
+    public Request() {
     }
 
     public required string Uri { get; set; }
