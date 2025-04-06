@@ -130,8 +130,10 @@ public sealed partial class RiskGraph : UserControl
             Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
             FontSize = 12,
         };
+        minText.Margin = new Thickness(minText.FontSize / 3);
+        minText.Measure(new Size(Double.PositiveInfinity, Double.PositiveInfinity));
         Canvas.SetLeft(minText, MapX(midPrice, minPrice, maxPrice));
-        Canvas.SetTop(minText, MapY(minPL, minPL, maxPL) - minText.FontSize * 2);
+        Canvas.SetTop(minText, MapY(minPL, minPL, maxPL) - minText.ActualHeight - minText.Margin.Top - minText.Margin.Bottom);
         Canvas.Children.Add(minText);
 
         var maxText = new TextBlock() {
@@ -139,6 +141,7 @@ public sealed partial class RiskGraph : UserControl
             Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
             FontSize = 12,
         };
+        maxText.Margin = new Thickness(maxText.FontSize / 3);
         Canvas.SetLeft(maxText, MapX(midPrice, minPrice, maxPrice));
         Canvas.SetTop(maxText, MapY(maxPL, minPL, maxPL));
         Canvas.Children.Add(maxText);
@@ -195,7 +198,7 @@ public sealed partial class RiskGraph : UserControl
                 }
                 else if (position.AssetClass == AssetClass.FutureOption ) {
                     // We need to add all values as delta changes from mid price
-                    if (position.Delta.HasValue) { 
+                    if (position.DeltaEstimator.HasValue) { 
                         var incrementDirection = currentPrice > midPrice ? 1 : -1;
                         var estimatedRange = Math.Abs(currentPrice - midPrice);
                         for (var deltaPrice = 0; deltaPrice < estimatedRange; deltaPrice += 1) {
