@@ -1,4 +1,7 @@
 using AppCore;
+using InteractiveBrokers;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -13,6 +16,7 @@ public sealed partial class RiskGraph : UserControl
 {
     #region Fields
 
+    private readonly ILogger<RiskGraph> _logger;
     private SortedList<TimeSpan, Brush> _riskIntervals = new ();
 
     DispatcherTimer _drawRiskTimer = new DispatcherTimer() {
@@ -25,6 +29,8 @@ public sealed partial class RiskGraph : UserControl
 
     public RiskGraph() {
         InitializeComponent();
+
+        _logger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<RiskGraph>>();
 
         _riskIntervals.Add(TimeSpan.FromMinutes(5), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
         /* TODO
@@ -90,6 +96,12 @@ public sealed partial class RiskGraph : UserControl
             riskCurves.Add(interval.Key, riskCurve);
         }
 
+        // Make min and max equal to each other
+        if (-maxPL < minPL)
+            minPL = -maxPL;
+        if (maxPL > -minPL)
+            maxPL = -minPL;
+
         // Now draw the risk curves
         foreach (var riskCurve in riskCurves) {
             var curve = riskCurve.Value;
@@ -131,9 +143,27 @@ public sealed partial class RiskGraph : UserControl
 
         var riskCurve = new RiskCurve();
 
+        // Estimate deltas with sigmoid function
+        foreach (var position in Positions!.Values) {
+            // Skip any positions that are not in the same underlying
+            if (position.UnderlyingSymbol != underlyingSymbol) {
+                continue;
+            }
+            else if (position.AssetClass == AssetClass.FutureOption) {
+                if (position.Delta.HasValue) {
+                    if (position.IsCall.Value)
+                        position.DeltaEstimator = (float)Math.Log((1 - position.Delta.Value) / position.Delta.Value) / (position.Strike.Value - midPrice);
+                    else
+                        position.DeltaEstimator = (float)Math.Log(1 / (1 + position.Delta.Value) - 1) / (position.Strike.Value - midPrice);
+                }
+                else {
+                    _logger.LogWarning($"Delta is not available for position {position.ContractDesciption}");
+                }
+            }
+        }
+
         // Go through the price range and calculate the P&L for each position
         for (var currentPrice = minPrice; currentPrice < maxPrice; currentPrice += priceIncrement) {
-
             var totalPL = 0f;
             foreach (var position in Positions!.Values) {
                 // Skip any positions that are not in the same underlying
@@ -145,6 +175,18 @@ public sealed partial class RiskGraph : UserControl
                     totalPL += position.PositionSize * (currentPrice - position.MarketPrice) * position.Multiplier.Value;
                 }
                 else if (position.AssetClass == AssetClass.FutureOption ) {
+                    // We need to add all values as delta changes from mid price
+                    if (position.Delta.HasValue) { 
+                        var incrementDirection = currentPrice > midPrice ? 1 : -1;
+                        var estimatedRange = Math.Abs(currentPrice - midPrice);
+                        for (var deltaPrice = 0; deltaPrice < estimatedRange; deltaPrice += 1) {
+                            var estimatedDelta = 1 / (1 + MathF.Exp(position.DeltaEstimator.Value * (position.Strike.Value - (midPrice + incrementDirection * deltaPrice))));
+                            if (!position.IsCall.Value) {
+                                estimatedDelta -= 1;
+                            }
+                            totalPL += estimatedDelta * incrementDirection * position.PositionSize * position.Multiplier.Value;
+                        }
+                    }
                 }
             }
             riskCurve.Add(currentPrice, totalPL);

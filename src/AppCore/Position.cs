@@ -34,15 +34,36 @@ public class Position
     public float? Multiplier { get; set; }
 
     [JsonPropertyName("strike")]
-    public JsonElement Strike { get; set; }
+    public JsonElement StrikeElement { get; set; }
+
+    private float? _strike = null;
+    [JsonIgnore]
+    public float? Strike => _strike;
 
     [JsonIgnore]
     public bool IsDataStreaming { get; set; } = false;
 
+    /// <summary>
+    /// Estimated delta with sigmoid function.
+    /// </summary>
+    [JsonIgnore]
+    public float? DeltaEstimator { get; set; }
+
+    [JsonIgnore]
     public float? Delta { get; set; }
+    [JsonIgnore]
     public float? Gamma { get; set; }
+    [JsonIgnore]
     public float? Vega { get; set; }
+    [JsonIgnore]
     public float? Theta { get; set; }
+
+    [JsonPropertyName("putOrCall")]
+    public string PutOrCall { get; set; }
+
+    bool? _isCall = null;
+    [JsonIgnore]
+    public bool? IsCall => _isCall;
 
     public string currency { get; set; }
     public float avgCost { get; set; }
@@ -51,7 +72,6 @@ public class Position
     public float unrealizedPnl { get; set; }
     public object exchs { get; set; }
     public string expiry { get; set; }
-    public string putOrCall { get; set; }
     public object exerciseStyle { get; set; }
     public object[] conExchMap { get; set; }
     public int undConid { get; set; }
@@ -106,6 +126,56 @@ public class Position
             Theta = theta;
             Vega = vega;
         }
+    }
+
+    public void PostParse() {
+        ParseStrike();
+
+        if (string.IsNullOrWhiteSpace(PutOrCall)) {
+            _isCall = null;
+        }
+        else if (PutOrCall.Equals("C", StringComparison.OrdinalIgnoreCase)) {
+            _isCall = true;
+        }
+        else if (PutOrCall.Equals("P", StringComparison.OrdinalIgnoreCase)) {
+            _isCall = false;
+        }
+        else {
+            _isCall = null;
+        }
+    }
+
+    private void ParseStrike() {
+        if (StrikeElement.ValueKind == JsonValueKind.Number) {
+            _strike = StrikeElement.GetSingle();
+            if (_strike != 0) {
+                return;
+            }
+        }
+        else if (StrikeElement.ValueKind == JsonValueKind.String) {
+            if (float.TryParse(StrikeElement.GetString(), out var strike) && strike != 0) {
+                _strike = strike;
+                return;
+            }
+        }
+
+        // Last resort, try to parse description
+        if (string.IsNullOrWhiteSpace(ContractDesciption)) {
+            _strike = null;
+            return;
+        }
+        var descriptionParts = ContractDesciption.Split(' ');
+        if (descriptionParts.Length < 3) {
+            _strike = null;
+            return;
+        }
+        if (float.TryParse(descriptionParts[2], out var strikeFromDesc) && strikeFromDesc != 0) {
+            _strike = strikeFromDesc;
+            return;
+        }
+
+        _strike = null;
+        return;
     }
 
     #endregion
