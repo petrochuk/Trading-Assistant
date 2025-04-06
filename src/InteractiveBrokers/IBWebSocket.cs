@@ -30,6 +30,15 @@ public class IBWebSocket : IDisposable
         MarketDataFields.Theta,
     };
     private string _optionFieldsString;
+    private List<MarketDataFields> _stockFields = new() {
+        MarketDataFields.LastPrice,
+        MarketDataFields.BidPrice,
+        MarketDataFields.AskPrice,
+        MarketDataFields.UnderlyingPrice,
+        MarketDataFields.MarketValue,
+        MarketDataFields.MarkPrice,
+    };
+    private string _stockFieldsString;
     private PositionsCollection? _positions;
 
     public IBWebSocket(ILogger<IBWebSocket> logger, string host = "localhost", int port = 5000) {
@@ -45,6 +54,7 @@ public class IBWebSocket : IDisposable
         };
 
         _optionFieldsString = string.Join("\",\"", _optionFields.Select(f => ((int)f).ToString()).ToArray());
+        _stockFieldsString = string.Join("\",\"", _stockFields.Select(f => ((int)f).ToString()).ToArray());
     }
 
     public string ClientSession { get; set; } = string.Empty;
@@ -58,8 +68,14 @@ public class IBWebSocket : IDisposable
             if (position.Value.AssetClass == AssetClass.Option || position.Value.AssetClass == AssetClass.FutureOption) {
                 // Request market data for options
                 var request = $@"smd+{position.Value.ContractId}+{{""fields"":[""{_optionFieldsString}""]}}";
-                _logger.LogInformation($"Requesting market data for option {position.Value.ContractDesciption}");
+                _logger.LogTrace($"Requesting market data for option {position.Value.ContractDesciption}");
 
+                _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
+            }
+            else if (position.Value.AssetClass == AssetClass.Stock || position.Value.AssetClass == AssetClass.Future) {
+                // Request market data for stocks and futures
+                var request = $@"smd+{position.Value.ContractId}+{{""fields"":[""{_stockFieldsString}""]}}";
+                _logger.LogTrace($"Requesting market data for stock {position.Value.ContractDesciption}");
                 _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
             }
         }
@@ -133,6 +149,9 @@ public class IBWebSocket : IDisposable
         _logger.LogInformation($"WebSocket thread finished");
     }
 
+    /// <summary>
+    /// Handles the data message received from Client Portal API.
+    /// </summary>
     private void HandleDataMessage(Dictionary<string, JsonElement> message) {
         if (_positions == null) {
             return;
@@ -152,7 +171,7 @@ public class IBWebSocket : IDisposable
         if (position.AssetClass == AssetClass.Option || position.AssetClass == AssetClass.FutureOption) {
             float? delta = null;
             if (!message.TryGetValue(((int)MarketDataFields.Delta).ToString(), out var deltaElement) || deltaElement.ValueKind != JsonValueKind.String) {
-                _logger.LogWarning($"Missing delta for {position.ContractDesciption}");
+                _logger.LogTrace($"Missing delta for {position.ContractDesciption}");
             }
             else {
                 delta = float.Parse(deltaElement.GetString()!);
@@ -160,7 +179,7 @@ public class IBWebSocket : IDisposable
 
             float? gamma = null;
             if (!message.TryGetValue(((int)MarketDataFields.Gamma).ToString(), out var gammaElement) || gammaElement.ValueKind != JsonValueKind.String) {
-                _logger.LogWarning($"Missing gamma for {position.ContractDesciption}");
+                _logger.LogTrace($"Missing gamma for {position.ContractDesciption}");
             }
             else {
                 gamma = float.Parse(gammaElement.GetString()!);
@@ -168,7 +187,7 @@ public class IBWebSocket : IDisposable
 
             float? theta = null;
             if (!message.TryGetValue(((int)MarketDataFields.Theta).ToString(), out var thetaElement) || thetaElement.ValueKind != JsonValueKind.String) {
-                _logger.LogWarning($"Missing theta for {position.ContractDesciption}");
+                _logger.LogTrace($"Missing theta for {position.ContractDesciption}");
             }
             else {
                 theta = float.Parse(thetaElement.GetString()!);
@@ -176,13 +195,16 @@ public class IBWebSocket : IDisposable
 
             float? vega = null;
             if (!message.TryGetValue(((int)MarketDataFields.Vega).ToString(), out var vegaElement) || vegaElement.ValueKind != JsonValueKind.String) {
-                _logger.LogWarning($"Missing vega for {position.ContractDesciption}");
+                _logger.LogTrace($"Missing vega for {position.ContractDesciption}");
             }
             else {
                 vega = float.Parse(vegaElement.GetString()!);
             }
 
             position.UpdateGreeks(delta, gamma, theta, vega);
+        }
+        else if (position.AssetClass == AssetClass.Stock || position.AssetClass == AssetClass.Future) {
+            // TODO
         }
     }
 

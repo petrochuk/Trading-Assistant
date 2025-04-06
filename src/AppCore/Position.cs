@@ -29,6 +29,9 @@ public class Position
     [JsonPropertyName("mktValue")]
     public float MarketValue { get; set; }
 
+    [JsonPropertyName("multiplier")]
+    public float? Multiplier { get; set; }
+
     public float? Delta { get; set; }
     public float? Gamma { get; set; }
     public float? Vega { get; set; }
@@ -42,7 +45,6 @@ public class Position
     public object exchs { get; set; }
     public string expiry { get; set; }
     public string putOrCall { get; set; }
-    public float multiplier { get; set; }
     public string strike { get; set; }
     public object exerciseStyle { get; set; }
     public object[] conExchMap { get; set; }

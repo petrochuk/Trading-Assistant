@@ -8,7 +8,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 {
     public SortedList<string, AssetClass> Underlyings { get; set; } = new();
 
-    public string DefaultUnderlying { get; set; } = string.Empty;
+    public Position? DefaultUnderlying { get; set; } = null;
 
     public void Reconcile(Dictionary<int, Position> positions) {
         // Remove positions that are not in the new list
@@ -37,7 +37,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 
         foreach (var position in Values) {
             if (position.AssetClass == AssetClass.Stock || position.AssetClass == AssetClass.Future ||
-                position.AssetClass == AssetClass.Option || position.AssetClass == AssetClass.FutureOption) { 
+                position.AssetClass == AssetClass.Option || position.AssetClass == AssetClass.FutureOption) {
+                if (position.AssetClass == AssetClass.Future) {
+                    DefaultUnderlying = position;
+                }
                 if (Underlyings.ContainsKey(position.UnderlyingSymbol)) {
                     continue;
                 }
@@ -47,7 +50,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                 }
                 else if (position.AssetClass == AssetClass.Future || position.AssetClass == AssetClass.FutureOption) {
                     Underlyings.Add(position.UnderlyingSymbol, AssetClass.Future);
-                    DefaultUnderlying = position.UnderlyingSymbol;
                 }
             }
         }
