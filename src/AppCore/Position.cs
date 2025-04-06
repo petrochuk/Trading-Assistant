@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace AppCore;
@@ -32,6 +33,12 @@ public class Position
     [JsonPropertyName("multiplier")]
     public float? Multiplier { get; set; }
 
+    [JsonPropertyName("strike")]
+    public JsonElement Strike { get; set; }
+
+    [JsonIgnore]
+    public bool IsDataStreaming { get; set; } = false;
+
     public float? Delta { get; set; }
     public float? Gamma { get; set; }
     public float? Vega { get; set; }
@@ -45,7 +52,6 @@ public class Position
     public object exchs { get; set; }
     public string expiry { get; set; }
     public string putOrCall { get; set; }
-    public string strike { get; set; }
     public object exerciseStyle { get; set; }
     public object[] conExchMap { get; set; }
     public int undConid { get; set; }

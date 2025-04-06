@@ -11,11 +11,17 @@ namespace TradingAssistant;
 
 public sealed partial class RiskGraph : UserControl
 {
+    #region Fields
+
     private SortedList<TimeSpan, Brush> _riskIntervals = new ();
 
     DispatcherTimer _drawRiskTimer = new DispatcherTimer() {
         Interval = TimeSpan.FromSeconds(15),
     };
+
+    #endregion
+
+    #region Constructors
 
     public RiskGraph() {
         InitializeComponent();
@@ -39,6 +45,8 @@ public sealed partial class RiskGraph : UserControl
         };
         _drawRiskTimer.Start();
     }
+
+    #endregion
 
     public PositionsCollection? Positions { get; set; }
 
@@ -128,12 +136,15 @@ public sealed partial class RiskGraph : UserControl
 
             var totalPL = 0f;
             foreach (var position in Positions!.Values) {
+                // Skip any positions that are not in the same underlying
+                if (position.UnderlyingSymbol != underlyingSymbol) {
+                    continue;
+                }
+
                 if (position.AssetClass == AssetClass.Future) {
-                    // Skip any positions that are not in the same underlying
-                    if (position.UnderlyingSymbol != underlyingSymbol) {
-                        continue;
-                    }
                     totalPL += position.PositionSize * (currentPrice - position.MarketPrice) * position.Multiplier.Value;
+                }
+                else if (position.AssetClass == AssetClass.FutureOption ) {
                 }
             }
             riskCurve.Add(currentPrice, totalPL);
