@@ -123,6 +123,25 @@ public sealed partial class RiskGraph : UserControl
             }
             Canvas.Children.Add(path);
         }
+
+        // Draw the min and max text
+        var minText = new TextBlock() {
+            Text = minPL.ToString("C"),
+            Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
+            FontSize = 12,
+        };
+        Canvas.SetLeft(minText, MapX(midPrice, minPrice, maxPrice));
+        Canvas.SetTop(minText, MapY(minPL, minPL, maxPL) - minText.FontSize * 2);
+        Canvas.Children.Add(minText);
+
+        var maxText = new TextBlock() {
+            Text = maxPL.ToString("C"),
+            Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
+            FontSize = 12,
+        };
+        Canvas.SetLeft(maxText, MapX(midPrice, minPrice, maxPrice));
+        Canvas.SetTop(maxText, MapY(maxPL, minPL, maxPL));
+        Canvas.Children.Add(maxText);
     }
 
     private double MapX(float value, float min, float max) {
