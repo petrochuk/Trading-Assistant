@@ -65,6 +65,9 @@ public class Position
     [JsonIgnore]
     public bool? IsCall => _isCall;
 
+    [JsonIgnore]
+    public float Beta { get; set; } = 1;
+
     public string currency { get; set; }
     public float avgCost { get; set; }
     public float avgPrice { get; set; }

@@ -22,6 +22,7 @@ public class IBWebSocket : IDisposable
         MarketDataFields.BidPrice,
         MarketDataFields.AskPrice,
         MarketDataFields.UnderlyingPrice,
+        MarketDataFields.Beta,
         MarketDataFields.MarketValue,
         MarketDataFields.MarkPrice,
         MarketDataFields.Delta,
@@ -35,6 +36,7 @@ public class IBWebSocket : IDisposable
         MarketDataFields.BidPrice,
         MarketDataFields.AskPrice,
         MarketDataFields.UnderlyingPrice,
+        MarketDataFields.Beta,
         MarketDataFields.MarketValue,
         MarketDataFields.MarkPrice,
     };
@@ -184,6 +186,16 @@ public class IBWebSocket : IDisposable
         if (!_positions.TryGetValue(contractId, out var position)) {
             _logger.LogWarning($"Position with contract ID {contractId} not found");
             return;
+        }
+
+        // Beta
+        if (message.TryGetValue(((int)MarketDataFields.Beta).ToString(), out var betaElement) && betaElement.ValueKind == JsonValueKind.String) {
+            if (float.TryParse(betaElement.GetString(), out var beta)) {
+                position.Beta = beta;
+            }
+            else {
+                _logger.LogError($"Invalid beta value for {position.ContractDesciption}");
+            }
         }
 
         // Update greeks for options
