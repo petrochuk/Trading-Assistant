@@ -99,7 +99,7 @@ public sealed partial class RiskGraph : UserControl
         // Make min and max equal to each other
         if (-maxPL < minPL)
             minPL = -maxPL;
-        if (maxPL > -minPL)
+        if (maxPL < -minPL)
             maxPL = -minPL;
 
         // Now draw the risk curves

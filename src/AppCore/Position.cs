@@ -124,10 +124,10 @@ public class Position
 
     public void UpdateGreeks(float? delta, float? gamma, float? theta, float? vega) {
         lock (_lock) {
-            Delta = delta;
-            Gamma = gamma;
-            Theta = theta;
-            Vega = vega;
+            Delta = delta ?? Delta;
+            Gamma = gamma ?? Gamma;
+            Theta = theta ?? Theta;
+            Vega = vega ?? Vega;
         }
     }
 
