@@ -23,15 +23,16 @@ public sealed partial class MainWindow : Window
         Enabled = true
     };
 
-    PositionsCollection _positions = new();
+    private readonly PositionsCollection _positions;
 
     #endregion
 
     #region Constructors
 
-    public MainWindow(ILogger<MainWindow> logger)
+    public MainWindow(ILogger<MainWindow> logger, PositionsCollection positions)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _positions = positions ?? throw new ArgumentNullException(nameof(positions));
 
         InitializeComponent();
 

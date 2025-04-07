@@ -1,4 +1,5 @@
-﻿using InteractiveBrokers;
+﻿using AppCore;
+using InteractiveBrokers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -66,6 +67,7 @@ public partial class App : Application
         serviceCollection.AddSingleton<MainWindow>();
 
         serviceCollection.AddInteractiveBrokers();
+        serviceCollection.AddAppCore();
 
         AppCore.ServiceProvider.Build(serviceCollection);
     }
