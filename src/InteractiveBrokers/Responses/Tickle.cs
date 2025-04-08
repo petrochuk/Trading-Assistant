@@ -4,7 +4,7 @@ public class Tickle
 {
     public string Session { get; set; } = string.Empty;
     public HMDS? HMDS { get; set; }
-    public IServer? IServer { get; set; }
+    public IBServer? IServer { get; set; }
     public long lastTickle { get; set; }
     public int ssoExpires { get; set; }
     public bool Collission { get; set; }
@@ -17,7 +17,7 @@ public class HMDS
     public string? Error { get; set; }
 }
 
-public class IServer
+public class IBServer
 {
     public AuthStatus AuthStatus { get; set; }
 }

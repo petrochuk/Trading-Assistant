@@ -102,7 +102,7 @@ public class IBWebSocket : IDisposable
 
                     try {
                         var messageString = Encoding.ASCII.GetString(buffer, 0, result.Count);
-                        var message = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(messageString);
+                        var message = JsonSerializer.Deserialize(messageString, SourceGeneratorContext.Default.DictionaryStringJsonElement);
                         if (message == null) {
                             _logger.LogError($"Invalid message received: {messageString}");
                             continue;
@@ -198,6 +198,12 @@ public class IBWebSocket : IDisposable
             }
         }
 
+        if (message.TryGetValue(((int)MarketDataFields.MarkPrice).ToString(), out var markElement) && markElement.ValueKind == JsonValueKind.String) {
+            if (!string.IsNullOrWhiteSpace(markElement.GetString()) && float.TryParse(markElement.GetString(), out var markPrice)) {
+                position.MarketPrice = markPrice;
+            }
+        }
+
         // Update greeks for options
         if (position.AssetClass == AssetClass.Option || position.AssetClass == AssetClass.FutureOption) {
             float? delta = null;
@@ -235,7 +241,6 @@ public class IBWebSocket : IDisposable
             position.UpdateGreeks(delta, gamma, theta, vega);
         }
         else if (position.AssetClass == AssetClass.Stock || position.AssetClass == AssetClass.Future) {
-            // TODO
         }
     }
 

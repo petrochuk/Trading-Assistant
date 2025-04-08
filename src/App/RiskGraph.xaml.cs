@@ -61,14 +61,20 @@ public sealed partial class RiskGraph : UserControl
     }
 
     public void Redraw() {
-        Canvas.Children.Clear();
-        DrawBackground();
 
-        if (Positions == null || !Positions.Any()) {
-            return;
+        try {
+            Canvas.Children.Clear();
+            DrawBackground();
+
+            if (Positions == null || !Positions.Any()) {
+                return;
+            }
+
+            DrawRiskIntervals();
         }
-
-        DrawRiskIntervals();
+        catch (Exception ex) {
+            _logger.LogError(ex, "Error drawing risk graph");
+        }
     }
 
     private void DrawRiskIntervals() {
@@ -124,7 +130,11 @@ public sealed partial class RiskGraph : UserControl
             Canvas.Children.Add(path);
         }
 
-        // Draw the min and max text
+        DrawLabels(midPrice, minPrice, maxPrice, maxPL, minPL);
+    }
+
+    private void DrawLabels(float midPrice, float minPrice, float maxPrice, float maxPL, float minPL) {
+        // Draw the min
         var minText = new TextBlock() {
             Text = minPL.ToString("C"),
             Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
@@ -136,6 +146,19 @@ public sealed partial class RiskGraph : UserControl
         Canvas.SetTop(minText, MapY(minPL, minPL, maxPL) - minText.ActualHeight - minText.Margin.Top - minText.Margin.Bottom);
         Canvas.Children.Add(minText);
 
+        // Draw the mid
+        var midText = new TextBlock() {
+            Text = midPrice.ToString("N2"),
+            Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
+            FontSize = 12,
+        };
+        midText.Margin = new Thickness(midText.FontSize / 3);
+        midText.Measure(new Size(Double.PositiveInfinity, Double.PositiveInfinity));
+        Canvas.SetLeft(midText, MapX(midPrice, minPrice, maxPrice));
+        Canvas.SetTop(midText, MapY(0, minPL, maxPL));
+        Canvas.Children.Add(midText);
+
+        // Draw the max
         var maxText = new TextBlock() {
             Text = maxPL.ToString("C"),
             Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],

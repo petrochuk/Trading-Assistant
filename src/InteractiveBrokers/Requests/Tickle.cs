@@ -18,7 +18,7 @@ internal class Tickle : Request
         response.EnsureSuccessStatusCode();
 
         var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
-        var tickleResponse = JsonSerializer.Deserialize<Responses.Tickle>(responseContent, JsonSerializerOptions);
+        var tickleResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.Tickle);
         if (tickleResponse == null) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid response");
         }

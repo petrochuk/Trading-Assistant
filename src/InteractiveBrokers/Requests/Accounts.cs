@@ -22,12 +22,12 @@ internal class Accounts : Request
         if (string.IsNullOrWhiteSpace(responseContent)) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty accounts response");
         }
-        var accountsResponse = JsonSerializer.Deserialize<Responses.Account[]>(responseContent, JsonSerializerOptions);
+        var accountsResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.ListAccount);
         if (accountsResponse == null) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid accounts response");
         }
-        if (accountsResponse.Length != 1) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {accountsResponse.Length} accounts response");
+        if (accountsResponse.Count != 1) {
+            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {accountsResponse.Count} accounts response");
         }
         var accountsArgs = new Args.AccountConnectedArgs {
             AccountId = accountsResponse[0].AccountId

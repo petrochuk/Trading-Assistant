@@ -4,12 +4,6 @@ namespace InteractiveBrokers.Requests;
 
 internal abstract class Request
 {
-    protected static readonly JsonSerializerOptions JsonSerializerOptions = new() {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-        AllowTrailingCommas = true
-    };
-
     public Request() {
     }
 

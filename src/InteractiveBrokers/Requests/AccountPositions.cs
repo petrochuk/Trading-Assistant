@@ -26,7 +26,7 @@ internal class AccountPositions : Request
         if (string.IsNullOrWhiteSpace(responseContent)) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty account positions response");
         }
-        var positionsResponse = JsonSerializer.Deserialize<List<Position>>(responseContent, JsonSerializerOptions);
+        var positionsResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.ListPosition);
         if (positionsResponse == null) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid accounts response");
         }
