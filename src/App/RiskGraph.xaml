@@ -18,19 +18,23 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <StackPanel Visibility="Collapsed" Grid.Column="0" Grid.Row="0" Background="{ThemeResource CommandBarBackgroundOpen}" >
-            <CommandBar DefaultLabelPosition="Right" IsOpen="True" IsSticky="True" 
-                        Background="{ThemeResource CommandBarBackgroundOpen}"
-                        BorderBrush="{ThemeResource CommandBarBackgroundOpen}"
-                        HorizontalAlignment="Left"
-                >
-                <AppBarButton Label="Connect" x:Name="ConnectButton">
-                    <AppBarButton.Icon>
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE703;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-            </CommandBar>
-        </StackPanel>
+        <Grid Grid.Column="0" Grid.Row="0" Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Grid.Row="0" Text="Delta" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="0" Grid.Row="1" Text="-" x:Name="DeltaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="1" Grid.Row="0" Text="Vega" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="1" Grid.Row="1" Text="-" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="2" Grid.Row="0" Text="Theta" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="2" Grid.Row="1" Text="-" x:Name="ThetaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+        </Grid>
         <Canvas x:Name="Canvas" Grid.Column="0" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
         </Canvas>
     </Grid>

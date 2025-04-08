@@ -17,10 +17,10 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Grid.Row="0" Background="{ThemeResource CommandBarBackgroundOpen}" >
+        <StackPanel Grid.Column="0" Grid.Row="0" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}" >
             <CommandBar DefaultLabelPosition="Right" IsOpen="True" IsSticky="True" 
-                        Background="{ThemeResource CommandBarBackgroundOpen}"
-                        BorderBrush="{ThemeResource CommandBarBackgroundOpen}"
+                        Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                        BorderBrush="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
                         HorizontalAlignment="Left"
                 >
                 <AppBarButton Label="Connect" Click="Play_Click" x:Name="ConnectButton">
