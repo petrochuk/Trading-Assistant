@@ -15,7 +15,7 @@ internal class Accounts : Request
     }
 
     public override void Execute(HttpClient httpClient) {
-        var response = httpClient.GetAsync("portfolio/accounts").ConfigureAwait(true).GetAwaiter().GetResult();
+        var response = httpClient.GetAsync(Uri).ConfigureAwait(true).GetAwaiter().GetResult();
         response.EnsureSuccessStatusCode();
 
         var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();

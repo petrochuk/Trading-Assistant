@@ -34,8 +34,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="Trading-Assistant (Package)"
-        Description="Trading-Assistant (Package)"
+        DisplayName="Trading Assistant"
+        Description="Interactive Brokers Trading Assistant"
         BackgroundColor="transparent"
         Square150x150Logo="Images\Square150x150Logo.png"
         Square44x44Logo="Images\Square44x44Logo.png">

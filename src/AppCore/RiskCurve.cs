@@ -22,5 +22,7 @@ public class RiskCurve
     public float MaxPL => _maxPL;
     public float MinPL => _minPL;
 
+    public string Name { get; set; } = string.Empty;
+
     public SortedList<float, float> Points => _points;
 }

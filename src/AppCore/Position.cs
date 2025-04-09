@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -68,19 +69,23 @@ public class Position
     [JsonIgnore]
     public float Beta { get; set; } = 1;
 
+    [JsonPropertyName("expiry")]
+    public string ExpiryString { get; set; } = string.Empty;
+
+    private DateTime? _expiration;
+    [JsonIgnore]
+    public DateTime? Expiration => _expiration;
+
     public string currency { get; set; }
     public float avgCost { get; set; }
     public float avgPrice { get; set; }
     public float realizedPnl { get; set; }
     public float unrealizedPnl { get; set; }
     public object exchs { get; set; }
-    public string expiry { get; set; }
     public object exerciseStyle { get; set; }
     public object[] conExchMap { get; set; }
     public int undConid { get; set; }
     public string model { get; set; }
-    public IncrementRule[] incrementRules { get; set; }
-    public DisplayRule displayRule { get; set; }
     public bool crossCurrency { get; set; }
     public int time { get; set; }
     public string allExchanges { get; set; }
@@ -105,6 +110,21 @@ public class Position
 
     private Lock _lock = new();
 
+    public Position() {
+    }
+
+    public Position(Contract contract) {
+        _ = contract ?? throw new ArgumentNullException(nameof(contract));
+
+        ContractId = contract.ContractId;
+        UnderlyingSymbol = contract.Symbol;
+        AssetClass = contract.AssetClass;
+        PositionSize = 0;
+        _expiration = contract.Expiration;
+        ContractDesciption = contract.ToString();
+        Multiplier = contract.Multiplier;
+    }
+
     /// <summary>
     /// Update the position with the values from another position.
     /// </summary>
@@ -119,6 +139,8 @@ public class Position
             PositionSize = value.PositionSize;
             MarketPrice = value.MarketPrice;
             MarketValue = value.MarketValue;
+            if (!string.IsNullOrWhiteSpace(ExpiryString))
+                _expiration = DateTime.ParseExact(ExpiryString, "yyyyMMdd", CultureInfo.InvariantCulture);
         }
     }
 
@@ -182,23 +204,4 @@ public class Position
     }
 
     #endregion
-}
-
-public class DisplayRule
-{
-    public int magnification { get; set; }
-    public DisplayRuleStep[] displayRuleStep { get; set; }
-}
-
-public class DisplayRuleStep
-{
-    public int decimalDigits { get; set; }
-    public float lowerEdge { get; set; }
-    public int wholeDigits { get; set; }
-}
-
-public class IncrementRule
-{
-    public float lowerEdge { get; set; }
-    public float increment { get; set; }
 }

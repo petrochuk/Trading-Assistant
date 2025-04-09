@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 
 namespace TradingAssistant;
 
@@ -55,6 +56,8 @@ public sealed partial class MainWindow : Window
         App.Instance.IBClient.OnTickle += IBClient_Tickle;
         App.Instance.IBClient.OnAccountConnected += IBClient_AccountConnected;
         App.Instance.IBClient.OnAccountPositions += IBClient_AccountPositions;
+        App.Instance.IBClient.OnContractFound += IBClient_OnContractFound;
+        App.Instance.IBClient.OnContractDetails += IBClient_OnContractDetails;
     }
 
     #endregion
@@ -112,10 +115,26 @@ public sealed partial class MainWindow : Window
     private void IBClient_AccountPositions(object? sender, AccountPositionsArgs e) {
         DispatcherQueue?.TryEnqueue(() => {
             _positions.Reconcile(e.Positions);
+            // Make sure we have positions for each underlying
+            foreach (var underlying in _positions.Underlyings.Values) {
+                if (underlying.Position == null) {
+                    App.Instance.IBClient.FindContract(underlying.Contract);
+                }
+            }
+
             App.Instance.IBWebSocket.RequestPositionMarketData(_positions);
             RiskGraphControl.Redraw();
         });
     }
+
+    private void IBClient_OnContractFound(object? sender, ContractFoundArgs e) {
+        App.Instance.IBClient.RequestContractDetails(e.Contract.ContractId);
+    }
+
+    private void IBClient_OnContractDetails(object? sender, ContractDetailsArgs e) {
+        _positions.AddPosition(e.Contract);
+    }
+
 
     private void IBClient_Tickle(object? sender, TickleArgs e) {
         _ibClientSession = e.Session;

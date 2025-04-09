@@ -1,4 +1,5 @@
-﻿using InteractiveBrokers.Args;
+﻿using AppCore;
+using InteractiveBrokers.Args;
 using Microsoft.Extensions.Logging;
 using Serilog.Core;
 using System.Threading.Channels;
@@ -85,6 +86,16 @@ public class IBClient : IDisposable
     /// </summary>
     public event EventHandler<AccountPositionsArgs>? OnAccountPositions;
 
+    /// <summary>
+    /// On contract found event.
+    /// </summary>
+    public event EventHandler<ContractFoundArgs>? OnContractFound;
+
+    /// <summary>
+    /// On contract details event.
+    /// </summary>
+    public event EventHandler<ContractDetailsArgs>? OnContractDetails;
+
     #endregion
 
     #region Public Methods
@@ -128,7 +139,29 @@ public class IBClient : IDisposable
 
         _logger.LogInformation($"Requesting account positions for account {account}");
         if (!_channel.Writer.TryWrite(request)) {
-            throw new IBClientException("Failed to request accounts");
+            throw new IBClientException("Failed to request account accounts");
+        }
+    }
+
+    #endregion
+
+    #region Contract management
+
+    public void FindContract(Contract contract) {
+        var request = new Requests.FindContract(contract, OnContractFound);
+
+        _logger.LogInformation($"Looking for {contract}");
+        if (!_channel.Writer.TryWrite(request)) {
+            throw new IBClientException($"Failed to find {contract}");
+        }
+    }
+    
+    public void RequestContractDetails(int contractId) {
+        var request = new Requests.RequestContractDetails(contractId, OnContractDetails);
+
+        _logger.LogInformation($"Requesting {contractId} details");
+        if (!_channel.Writer.TryWrite(request)) {
+            throw new IBClientException("Failed to request contract details");
         }
     }
 
