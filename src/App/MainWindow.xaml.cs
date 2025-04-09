@@ -132,7 +132,10 @@ public sealed partial class MainWindow : Window
     }
 
     private void IBClient_OnContractDetails(object? sender, ContractDetailsArgs e) {
-        _positions.AddPosition(e.Contract);
+        var position = _positions.AddPosition(e.Contract);
+        if (position != null) {
+            App.Instance.IBWebSocket.RequestPositionMarketData(position);
+        }
     }
 
 

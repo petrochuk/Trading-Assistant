@@ -67,12 +67,17 @@ public class IBWebSocket : IDisposable
         EnsureSocketConnected();
     }
 
+    public void RequestPositionMarketData(Position position) {
+        EnsureSocketConnected();
+
+        RequestMarketData(position);
+    }
+
     private void EnsureSocketConnected() {
-        if (_mainThread.IsAlive) {
-            return;
+        if (!_mainThread.IsAlive) {
+            // Start the main thread if it yet started
+            _mainThread.Start();
         }
-        // Restart the main thread if it is not alive
-        _mainThread.Start();
         _connectedEvent.WaitOne();
     }
 
@@ -89,7 +94,6 @@ public class IBWebSocket : IDisposable
                 // Connect to the WebSocket server
                 _logger.LogInformation($"Connecting to WebSocket server at {_uri}...");
                 _clientWebSocket.ConnectAsync(_uri, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
-                _connectedEvent.Set();
 
                 var buffer = new byte[65536];
                 while (_clientWebSocket.State == WebSocketState.Open) {
@@ -144,29 +148,34 @@ public class IBWebSocket : IDisposable
     private void HandleSystemMessage(Dictionary<string, JsonElement> message) {
         if (message.TryGetValue("success", out var successElement)) {
             _logger.LogInformation($"success message: {successElement.GetString()}");
+            _connectedEvent.Set();
             if (_positions != null) {
                 _logger.LogInformation($"Requesting market data for {_positions.Count} positions");
                 foreach (var position in _positions) {
-                    if (position.Value.IsDataStreaming) {
-                        continue;
-                    }
-
-                    position.Value.IsDataStreaming = true;
-                    if (position.Value.AssetClass == AssetClass.Option || position.Value.AssetClass == AssetClass.FutureOption) {
-                        // Request market data for options
-                        var request = $@"smd+{position.Value.ContractId}+{{""fields"":[""{_optionFieldsString}""]}}";
-                        _logger.LogTrace($"Requesting market data for option {position.Value.ContractDesciption}");
-
-                        _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
-                    }
-                    else if (position.Value.AssetClass == AssetClass.Stock || position.Value.AssetClass == AssetClass.Future) {
-                        // Request market data for stocks and futures
-                        var request = $@"smd+{position.Value.ContractId}+{{""fields"":[""{_stockFieldsString}""]}}";
-                        _logger.LogTrace($"Requesting market data for stock {position.Value.ContractDesciption}");
-                        _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
-                    }
+                    RequestMarketData(position.Value);
                 }
             }
+        }
+    }
+
+    private void RequestMarketData(Position position) {
+        if (position.IsDataStreaming) {
+            return;
+        }
+
+        position.IsDataStreaming = true;
+        if (position.AssetClass == AssetClass.Option || position.AssetClass == AssetClass.FutureOption) {
+            // Request market data for options
+            var request = $@"smd+{position.ContractId}+{{""fields"":[""{_optionFieldsString}""]}}";
+            _logger.LogTrace($"Requesting market data for option {position.ContractDesciption}");
+
+            _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
+        }
+        else if (position.AssetClass == AssetClass.Stock || position.AssetClass == AssetClass.Future) {
+            // Request market data for stocks and futures
+            var request = $@"smd+{position.ContractId}+{{""fields"":[""{_stockFieldsString}""]}}";
+            _logger.LogTrace($"Requesting market data for stock {position.ContractDesciption}");
+            _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
     }
 

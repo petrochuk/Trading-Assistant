@@ -116,8 +116,14 @@ public sealed partial class RiskGraph : UserControl
             return;
         }
 
+
         // First calculate the risk curves for each interval
         var midPrice = Positions.DefaultUnderlying.MarketPrice;
+        if (midPrice == 0) {
+            _logger.LogTrace("No market price available for underlying");
+            return;
+        }
+
         var underlyingSymbol = Positions.DefaultUnderlying.UnderlyingSymbol;
         var minPrice = midPrice * 0.95f;
         var maxPrice = midPrice * 1.05f;

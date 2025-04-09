@@ -30,12 +30,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
             // Add or update positions from the new list
             foreach (var positionKV in positions) {
                 if (TryGetValue(positionKV.Key, out var existingPosition)) {
-                    if (positionKV.Value.PositionSize == 0) {
-                        RemovePosition(positionKV.Key);
-                        continue;
-                    }
-                    else
-                        existingPosition.UpdateFrom(positionKV.Value);
+                    existingPosition.UpdateFrom(positionKV.Value);
                 }
                 else {
                     if (positionKV.Value.PositionSize == 0) {
@@ -52,15 +47,18 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
         }
     }
 
-    public void AddPosition(Contract contract) {
+    public Position? AddPosition(Contract contract) {
         lock (_lock) {
             if (ContainsKey(contract.ContractId)) {
                 _logger.LogTrace($"Position {contract} already exists");
-                return;
+                return null;
             }
             var position = new Position(contract);
             TryAdd(contract.ContractId, position);
             _logger.LogInformation($"Added empty position for {contract}");
+            DefaultUnderlying = position;
+
+            return position;
         }
     }
 
@@ -110,6 +108,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                                 };
                             }
                         }
+                        DefaultUnderlying = position;
                     }
                     break;
                 case AssetClass.FutureOption:
