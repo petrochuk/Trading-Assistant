@@ -15,6 +15,8 @@ internal class FindContract : Request
     [SetsRequiredMembers]
     public FindContract(Contract contract, EventHandler<ContractFoundArgs>? responseHandler) {
         _ = contract ?? throw new ArgumentNullException(nameof(contract));
+        if (string.IsNullOrWhiteSpace(contract.Symbol))
+            throw new ArgumentNullException(nameof(contract.Symbol), "Contract symbol cannot be null or empty");
 
         if (contract.AssetClass == AssetClass.Stock) {
             Uri = $"trsrv/stocks?symbols={contract.Symbol}";

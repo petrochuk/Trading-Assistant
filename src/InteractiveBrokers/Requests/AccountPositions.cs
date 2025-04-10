@@ -36,7 +36,10 @@ internal class AccountPositions : Request
         }
 
         var args = new AccountPositionsArgs {
-            Positions = positionsResponse.ToDictionary(x => x.ContractId, x => x),
+            // Filter out positions with no symbol
+            Positions = positionsResponse
+                .Where(x => !string.IsNullOrWhiteSpace(x.UnderlyingSymbol) || x.PositionSize == 0)
+                .ToDictionary(x => x.ContractId, x => x),
         };
 
         _responseHandler?.Invoke(this, args);

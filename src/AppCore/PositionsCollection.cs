@@ -23,7 +23,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
             // Remove positions that are not in the new list
             foreach (var contractId in Keys.ToList()) {
                 if (!positions.ContainsKey(contractId)) {
-                    RemovePosition(contractId);
+                    if (contractId != DefaultUnderlying?.ContractId) {
+                        RemovePosition(contractId);
+                    }
                 }
             }
 
