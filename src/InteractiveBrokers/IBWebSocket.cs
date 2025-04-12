@@ -74,7 +74,7 @@ public class IBWebSocket : IDisposable
     }
 
     private void EnsureSocketConnected() {
-        if (!_mainThread.IsAlive) {
+        if (_mainThread.ThreadState.HasFlag(ThreadState.Unstarted)) {
             // Start the main thread if it yet started
             _mainThread.Start();
         }

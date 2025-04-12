@@ -1,5 +1,6 @@
 ﻿using AppCore;
 using InteractiveBrokers.Args;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
@@ -38,9 +39,14 @@ internal class AccountPositions : Request
         var args = new AccountPositionsArgs {
             // Filter out positions with no symbol
             Positions = positionsResponse
-                .Where(x => !string.IsNullOrWhiteSpace(x.UnderlyingSymbol) || x.PositionSize == 0)
+                .Where(x => !string.IsNullOrWhiteSpace(x.UnderlyingSymbol) && x.PositionSize != 0)
                 .ToDictionary(x => x.ContractId, x => x),
         };
+
+        // Sometimes IBKR returns an empty list of positions. Ignore this case.
+        if (args.Positions.Count == 0) {
+            return;
+        }
 
         _responseHandler?.Invoke(this, args);
     }

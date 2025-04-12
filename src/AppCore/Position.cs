@@ -189,7 +189,7 @@ public class Position
             _strike = null;
             return;
         }
-        var descriptionParts = ContractDesciption.Split(' ');
+        var descriptionParts = ContractDesciption.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (descriptionParts.Length < 3) {
             _strike = null;
             return;
