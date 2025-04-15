@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window
         // Set the background color of the title bar to system color for current theme
         AppWindow.TitleBar.BackgroundColor = (Windows.UI.Color)App.Current.Resources["SystemAccentColorDark3"];
 
+        _positions.OnPositionAdded += OnPositionAdded;
         _positionsTimer.Elapsed += (s, args) => {
             if (string.IsNullOrWhiteSpace(_accountId)) {
                 return;
@@ -62,7 +63,7 @@ public sealed partial class MainWindow : Window
 
     #endregion
 
-    #region Event Handlers
+    #region UX Event Handlers
 
     private async void Play_Click(object sender, RoutedEventArgs e) {
         try {
@@ -86,6 +87,15 @@ public sealed partial class MainWindow : Window
     }
 
     #endregion
+
+    #region Positions Event Handlers
+
+    private void OnPositionAdded(object? sender, Position position) {
+        App.Instance.IBWebSocket.RequestPositionMarketData(position);
+    }
+
+    #endregion
+
 
     #region IBClient Event Handlers
 

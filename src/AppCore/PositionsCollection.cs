@@ -1,22 +1,38 @@
-﻿
-
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
 namespace AppCore;
 
 public class PositionsCollection : ConcurrentDictionary<int, Position>
 {
+    #region Fields
+
     private readonly ILogger<PositionsCollection> _logger;
     private readonly Lock _lock = new();
+
+    #endregion
+
+    #region Constructors
 
     public PositionsCollection(ILogger<PositionsCollection> logger) {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    #endregion
+
+    #region Events
+
+    public event EventHandler<Position>? OnPositionAdded;
+
+    #endregion
+
+    #region Properties
+
     public SortedList<string, (Contract Contract, Position? Position)> Underlyings { get; set; } = new();
 
     public Position? DefaultUnderlying { get; set; } = null;
+
+    #endregion
 
     public void Reconcile(Dictionary<int, Position> positions) {
         lock (_lock) { 
@@ -39,8 +55,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                         _logger.LogTrace($"Skipping position {positionKV.Value.ContractDesciption} with size 0");
                         continue;
                     }
-                    TryAdd(positionKV.Key, positionKV.Value);
-                    _logger.LogInformation($"Added {positionKV.Value.PositionSize} position {positionKV.Value.ContractDesciption}");
+                    if (TryAdd(positionKV.Key, positionKV.Value)) {
+                        _logger.LogInformation($"Added {positionKV.Value.PositionSize} position {positionKV.Value.ContractDesciption}");
+                        OnPositionAdded?.Invoke(this, positionKV.Value);
+                    }
                 }
             }
 
