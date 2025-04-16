@@ -22,6 +22,8 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Responses.Account))]
 [JsonSerializable(typeof(Responses.AccountParent))]
 [JsonSerializable(typeof(Dictionary<string, JsonElement>))]
+[JsonSerializable(typeof(Args.AccountSummaryArgs))]
+[JsonSerializable(typeof(Args.SummaryLine))]
 internal partial class SourceGeneratorContext : JsonSerializerContext
 {
 

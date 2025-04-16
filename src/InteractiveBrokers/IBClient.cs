@@ -1,5 +1,6 @@
 ﻿using AppCore;
 using InteractiveBrokers.Args;
+using InteractiveBrokers.Responses;
 using Microsoft.Extensions.Logging;
 using Serilog.Core;
 using System.Threading.Channels;
@@ -87,6 +88,11 @@ public class IBClient : IDisposable
     public event EventHandler<AccountPositionsArgs>? OnAccountPositions;
 
     /// <summary>
+    /// On account summary event.
+    /// </summary>
+    public event EventHandler<AccountSummaryArgs>? OnAccountSummary;
+
+    /// <summary>
     /// On contract found event.
     /// </summary>
     public event EventHandler<ContractFoundArgs>? OnContractFound;
@@ -132,7 +138,7 @@ public class IBClient : IDisposable
 
     public void RequestAccountPositions(string account) {
         if (string.IsNullOrWhiteSpace(account)) {
-            throw new IBClientException("Account ID cannot be null or empty");
+            throw new IBClientException("Account cannot be null or empty");
         }
 
         var request = new Requests.AccountPositions(account, OnAccountPositions);
@@ -140,6 +146,19 @@ public class IBClient : IDisposable
         _logger.LogInformation($"Requesting account positions for account {account}");
         if (!_channel.Writer.TryWrite(request)) {
             throw new IBClientException("Failed to request account accounts");
+        }
+    }
+
+    public void RequestAccountSummary(string account) {
+        if (string.IsNullOrWhiteSpace(account)) {
+            throw new IBClientException("Account cannot be null or empty");
+        }
+
+        var request = new Requests.AccountSummary(account, OnAccountSummary);
+
+        _logger.LogInformation($"Requesting account summary for account {account}");
+        if (!_channel.Writer.TryWrite(request)) {
+            throw new IBClientException("Failed to request account summary");
         }
     }
 

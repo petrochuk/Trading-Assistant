@@ -1,10 +1,8 @@
 using AppCore;
 using InteractiveBrokers.Args;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Documents;
 
 namespace TradingAssistant;
 
@@ -20,6 +18,10 @@ public sealed partial class MainWindow : Window
     private string _ibClientSession = string.Empty;
 
     private System.Timers.Timer _positionsTimer = new(TimeSpan.FromMinutes(1)) {
+        AutoReset = true,
+        Enabled = true
+    };
+    private System.Timers.Timer _accountSummaryTimer = new(TimeSpan.FromMinutes(1)) {
         AutoReset = true,
         Enabled = true
     };
@@ -50,6 +52,12 @@ public sealed partial class MainWindow : Window
             App.Instance.IBClient.RequestAccountPositions(_accountId);
         };
         _positionsTimer.Start();
+        _accountSummaryTimer.Elapsed += (s, args) => {
+            if (string.IsNullOrWhiteSpace(_accountId)) {
+                return;
+            }
+            App.Instance.IBClient.RequestAccountSummary(_accountId);
+        };
         RiskGraphControl.Positions = _positions;
 
         // Subscribe to client events

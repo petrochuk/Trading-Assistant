@@ -1,6 +1,4 @@
-﻿using AppCore;
-using InteractiveBrokers.Args;
-using System.Diagnostics;
+﻿using InteractiveBrokers.Args;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
