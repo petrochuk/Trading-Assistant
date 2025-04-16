@@ -32,10 +32,6 @@ internal class AccountPositions : Request
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid accounts response");
         }
 
-        foreach (var position in positionsResponse) {
-            position.PostParse();
-        }
-
         var args = new AccountPositionsArgs {
             // Filter out positions with no symbol
             Positions = positionsResponse

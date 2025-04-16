@@ -34,6 +34,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 
     #endregion
 
+    #region Methods
+
     public void Reconcile(Dictionary<int, Position> positions) {
         lock (_lock) { 
             // Remove positions that are not in the new list
@@ -146,4 +148,55 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
             }
         }
     }
+
+    public Greeks CalculateGreeks() {
+        var greeks = new Greeks();
+
+        lock (_lock) {
+            foreach (var position in Values) {
+                if (position.UnderlyingSymbol != DefaultUnderlying?.UnderlyingSymbol) {
+                    continue;
+                }
+                if (position.AssetClass == AssetClass.Future || position.AssetClass == AssetClass.Stock) {
+                    greeks.Delta += position.PositionSize;
+                }
+                else if (position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option) {
+                    if (position.Delta.HasValue) {
+                        greeks.Delta += position.Delta.Value * position.PositionSize;
+                    }
+                    if (position.Delta.HasValue && position.Theta.HasValue && position.MarketPrice != 0) {
+                        var absTheta = MathF.Abs(position.Theta.Value);
+                        if (position.MarketPrice < absTheta)
+                            absTheta = position.MarketPrice;
+                        if (-0.5f < position.Delta.Value && position.Delta.Value < 0.5f)
+                            greeks.Charm -= position.Delta.Value * (absTheta / position.MarketPrice) * position.PositionSize;
+                        else {
+                            var intrinsicValue = position.IsCall.Value ? DefaultUnderlying.MarketPrice - position.Strike.Value : position.Strike.Value - DefaultUnderlying.MarketPrice;
+                            if (intrinsicValue < 0)
+                                intrinsicValue = 0;
+                            var extrinsicValue = position.MarketPrice - intrinsicValue;
+                            if (extrinsicValue < 0)
+                                extrinsicValue = 0;
+                            if (extrinsicValue < absTheta)
+                                absTheta = extrinsicValue;
+
+                            greeks.Charm += ((position.IsCall.Value ? 1f : -1f) - position.Delta.Value) * (absTheta / extrinsicValue) * position.PositionSize;
+                        }
+                    }
+                    if (position.Gamma.HasValue) {
+                        greeks.Gamma += position.Gamma.Value * position.PositionSize;
+                    }
+                    if (position.Theta.HasValue) {
+                        greeks.Theta += position.Theta.Value * position.PositionSize * position.Multiplier.Value;
+                    }
+                    if (position.Vega.HasValue) {
+                        greeks.Vega += position.Vega.Value * position.PositionSize;
+                    }
+                }
+            }
+        }
+
+        return greeks;
+    }
+    #endregion
 }

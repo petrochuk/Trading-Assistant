@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace AppCore;
 
 [DebuggerDisplay("{ContractDesciption} {PositionSize}")]
-public class Position
+public class Position : IJsonOnDeserialized
 {
     public string AcctId { get; set; } = string.Empty;
 
@@ -113,6 +113,31 @@ public class Position
     public Position() {
     }
 
+    /// <summary>
+    /// Create a new option position.
+    /// </summary>
+    public Position(string underlyingSymbol,
+        AssetClass assetClass, bool isCall, float strike, float multiplier) {
+        if (string.IsNullOrWhiteSpace(underlyingSymbol)) {
+            throw new ArgumentNullException(nameof(underlyingSymbol), "Underlying symbol is required.");
+        }
+        if (assetClass != AssetClass.FutureOption && assetClass != AssetClass.Option) {
+            throw new ArgumentOutOfRangeException(nameof(assetClass), $"Asset class {assetClass} is not a valid option asset class.");
+        }
+        if (strike <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(strike), $"Strike {strike} is not a valid option strike.");
+        }
+        if (multiplier <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(multiplier), $"Multiplier {multiplier} is not a valid option multiplier.");
+        }
+
+        UnderlyingSymbol = underlyingSymbol;
+        AssetClass = assetClass;
+        _isCall = isCall;
+        _strike = strike;
+        Multiplier = multiplier;
+    }
+
     public Position(Contract contract) {
         _ = contract ?? throw new ArgumentNullException(nameof(contract));
 
@@ -146,15 +171,23 @@ public class Position
 
     public void UpdateGreeks(float? delta, float? gamma, float? theta, float? vega) {
         lock (_lock) {
-            Delta = delta ?? Delta;
+            if (delta != null) { 
+                if (IsCall!.Value && delta < 0 || !IsCall!.Value && delta > 0)
+                    throw new ArgumentOutOfRangeException(nameof(delta), $"Delta {delta} is not in the expected range for the option type iscall: {IsCall!.Value}");
+                Delta = delta;
+            }
             Gamma = gamma ?? Gamma;
             Theta = theta ?? Theta;
             Vega = vega ?? Vega;
         }
     }
 
-    public void PostParse() {
+    void IJsonOnDeserialized.OnDeserialized() {
         ParseStrike();
+        ParsePutOrCall();
+    }
+
+    public void ParsePutOrCall() {
 
         if (string.IsNullOrWhiteSpace(PutOrCall)) {
             _isCall = null;

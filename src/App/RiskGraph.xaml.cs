@@ -79,36 +79,12 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void UpdateGreeks() {
-        var delta = 0f;
-        var gamma = 0f;
-        var theta = 0f;
-        var vega = 0f;
 
-        foreach (var position in Positions!.Values) {
-            if (position.UnderlyingSymbol != Positions.DefaultUnderlying?.UnderlyingSymbol) {
-                continue;
-            }
-            if (position.AssetClass == AssetClass.Future || position.AssetClass == AssetClass.Stock) {
-                delta += position.PositionSize;
-            }
-            else if (position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option) {
-                if (position.Delta.HasValue) {
-                    delta += position.Delta.Value * position.PositionSize;
-                }
-                if (position.Gamma.HasValue) {
-                    gamma += position.Gamma.Value * position.PositionSize;
-                }
-                if (position.Theta.HasValue) {
-                    theta += position.Theta.Value * position.PositionSize * position.Multiplier.Value;
-                }
-                if (position.Vega.HasValue) {
-                    vega += position.Vega.Value * position.PositionSize;
-                }
-            }
-        }
+        var greeks = Positions!.CalculateGreeks();
 
-        DeltaText.Text = $"{delta.ToString("N2")}";
-        ThetaText.Text = $"{theta.ToString("N2")}";
+        DeltaText.Text = $"{greeks.Delta.ToString("N2")}";
+        CharmText.Text = $"{greeks.Charm.ToString("N2")}";
+        ThetaText.Text = $"{greeks.Theta.ToString("N2")}";
     }
 
     private void DrawRiskIntervals() {
