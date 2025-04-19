@@ -2,12 +2,13 @@
 
 public class Account
 {
-    public required string Id { get; set; }
-    public required string AccountId { get; set; }
+    public required string Id { get; init; }
+    public required string AccountId { get; init; }
+    public required string DisplayName { get; init; }
+
     public bool brokerageAccess { get; set; }
     public string accountVan { get; set; }
     public string accountTitle { get; set; }
-    public string displayName { get; set; }
     public object accountAlias { get; set; }
     public long accountStatus { get; set; }
     public string currency { get; set; }

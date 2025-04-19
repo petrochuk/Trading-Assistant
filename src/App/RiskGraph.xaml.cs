@@ -1,4 +1,5 @@
 using AppCore;
+using AppCore.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
@@ -55,6 +56,8 @@ public sealed partial class RiskGraph : UserControl
 
     public PositionsCollection? Positions { get; set; }
 
+    public Account? Account { get; set; }
+
     private void OnSizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs e) {
         Redraw();
     }
@@ -84,14 +87,15 @@ public sealed partial class RiskGraph : UserControl
 
         DeltaText.Text = $"{greeks.Delta.ToString("N2")}";
         CharmText.Text = $"{greeks.Charm.ToString("N2")}";
-        ThetaText.Text = $"{greeks.Theta.ToString("N2")}";
+        if (Account != null && Account.NetLiquidationValue != 0) {
+            ThetaText.Text = $"{greeks.Theta / Account.NetLiquidationValue:P2}";
+        }
     }
 
     private void DrawRiskIntervals() {
         if (Positions == null || Positions.DefaultUnderlying == null) {
             return;
         }
-
 
         // First calculate the risk curves for each interval
         var midPrice = Positions.DefaultUnderlying.MarketPrice;
@@ -151,16 +155,18 @@ public sealed partial class RiskGraph : UserControl
 
     private void DrawLabels(float midPrice, float minPrice, float maxPrice, float maxPL, float minPL) {
         // Draw the min
-        var minText = new TextBlock() {
-            Text = minPL.ToString("C"),
-            Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
-            FontSize = 12,
-        };
-        minText.Margin = new Thickness(minText.FontSize / 3);
-        minText.Measure(new Size(Double.PositiveInfinity, Double.PositiveInfinity));
-        Canvas.SetLeft(minText, MapX(midPrice, minPrice, maxPrice));
-        Canvas.SetTop(minText, MapY(minPL, minPL, maxPL) - minText.ActualHeight - minText.Margin.Top - minText.Margin.Bottom);
-        Canvas.Children.Add(minText);
+        if (Account != null && Account.NetLiquidationValue != 0) {
+            var minText = new TextBlock() {
+                Text = (minPL / Account.NetLiquidationValue).ToString("P2"),
+                Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
+                FontSize = 12,
+            };
+            minText.Margin = new Thickness(minText.FontSize / 3);
+            minText.Measure(new Size(Double.PositiveInfinity, Double.PositiveInfinity));
+            Canvas.SetLeft(minText, MapX(midPrice, minPrice, maxPrice));
+            Canvas.SetTop(minText, MapY(minPL, minPL, maxPL) - minText.ActualHeight - minText.Margin.Top - minText.Margin.Bottom);
+            Canvas.Children.Add(minText);
+        }
 
         // Draw the mid
         var midText = new TextBlock() {
@@ -175,28 +181,30 @@ public sealed partial class RiskGraph : UserControl
         Canvas.Children.Add(midText);
 
         // Draw the max
-        var maxText = new TextBlock() {
-            Text = maxPL.ToString("C"),
-            Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
-            FontSize = 12,
-        };
-        maxText.Margin = new Thickness(maxText.FontSize / 3);
-        Canvas.SetLeft(maxText, MapX(midPrice, minPrice, maxPrice));
-        Canvas.SetTop(maxText, MapY(maxPL, minPL, maxPL));
-        Canvas.Children.Add(maxText);
+        if (Account != null && Account.NetLiquidationValue != 0) {
+            var maxText = new TextBlock() {
+                Text = (maxPL / Account.NetLiquidationValue).ToString("P2"),
+                Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
+                FontSize = 12,
+            };
+            maxText.Margin = new Thickness(maxText.FontSize / 3);
+            Canvas.SetLeft(maxText, MapX(midPrice, minPrice, maxPrice));
+            Canvas.SetTop(maxText, MapY(maxPL, minPL, maxPL));
+            Canvas.Children.Add(maxText);
+        }
     }
 
     private double MapX(float value, float min, float max) {
         // Map the value to the width of the canvas
         var range = max - min;
-        var mappedValue = (value - min) / range * ActualWidth;
+        var mappedValue = (value - min) / range * Canvas.ActualWidth;
         return mappedValue;
     }
 
     private double MapY(float value, float min, float max) {
         // Map the value to the height of the canvas
         var range = max - min;
-        var mappedValue = (max - value) / range * ActualHeight;
+        var mappedValue = (max - value) / range * Canvas.ActualHeight;
         return mappedValue;
     }
 
@@ -260,7 +268,7 @@ public sealed partial class RiskGraph : UserControl
         var topRect = new Rectangle() {
             Fill = (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"],
             Width = ActualWidth,
-            Height = MidPixel(ActualHeight),
+            Height = MidPixel(Canvas.ActualHeight),
             VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Bottom,
         };
         Canvas.SetLeft(topRect, 0);
@@ -270,11 +278,11 @@ public sealed partial class RiskGraph : UserControl
         var bottomRect = new Rectangle() {
             Fill = (Brush)App.Current.Resources["SystemFillColorCriticalBackgroundBrush"],
             Width = ActualWidth,
-            Height = MidPixel(ActualHeight),
+            Height = MidPixel(Canvas.ActualHeight),
             VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Bottom,
         };
         Canvas.SetLeft(bottomRect, 0);
-        Canvas.SetTop(bottomRect, MidPixel(ActualHeight));
+        Canvas.SetTop(bottomRect, MidPixel(Canvas.ActualHeight));
         Canvas.Children.Add(bottomRect);
 
         var midLine = new Line() {
@@ -283,7 +291,7 @@ public sealed partial class RiskGraph : UserControl
             X1 = MidPixel(ActualWidth),
             X2 = MidPixel(ActualWidth),
             Y1 = 0,
-            Y2 = ActualHeight,
+            Y2 = Canvas.ActualHeight,
         };
         Canvas.Children.Add(midLine);
     }

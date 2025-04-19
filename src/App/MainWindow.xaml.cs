@@ -1,4 +1,5 @@
 using AppCore;
+using AppCore.Models;
 using InteractiveBrokers.Args;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
@@ -14,14 +15,10 @@ public sealed partial class MainWindow : Window
     #region Fields
 
     private readonly ILogger<MainWindow> _logger;
-    private string _accountId = string.Empty;
+    private Account? _account = null;
     private string _ibClientSession = string.Empty;
 
     private System.Timers.Timer _positionsTimer = new(TimeSpan.FromMinutes(1)) {
-        AutoReset = true,
-        Enabled = true
-    };
-    private System.Timers.Timer _accountSummaryTimer = new(TimeSpan.FromMinutes(1)) {
         AutoReset = true,
         Enabled = true
     };
@@ -46,18 +43,13 @@ public sealed partial class MainWindow : Window
 
         _positions.OnPositionAdded += OnPositionAdded;
         _positionsTimer.Elapsed += (s, args) => {
-            if (string.IsNullOrWhiteSpace(_accountId)) {
+            if (_account == null) {
                 return;
             }
-            App.Instance.IBClient.RequestAccountPositions(_accountId);
+            App.Instance.IBClient.RequestAccountPositions(_account.Id);
+            App.Instance.IBClient.RequestAccountSummary(_account.Id);
         };
         _positionsTimer.Start();
-        _accountSummaryTimer.Elapsed += (s, args) => {
-            if (string.IsNullOrWhiteSpace(_accountId)) {
-                return;
-            }
-            App.Instance.IBClient.RequestAccountSummary(_accountId);
-        };
         RiskGraphControl.Positions = _positions;
 
         // Subscribe to client events
@@ -65,6 +57,7 @@ public sealed partial class MainWindow : Window
         App.Instance.IBClient.OnTickle += IBClient_Tickle;
         App.Instance.IBClient.OnAccountConnected += IBClient_AccountConnected;
         App.Instance.IBClient.OnAccountPositions += IBClient_AccountPositions;
+        App.Instance.IBClient.OnAccountSummary += IBClient_AccountSummary;
         App.Instance.IBClient.OnContractFound += IBClient_OnContractFound;
         App.Instance.IBClient.OnContractDetails += IBClient_OnContractDetails;
     }
@@ -104,7 +97,6 @@ public sealed partial class MainWindow : Window
 
     #endregion
 
-
     #region IBClient Event Handlers
 
     private void IBClient_Connected(object? sender, EventArgs e) {
@@ -124,10 +116,32 @@ public sealed partial class MainWindow : Window
     }
 
     private void IBClient_AccountConnected(object? sender, AccountConnectedArgs e) {
-        _accountId = e.AccountId;
+        if (_account == null || _account.Id != e.Account.Id) {
+            if (_account != null) {
+                _logger.LogInformation($"Account changed from {_account.Id} to {e.Account.Id}");
+            }
+            _account = new Account() {
+                Id = e.Account.Id,
+                Name = e.Account.DisplayName,
+            };
+            RiskGraphControl.Account = _account;
+        }
 
-        // Request account positions
-        App.Instance.IBClient.RequestAccountPositions(_accountId);
+        // Request account positions and summary
+        App.Instance.IBClient.RequestAccountPositions(_account.Id);
+        App.Instance.IBClient.RequestAccountSummary(_account.Id);
+    }
+
+    private void IBClient_AccountSummary(object? sender, AccountSummaryArgs e) {
+        if (_account == null || _account.Id != e.accountcode.Value) {
+            _logger.LogInformation($"Summary for account {e.accountcode.Value} not found");
+            return;
+        }
+
+        _account.NetLiquidationValue = e.NetLiquidation.Amount;
+        DispatcherQueue?.TryEnqueue(() => {
+            RiskGraphControl.Redraw();
+        });
     }
 
     private void IBClient_AccountPositions(object? sender, AccountPositionsArgs e) {
@@ -155,7 +169,6 @@ public sealed partial class MainWindow : Window
             App.Instance.IBWebSocket.RequestPositionMarketData(position);
         }
     }
-
 
     private void IBClient_Tickle(object? sender, TickleArgs e) {
         _ibClientSession = e.Session;

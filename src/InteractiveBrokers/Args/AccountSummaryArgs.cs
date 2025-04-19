@@ -156,11 +156,11 @@ public class AccountSummaryArgs : EventArgs
     [JsonPropertyName("maintmarginreq-s")]
     public SummaryLine maintmarginreqs { get; set; }
 
-    public SummaryLine netliquidation { get; set; }
+    public required SummaryLine NetLiquidation { get; init; }
     [JsonPropertyName("netliquidation-c")]
-    public SummaryLine netliquidationc { get; set; }
+    public required SummaryLine NetLiquidationC { get; init; }
     [JsonPropertyName("netliquidation-s")]
-    public SummaryLine netliquidations { get; set; }
+    public required SummaryLine NetLiquidationS { get; init; }
 
     public SummaryLine netliquidationuncertainty { get; set; }
     public SummaryLine nlvandmargininreview { get; set; }

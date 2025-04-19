@@ -9,6 +9,8 @@ namespace InteractiveBrokers;
 
 public class IBWebSocket : IDisposable
 {
+    #region Fields
+
     private readonly string _host;
     private readonly int _port;
     private readonly Uri _uri;
@@ -43,6 +45,10 @@ public class IBWebSocket : IDisposable
     private string _stockFieldsString;
     private PositionsCollection? _positions;
 
+    #endregion
+
+    #region Constructors
+
     public IBWebSocket(ILogger<IBWebSocket> logger, string host = "localhost", int port = 5000) {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _host = string.IsNullOrWhiteSpace(host) ? "localhost" : host;
@@ -58,6 +64,8 @@ public class IBWebSocket : IDisposable
         _optionFieldsString = string.Join("\",\"", _optionFields.Select(f => ((int)f).ToString()).ToArray());
         _stockFieldsString = string.Join("\",\"", _stockFields.Select(f => ((int)f).ToString()).ToArray());
     }
+
+    #endregion
 
     public string ClientSession { get; set; } = string.Empty;
 

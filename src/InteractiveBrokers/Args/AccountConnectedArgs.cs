@@ -1,6 +1,8 @@
-﻿namespace InteractiveBrokers.Args;
+﻿using InteractiveBrokers.Responses;
+
+namespace InteractiveBrokers.Args;
 
 public class AccountConnectedArgs : EventArgs
 {
-    public required string AccountId { get; set; }
+    public required Account Account { get; init; }
 }

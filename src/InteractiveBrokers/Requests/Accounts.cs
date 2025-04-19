@@ -1,15 +1,14 @@
-﻿using InteractiveBrokers.Args;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace InteractiveBrokers.Requests;
 
 internal class Accounts : Request
 {
-    EventHandler<AccountConnectedArgs>? _responseHandler;
+    EventHandler<Args.AccountConnectedArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public Accounts(EventHandler<AccountConnectedArgs>? responseHandler) {
+    public Accounts(EventHandler<Args.AccountConnectedArgs>? responseHandler) {
         Uri = "portfolio/accounts";
         _responseHandler = responseHandler;
     }
@@ -30,7 +29,7 @@ internal class Accounts : Request
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {accountsResponse.Count} accounts response");
         }
         var accountsArgs = new Args.AccountConnectedArgs {
-            AccountId = accountsResponse[0].AccountId
+            Account = accountsResponse[0]
         };
 
         _responseHandler?.Invoke(this, accountsArgs);

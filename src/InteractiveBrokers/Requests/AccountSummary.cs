@@ -9,11 +9,11 @@ internal class AccountSummary : Request
     EventHandler<AccountSummaryArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public AccountSummary(string account, EventHandler<AccountSummaryArgs>? responseHandler) {
-        if (string.IsNullOrWhiteSpace(account)) {
+    public AccountSummary(string accountId, EventHandler<AccountSummaryArgs>? responseHandler) {
+        if (string.IsNullOrWhiteSpace(accountId)) {
             throw new IBClientException("Account ID cannot be null or empty");
         }
-        Uri = $"portfolio/{account}/summary";
+        Uri = $"portfolio/{accountId}/summary";
         _responseHandler = responseHandler;
     }
 
