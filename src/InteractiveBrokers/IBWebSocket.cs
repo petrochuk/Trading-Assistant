@@ -81,6 +81,14 @@ public class IBWebSocket : IDisposable
         RequestMarketData(position);
     }
 
+    public void StopPositionMarketData(Position position) {
+        if (_clientWebSocket == null || _mainThread == null) {
+            return;
+        }
+
+        StopMarketData(position);
+    }
+
     private void EnsureSocketConnected() {
         if (_mainThread.ThreadState.HasFlag(ThreadState.Unstarted)) {
             // Start the main thread if it yet started
@@ -185,6 +193,16 @@ public class IBWebSocket : IDisposable
             _logger.LogTrace($"Requesting market data for stock {position.ContractDesciption}");
             _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
+    }
+
+    private void StopMarketData(Position position) {
+        if (!position.IsDataStreaming) {
+            return;
+        }
+        position.IsDataStreaming = false;
+        var request = $@"umd+{position.ContractId}+{{}}";
+        _logger.LogTrace($"Stopping market data for {position.ContractDesciption}");
+        _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
     }
 
     /// <summary>

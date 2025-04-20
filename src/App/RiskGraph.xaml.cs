@@ -58,7 +58,7 @@ public sealed partial class RiskGraph : UserControl
 
     public Account? Account { get; set; }
 
-    private void OnSizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs e) {
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e) {
         Redraw();
     }
 
@@ -269,7 +269,7 @@ public sealed partial class RiskGraph : UserControl
             Fill = (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"],
             Width = ActualWidth,
             Height = MidPixel(Canvas.ActualHeight),
-            VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Bottom,
+            VerticalAlignment = VerticalAlignment.Bottom,
         };
         Canvas.SetLeft(topRect, 0);
         Canvas.SetTop(topRect, 0);
@@ -279,7 +279,7 @@ public sealed partial class RiskGraph : UserControl
             Fill = (Brush)App.Current.Resources["SystemFillColorCriticalBackgroundBrush"],
             Width = ActualWidth,
             Height = MidPixel(Canvas.ActualHeight),
-            VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Bottom,
+            VerticalAlignment = VerticalAlignment.Bottom,
         };
         Canvas.SetLeft(bottomRect, 0);
         Canvas.SetTop(bottomRect, MidPixel(Canvas.ActualHeight));

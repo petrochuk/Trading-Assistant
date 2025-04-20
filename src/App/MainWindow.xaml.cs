@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.BackgroundColor = (Windows.UI.Color)App.Current.Resources["SystemAccentColorDark3"];
 
         _positions.OnPositionAdded += OnPositionAdded;
+        _positions.OnPositionRemoved += OnPositionRemoved;
         _positionsTimer.Elapsed += (s, args) => {
             if (_account == null) {
                 return;
@@ -93,6 +94,10 @@ public sealed partial class MainWindow : Window
 
     private void OnPositionAdded(object? sender, Position position) {
         App.Instance.IBWebSocket.RequestPositionMarketData(position);
+    }
+
+    private void OnPositionRemoved(object? sender, Position position) {
+        App.Instance.IBWebSocket.StopPositionMarketData(position);
     }
 
     #endregion

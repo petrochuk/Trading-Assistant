@@ -1,8 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace AppCore;
 
+[DebuggerDisplay("c:{Count}")]
 public class PositionsCollection : ConcurrentDictionary<int, Position>
 {
     #region Fields
@@ -23,6 +25,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
     #region Events
 
     public event EventHandler<Position>? OnPositionAdded;
+    public event EventHandler<Position>? OnPositionRemoved;
 
     #endregion
 
@@ -85,8 +88,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
     }
 
     private void RemovePosition(int contractId) {
-        TryRemove(contractId, out var removedPosition);
-        _logger.LogInformation($"Removed position {removedPosition!.ContractDesciption}");
+        if (TryRemove(contractId, out var removedPosition)) {
+            _logger.LogInformation($"Removed position {removedPosition!.ContractDesciption}");
+            OnPositionRemoved?.Invoke(this, removedPosition);
+        }
     }
 
     private void UpdateUnderlyings() {

@@ -1,15 +1,22 @@
-﻿namespace InteractiveBrokers.Responses;
+﻿using System.Text.Json.Serialization;
+
+namespace InteractiveBrokers.Responses;
 
 public class Account
 {
     public required string Id { get; init; }
+
     public required string AccountId { get; init; }
+
     public required string DisplayName { get; init; }
 
+    [JsonPropertyName("accountAlias")]
+    public required string Alias { get; set; }
+
     public bool brokerageAccess { get; set; }
+
     public string accountVan { get; set; }
     public string accountTitle { get; set; }
-    public object accountAlias { get; set; }
     public long accountStatus { get; set; }
     public string currency { get; set; }
     public string type { get; set; }
