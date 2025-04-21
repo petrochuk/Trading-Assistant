@@ -1,4 +1,5 @@
-﻿using InteractiveBrokers.Args;
+﻿using AppCore.Models;
+using InteractiveBrokers.Args;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
@@ -30,12 +31,19 @@ internal class AccountPositions : Request
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid accounts response");
         }
 
-        var args = new AccountPositionsArgs {
-            // Filter out positions with no symbol
-            Positions = positionsResponse
-                .Where(x => !string.IsNullOrWhiteSpace(x.UnderlyingSymbol) && x.PositionSize != 0)
-                .ToDictionary(x => x.ContractId, x => x),
-        };
+        var args = new AccountPositionsArgs();
+
+        foreach (var position in positionsResponse) {
+            if (position == null) {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(position.undSym) && position.position == 0) {
+                continue;
+            }
+
+            args.Positions.Add(position.conid, position);
+        }
 
         // Sometimes IBKR returns an empty list of positions. Ignore this case.
         if (args.Positions.Count == 0) {

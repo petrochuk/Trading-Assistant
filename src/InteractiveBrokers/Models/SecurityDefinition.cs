@@ -1,4 +1,6 @@
-﻿namespace InteractiveBrokers.Models;
+﻿using InteractiveBrokers.Responses;
+
+namespace InteractiveBrokers.Models;
 
 public class SecurityDefinition
 {
@@ -32,21 +34,3 @@ public class SecurityDefinition
     public int pageSize { get; set; }
 }
 
-public class DisplayRule
-{
-    public int magnification { get; set; }
-    public DisplayRulestep[] displayRuleStep { get; set; }
-}
-
-public class DisplayRulestep
-{
-    public int decimalDigits { get; set; }
-    public float lowerEdge { get; set; }
-    public int wholeDigits { get; set; }
-}
-
-public class IncrementRule
-{
-    public float lowerEdge { get; set; }
-    public float increment { get; set; }
-}

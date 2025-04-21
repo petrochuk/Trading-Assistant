@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using AppCore.Models;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 
@@ -39,7 +40,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 
     #region Methods
 
-    public void Reconcile(Dictionary<int, Position> positions) {
+    public void Reconcile(Dictionary<int, IPosition> positions) {
         lock (_lock) { 
             // Remove positions that are not in the new list
             foreach (var contractId in Keys.ToList()) {
@@ -56,13 +57,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                     existingPosition.UpdateFrom(positionKV.Value);
                 }
                 else {
-                    if (positionKV.Value.PositionSize == 0) {
+                    if (positionKV.Value.Size == 0) {
                         _logger.LogTrace($"Skipping position {positionKV.Value.ContractDesciption} with size 0");
                         continue;
                     }
-                    if (TryAdd(positionKV.Key, positionKV.Value)) {
-                        _logger.LogInformation($"Added {positionKV.Value.PositionSize} position {positionKV.Value.ContractDesciption}");
-                        OnPositionAdded?.Invoke(this, positionKV.Value);
+                    var position = new Position(positionKV.Value);
+                    if (TryAdd(positionKV.Key, position)) {
+                        _logger.LogInformation($"Added {position.Size} position {position.ContractDesciption}");
+                        OnPositionAdded?.Invoke(this, position);
                     }
                 }
             }
@@ -100,20 +102,20 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
         foreach (var position in Values) {
             switch (position.AssetClass) {
                 case AssetClass.Stock:
-                    Underlyings.Add(position.UnderlyingSymbol, new() {
+                    Underlyings.Add(position.Symbol, new() {
                         Contract = new Contract() {
-                            Symbol = position.UnderlyingSymbol,
+                            Symbol = position.Symbol,
                             AssetClass = position.AssetClass,
                             ContractId = position.ContractId
                         },
                         Position = position });
                     break;
                 case AssetClass.Future:
-                    if (Underlyings.TryGetValue(position.UnderlyingSymbol, out var existingUnderlying)) {
+                    if (Underlyings.TryGetValue(position.Symbol, out var existingUnderlying)) {
                         if (existingUnderlying.Position == null) {
-                            Underlyings[position.UnderlyingSymbol] = new() {
+                            Underlyings[position.Symbol] = new() {
                                 Contract = new Contract() {
-                                    Symbol = position.UnderlyingSymbol,
+                                    Symbol = position.Symbol,
                                     AssetClass = position.AssetClass,
                                     ContractId = position.ContractId,
                                     Expiration = position.Expiration
@@ -124,9 +126,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                         else {
                             // Replace with front month future
                             if (position.Expiration < existingUnderlying.Contract.Expiration) {
-                                Underlyings[position.UnderlyingSymbol] = new() {
+                                Underlyings[position.Symbol] = new() {
                                     Contract = new Contract() {
-                                        Symbol = position.UnderlyingSymbol,
+                                        Symbol = position.Symbol,
                                         AssetClass = position.AssetClass,
                                         ContractId = position.ContractId,
                                         Expiration = position.Expiration
@@ -139,11 +141,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                     }
                     break;
                 case AssetClass.FutureOption:
-                    if (!Underlyings.TryGetValue(position.UnderlyingSymbol, out var existingPosition2)) {
+                    if (!Underlyings.TryGetValue(position.Symbol, out var existingPosition2)) {
                         // Add placeholder for position
-                        Underlyings.Add(position.UnderlyingSymbol, new() {
+                        Underlyings.Add(position.Symbol, new() {
                             Contract = new Contract() {
-                                Symbol = position.UnderlyingSymbol,
+                                Symbol = position.Symbol,
                                 AssetClass = AssetClass.Future
                             },
                             Position = null
@@ -159,24 +161,24 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 
         lock (_lock) {
             foreach (var position in Values) {
-                if (position.UnderlyingSymbol != DefaultUnderlying?.UnderlyingSymbol) {
+                if (position.Symbol != DefaultUnderlying?.Symbol) {
                     continue;
                 }
                 if (position.AssetClass == AssetClass.Future || position.AssetClass == AssetClass.Stock) {
-                    greeks.Delta += position.PositionSize;
+                    greeks.Delta += position.Size;
                 }
                 else if (position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option) {
                     if (position.Delta.HasValue) {
-                        greeks.Delta += position.Delta.Value * position.PositionSize;
+                        greeks.Delta += position.Delta.Value * position.Size;
                     }
                     if (position.Delta.HasValue && position.Theta.HasValue && position.MarketPrice != 0) {
                         var absTheta = MathF.Abs(position.Theta.Value);
                         if (position.MarketPrice < absTheta)
                             absTheta = position.MarketPrice;
                         if (-0.5f < position.Delta.Value && position.Delta.Value < 0.5f)
-                            greeks.Charm -= position.Delta.Value * (absTheta / position.MarketPrice) * position.PositionSize;
+                            greeks.Charm -= position.Delta.Value * (absTheta / position.MarketPrice) * position.Size;
                         else {
-                            var intrinsicValue = position.IsCall.Value ? DefaultUnderlying.MarketPrice - position.Strike.Value : position.Strike.Value - DefaultUnderlying.MarketPrice;
+                            var intrinsicValue = position.IsCall ? DefaultUnderlying.MarketPrice - position.Strike : position.Strike - DefaultUnderlying.MarketPrice;
                             if (intrinsicValue < 0)
                                 intrinsicValue = 0;
                             var extrinsicValue = position.MarketPrice - intrinsicValue;
@@ -185,17 +187,17 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                             if (extrinsicValue < absTheta)
                                 absTheta = extrinsicValue;
 
-                            greeks.Charm += ((position.IsCall.Value ? 1f : -1f) - position.Delta.Value) * (absTheta / extrinsicValue) * position.PositionSize;
+                            greeks.Charm += ((position.IsCall ? 1f : -1f) - position.Delta.Value) * (absTheta / extrinsicValue) * position.Size;
                         }
                     }
                     if (position.Gamma.HasValue) {
-                        greeks.Gamma += position.Gamma.Value * position.PositionSize;
+                        greeks.Gamma += position.Gamma.Value * position.Size;
                     }
                     if (position.Theta.HasValue) {
-                        greeks.Theta += position.Theta.Value * position.PositionSize * position.Multiplier.Value;
+                        greeks.Theta += position.Theta.Value * position.Size * position.Multiplier;
                     }
                     if (position.Vega.HasValue) {
-                        greeks.Vega += position.Vega.Value * position.PositionSize;
+                        greeks.Vega += position.Vega.Value * position.Size;
                     }
                 }
             }

@@ -1,4 +1,5 @@
 ﻿using AppCore;
+using AppCore.Models;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.WebSockets;

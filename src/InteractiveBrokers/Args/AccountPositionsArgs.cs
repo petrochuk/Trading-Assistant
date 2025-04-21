@@ -1,8 +1,8 @@
-﻿using AppCore;
+﻿using AppCore.Models;
 
 namespace InteractiveBrokers.Args;
 
 public class AccountPositionsArgs : EventArgs
 {
-    public required Dictionary<int, Position> Positions { get; set; }
+    public Dictionary<int, IPosition> Positions { get; set; } = new();
 }

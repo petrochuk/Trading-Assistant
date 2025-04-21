@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+﻿using AppCore.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AppCore.Tests;
 
@@ -12,12 +13,12 @@ public sealed class PositionsCollectionTests
 
         var underlyingPosition = new Position {
             ContractId = 1,
-            PositionSize = 0,
-            UnderlyingSymbol = "ES",
+            Size = 0,
+            Symbol = "ES",
             AssetClass = AssetClass.Future
         };
-        var position1 = new Position(underlyingPosition.UnderlyingSymbol, AssetClass.FutureOption, isCall: true, 5000, 50);
-        position1.PositionSize = 1;
+        var position1 = new Position(underlyingPosition.Symbol, AssetClass.FutureOption, isCall: true, 5000, 50);
+        position1.Size = 1;
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 10.0f;
@@ -42,17 +43,17 @@ public sealed class PositionsCollectionTests
 
         var underlyingPosition = new Position {
             ContractId = 1,
-            PositionSize = 0,
-            UnderlyingSymbol = "ES",
+            Size = 0,
+            Symbol = "ES",
             AssetClass = AssetClass.Future
         };
         underlyingPosition.MarketPrice = 5050f;
 
-        var position1 = new Position(underlyingPosition.UnderlyingSymbol, AssetClass.FutureOption, isCall: true, 5000, 50);
+        var position1 = new Position(underlyingPosition.Symbol, AssetClass.FutureOption, isCall: true, 5000, 50);
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 60.0f;
-        position1.PositionSize = 1;
+        position1.Size = 1;
         position1.UpdateGreeks(delta: 0.8f, gamma: 0.0f, theta: -10f, vega: 0.0f);
 
         positions.TryAdd(1, position1);
@@ -62,7 +63,7 @@ public sealed class PositionsCollectionTests
         var greeks = positions.CalculateGreeks();
 
         // Assert
-        Assert.AreEqual(position1.Delta * position1.PositionSize, greeks.Delta);
+        Assert.AreEqual(position1.Delta * position1.Size, greeks.Delta);
         Assert.IsTrue(MathF.Abs(0.2f - greeks.Charm) < 0.00001f);
     }
 
@@ -74,17 +75,17 @@ public sealed class PositionsCollectionTests
 
         var underlyingPosition = new Position {
             ContractId = 1,
-            PositionSize = 0,
-            UnderlyingSymbol = "ES",
+            Size = 0,
+            Symbol = "ES",
             AssetClass = AssetClass.Future
         };
         underlyingPosition.MarketPrice = 4950f;
 
-        var position1 = new Position(underlyingPosition.UnderlyingSymbol, AssetClass.FutureOption, isCall: false, 5000, 50);
+        var position1 = new Position(underlyingPosition.Symbol, AssetClass.FutureOption, isCall: false, 5000, 50);
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 60.0f;
-        position1.PositionSize = 1;
+        position1.Size = 1;
         position1.UpdateGreeks(delta: -0.8f, gamma: 0.0f, theta: -10f, vega: 0.0f);
 
         positions.TryAdd(1, position1);
@@ -94,7 +95,7 @@ public sealed class PositionsCollectionTests
         var greeks = positions.CalculateGreeks();
 
         // Assert
-        Assert.AreEqual(position1.Delta * position1.PositionSize, greeks.Delta);
+        Assert.AreEqual(position1.Delta * position1.Size, greeks.Delta);
         Assert.IsTrue(MathF.Abs(-0.2f - greeks.Charm) < 0.00001f);
     }
 }

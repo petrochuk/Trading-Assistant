@@ -1,5 +1,4 @@
-﻿using AppCore;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace InteractiveBrokers;
@@ -10,8 +9,7 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Responses.HMDS))]
 [JsonSerializable(typeof(Responses.AuthStatus))]
 [JsonSerializable(typeof(Responses.ServerInfo))]
-[JsonSerializable(typeof(List<Position>))]
-[JsonSerializable(typeof(Position))]
+[JsonSerializable(typeof(List<Responses.Position>))]
 [JsonSerializable(typeof(Dictionary<string, List<Models.Contract>>))]
 [JsonSerializable(typeof(List<Models.Contract>))]
 [JsonSerializable(typeof(Models.Contract))]
@@ -26,5 +24,4 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Args.SummaryLine))]
 internal partial class SourceGeneratorContext : JsonSerializerContext
 {
-
 }

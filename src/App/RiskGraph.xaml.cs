@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using Windows.Foundation;
 
@@ -54,8 +55,12 @@ public sealed partial class RiskGraph : UserControl
 
     #endregion
 
-    public PositionsCollection? Positions { get; set; }
+    PositionsCollection? _positions;
+    public void SetPositions(PositionsCollection? positions) {
+        _positions = positions;
+    }
 
+    [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
     public Account? Account { get; set; }
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e) {
@@ -70,7 +75,7 @@ public sealed partial class RiskGraph : UserControl
 
             UpdateGreeks();
 
-            if (Positions == null || !Positions.Any()) {
+            if (_positions == null || !_positions.Any()) {
                 return;
             }
 
@@ -83,7 +88,7 @@ public sealed partial class RiskGraph : UserControl
 
     private void UpdateGreeks() {
 
-        var greeks = Positions!.CalculateGreeks();
+        var greeks = _positions!.CalculateGreeks();
 
         DeltaText.Text = $"{greeks.Delta:N2}";
         GammaText.Text = $"{greeks.Gamma:N4}";
@@ -94,18 +99,18 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void DrawRiskIntervals() {
-        if (Positions == null || Positions.DefaultUnderlying == null) {
+        if (_positions == null || _positions.DefaultUnderlying == null) {
             return;
         }
 
         // First calculate the risk curves for each interval
-        var midPrice = Positions.DefaultUnderlying.MarketPrice;
+        var midPrice = _positions.DefaultUnderlying.MarketPrice;
         if (midPrice == 0) {
             _logger.LogTrace("No market price available for underlying");
             return;
         }
 
-        var underlyingSymbol = Positions.DefaultUnderlying.UnderlyingSymbol;
+        var underlyingSymbol = _positions.DefaultUnderlying.Symbol;
         var minPrice = midPrice * 0.95f;
         var maxPrice = midPrice * 1.05f;
         var priceIncrement = (maxPrice - minPrice) / 100f;
@@ -214,17 +219,17 @@ public sealed partial class RiskGraph : UserControl
         var riskCurve = new RiskCurve();
 
         // Estimate deltas with sigmoid function
-        foreach (var position in Positions!.Values) {
+        foreach (var position in _positions!.Values) {
             // Skip any positions that are not in the same underlying
-            if (position.UnderlyingSymbol != underlyingSymbol) {
+            if (position.Symbol != underlyingSymbol) {
                 continue;
             }
             else if (position.AssetClass == AssetClass.FutureOption) {
                 if (position.Delta.HasValue) {
-                    if (position.IsCall.Value)
-                        position.DeltaEstimator = (float)Math.Log((1 - position.Delta.Value) / position.Delta.Value) / (position.Strike.Value - midPrice);
+                    if (position.IsCall)
+                        position.DeltaEstimator = (float)Math.Log((1 - position.Delta.Value) / position.Delta.Value) / (position.Strike - midPrice);
                     else
-                        position.DeltaEstimator = (float)Math.Log(1 / (1 + position.Delta.Value) - 1) / (position.Strike.Value - midPrice);
+                        position.DeltaEstimator = (float)Math.Log(1 / (1 + position.Delta.Value) - 1) / (position.Strike - midPrice);
                 }
                 else {
                     _logger.LogWarning($"Delta is not available for position {position.ContractDesciption}");
@@ -235,14 +240,14 @@ public sealed partial class RiskGraph : UserControl
         // Go through the price range and calculate the P&L for each position
         for (var currentPrice = minPrice; currentPrice < maxPrice; currentPrice += priceIncrement) {
             var totalPL = 0f;
-            foreach (var position in Positions!.Values) {
+            foreach (var position in _positions!.Values) {
                 // Skip any positions that are not in the same underlying
-                if (position.UnderlyingSymbol != underlyingSymbol) {
+                if (position.Symbol != underlyingSymbol) {
                     continue;
                 }
 
                 if (position.AssetClass == AssetClass.Future) {
-                    totalPL += position.PositionSize * (currentPrice - position.MarketPrice) * position.Multiplier.Value;
+                    totalPL += position.Size * (currentPrice - position.MarketPrice) * position.Multiplier;
                 }
                 else if (position.AssetClass == AssetClass.FutureOption ) {
                     // We need to add all values as delta changes from mid price
@@ -250,11 +255,11 @@ public sealed partial class RiskGraph : UserControl
                         var incrementDirection = currentPrice > midPrice ? 1 : -1;
                         var estimatedRange = Math.Abs(currentPrice - midPrice);
                         for (var deltaPrice = 0; deltaPrice < estimatedRange; deltaPrice += 1) {
-                            var estimatedDelta = 1 / (1 + MathF.Exp(position.DeltaEstimator.Value * (position.Strike.Value - (midPrice + incrementDirection * deltaPrice))));
-                            if (!position.IsCall.Value) {
+                            var estimatedDelta = 1 / (1 + MathF.Exp(position.DeltaEstimator.Value * (position.Strike - (midPrice + incrementDirection * deltaPrice))));
+                            if (!position.IsCall) {
                                 estimatedDelta -= 1;
                             }
-                            totalPL += estimatedDelta * incrementDirection * position.PositionSize * position.Multiplier.Value;
+                            totalPL += estimatedDelta * incrementDirection * position.Size * position.Multiplier;
                         }
                     }
                 }

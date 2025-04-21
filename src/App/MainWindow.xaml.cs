@@ -51,7 +51,7 @@ public sealed partial class MainWindow : Window
             App.Instance.IBClient.RequestAccountSummary(_account.Id);
         };
         _positionsTimer.Start();
-        RiskGraphControl.Positions = _positions;
+        RiskGraphControl.SetPositions(_positions);
 
         // Subscribe to client events
         App.Instance.IBClient.OnConnected += IBClient_Connected;
