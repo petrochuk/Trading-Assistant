@@ -1,4 +1,5 @@
 ﻿using AppCore;
+using AppCore.Extenstions;
 using InteractiveBrokers.Args;
 using Microsoft.Extensions.Logging;
 using System.Threading.Channels;
@@ -134,27 +135,27 @@ public class IBClient : IDisposable
         }
     }
 
-    public void RequestAccountPositions(string account) {
-        if (string.IsNullOrWhiteSpace(account)) {
+    public void RequestAccountPositions(string accountId) {
+        if (string.IsNullOrWhiteSpace(accountId)) {
             throw new IBClientException("Account cannot be null or empty");
         }
 
-        var request = new Requests.AccountPositions(account, OnAccountPositions);
+        var request = new Requests.AccountPositions(accountId, OnAccountPositions);
 
-        _logger.LogInformation($"Requesting account positions for account {account}");
+        _logger.LogInformation($"Requesting positions for account {accountId.Mask()}");
         if (!_channel.Writer.TryWrite(request)) {
-            throw new IBClientException("Failed to request account accounts");
+            throw new IBClientException("Failed to request account positions");
         }
     }
 
-    public void RequestAccountSummary(string account) {
-        if (string.IsNullOrWhiteSpace(account)) {
+    public void RequestAccountSummary(string accountId) {
+        if (string.IsNullOrWhiteSpace(accountId)) {
             throw new IBClientException("Account cannot be null or empty");
         }
 
-        var request = new Requests.AccountSummary(account, OnAccountSummary);
+        var request = new Requests.AccountSummary(accountId, OnAccountSummary);
 
-        _logger.LogInformation($"Requesting account summary for account {account}");
+        _logger.LogInformation($"Requesting summary for account {accountId.Mask()}");
         if (!_channel.Writer.TryWrite(request)) {
             throw new IBClientException("Failed to request account summary");
         }
@@ -191,7 +192,7 @@ public class IBClient : IDisposable
         while (_channel.Reader.WaitToReadAsync().AsTask().Result) {
             while (_channel.Reader.TryRead(out var request)) {
                 try {
-                    _logger.LogInformation($"Execute: {request.Uri}");
+                    _logger.LogTrace($"Execute: {request.Uri}");
                     request.Execute(_httpClient);
                 }
                 catch (Exception ex) {

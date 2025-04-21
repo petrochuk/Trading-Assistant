@@ -5,7 +5,7 @@ namespace AppCore;
 /// <summary>
 /// Asset class or Security type.
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<AssetClass>))]
 public enum AssetClass
 {
     [JsonStringEnumMemberName("STK")]

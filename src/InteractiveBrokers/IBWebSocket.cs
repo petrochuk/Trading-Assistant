@@ -37,7 +37,6 @@ public class IBWebSocket : IDisposable
         MarketDataFields.LastPrice,
         MarketDataFields.BidPrice,
         MarketDataFields.AskPrice,
-        MarketDataFields.UnderlyingPrice,
         MarketDataFields.Beta,
         MarketDataFields.MarketValue,
         MarketDataFields.MarkPrice,
@@ -135,11 +134,14 @@ public class IBWebSocket : IDisposable
                         var topicString = topic.GetString();
                         if (topicString != null) {
                             if (topicString.StartsWith("smd+")) {
-                                _logger.LogTrace($"Received market data message: {messageString}");
+                                _logger.LogTrace($"Market data: {messageString}");
                                 HandleDataMessage(message);
                             }
                             else if (topicString == "system") {
                                 HandleSystemMessage(message);
+                            }
+                            else {
+                                _logger.LogWarning($"Unknown topic: {topicString}");
                             }
                         }
                     }
@@ -213,6 +215,7 @@ public class IBWebSocket : IDisposable
             return;
         }
 
+        // Find the position by contract ID
         if (!message.TryGetValue("conid", out var contractIdElement) || contractIdElement.ValueKind != JsonValueKind.Number) {
             _logger.LogError($"Error message missing expected conid");
             return;
