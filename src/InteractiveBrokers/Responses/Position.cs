@@ -22,7 +22,7 @@ public class Position : IPosition, IJsonOnDeserialized
     public object exchs { get; set; }
     public string expiry { get; set; }
     public string putOrCall { get; set; }
-    public float multiplier { get; set; }
+    public float? multiplier { get; set; }
     public JsonElement strike { get; set; }
     public object exerciseStyle { get; set; }
     public object[] conExchMap { get; set; }
@@ -65,11 +65,29 @@ public class Position : IPosition, IJsonOnDeserialized
 
     string IPosition.ContractDesciption => contractDesc;
 
-    string IPosition.Symbol => undSym;
+    string IPosition.Symbol {
+        get {
+            if (!string.IsNullOrWhiteSpace(undSym)) {
+                return undSym;
+            }
+
+            // Try to parse the symbol from the description
+            if (string.IsNullOrWhiteSpace(contractDesc)) {
+                throw new InvalidOperationException("Unable to determine symbol. No description available.");
+            }
+
+            var descriptionParts = contractDesc.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (descriptionParts.Length > 0 && descriptionParts[0].Length > 0) {
+                return descriptionParts[0];
+            }
+
+            throw new InvalidOperationException($"Unable to determine symbol from description: {contractDesc}");
+        }
+    }
 
     AssetClass IPosition.AssetClass => assetClass;
 
-    float IPosition.Multiplier => multiplier;
+    float IPosition.Multiplier => multiplier.Value;
 
     bool IPosition.IsCall {
         get {
@@ -135,6 +153,18 @@ public class Position : IPosition, IJsonOnDeserialized
     float IPosition.MarketPrice => mktPrice;
 
     float IPosition.MarketValue => mktValue;
+
+    public bool IsValid {
+        get {
+            if (!multiplier.HasValue)
+                return false;
+
+            if (string.IsNullOrWhiteSpace(undSym) && position == 0)
+                return false;
+
+            return true;
+        }
+    }
 
     void IJsonOnDeserialized.OnDeserialized() {
     }

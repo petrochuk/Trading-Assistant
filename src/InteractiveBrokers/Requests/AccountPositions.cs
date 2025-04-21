@@ -1,7 +1,7 @@
-﻿using AppCore.Models;
-using InteractiveBrokers.Args;
+﻿using InteractiveBrokers.Args;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace InteractiveBrokers.Requests;
 
@@ -35,10 +35,12 @@ internal class AccountPositions : Request
 
         foreach (var position in positionsResponse) {
             if (position == null) {
+                Logger?.LogWarning("IBKR provided null position in response");
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(position.undSym) && position.position == 0) {
+            if (!position.IsValid) {
+                Logger?.LogWarning($"IBKR provided invalid position in response: {position.contractDesc}");
                 continue;
             }
 
@@ -47,6 +49,7 @@ internal class AccountPositions : Request
 
         // Sometimes IBKR returns an empty list of positions. Ignore this case.
         if (args.Positions.Count == 0) {
+            Logger?.LogWarning($"IBKR returned only invalid positions in response");
             return;
         }
 

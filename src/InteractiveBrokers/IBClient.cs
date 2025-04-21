@@ -1,6 +1,7 @@
 ﻿using AppCore;
 using AppCore.Extenstions;
 using InteractiveBrokers.Args;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Threading.Channels;
 
@@ -140,7 +141,9 @@ public class IBClient : IDisposable
             throw new IBClientException("Account cannot be null or empty");
         }
 
-        var request = new Requests.AccountPositions(accountId, OnAccountPositions);
+        var request = new Requests.AccountPositions(accountId, OnAccountPositions) {
+            Logger = AppCore.ServiceProvider.Instance.GetService<ILogger<Requests.Request>>()
+        };
 
         _logger.LogInformation($"Requesting positions for account {accountId.Mask()}");
         if (!_channel.Writer.TryWrite(request)) {

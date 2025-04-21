@@ -23,4 +23,6 @@ public interface IPosition
     float MarketPrice { get; }
 
     float MarketValue { get; }
+
+    bool IsValid { get; }
 }
