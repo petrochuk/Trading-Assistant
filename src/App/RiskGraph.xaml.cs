@@ -85,8 +85,9 @@ public sealed partial class RiskGraph : UserControl
 
         var greeks = Positions!.CalculateGreeks();
 
-        DeltaText.Text = $"{greeks.Delta.ToString("N2")}";
-        CharmText.Text = $"{greeks.Charm.ToString("N2")}";
+        DeltaText.Text = $"{greeks.Delta:N2}";
+        GammaText.Text = $"{greeks.Gamma:N4}";
+        CharmText.Text = $"{greeks.Charm:N2}";
         if (Account != null && Account.NetLiquidationValue != 0) {
             ThetaText.Text = $"{greeks.Theta / Account.NetLiquidationValue:P2}";
         }
