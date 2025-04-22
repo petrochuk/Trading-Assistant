@@ -31,14 +31,22 @@ internal class AccountPositions : Request
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid accounts response");
         }
 
+        // Sometimes IB returns all positions as invalid. Ignore this case.
+        var allInvalid = true;
+        foreach (var position in positionsResponse) {
+            if (position != null && position.IsValid) {
+                allInvalid = false;
+                break;
+            }
+        }
+        if (allInvalid) {
+            Logger?.LogWarning($"IBKR returned only invalid positions in response");
+            return;
+        }
+
         var args = new AccountPositionsArgs();
 
         foreach (var position in positionsResponse) {
-            if (position == null) {
-                Logger?.LogWarning("IBKR provided null position in response");
-                continue;
-            }
-
             if (!position.IsValid) {
                 Logger?.LogWarning($"IBKR provided invalid position in response: {position.contractDesc}");
                 continue;
@@ -49,7 +57,6 @@ internal class AccountPositions : Request
 
         // Sometimes IBKR returns an empty list of positions. Ignore this case.
         if (args.Positions.Count == 0) {
-            Logger?.LogWarning($"IBKR returned only invalid positions in response");
             return;
         }
 
