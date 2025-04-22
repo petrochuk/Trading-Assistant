@@ -6,6 +6,8 @@ using System.Text.Json.Serialization;
 
 namespace InteractiveBrokers.Responses;
 
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+
 public class Position : IPosition, IJsonOnDeserialized
 {
     public string acctId { get; set; }
@@ -87,7 +89,15 @@ public class Position : IPosition, IJsonOnDeserialized
 
     AssetClass IPosition.AssetClass => assetClass;
 
-    float IPosition.Multiplier => multiplier.Value;
+    float IPosition.Multiplier {
+        get {
+            if (!multiplier.HasValue) {
+                throw new InvalidOperationException("No multiplier value available.");
+            }
+
+            return multiplier.Value;
+        }
+    }
 
     bool IPosition.IsCall {
         get {

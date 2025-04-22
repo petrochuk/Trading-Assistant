@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
-using System.Globalization;
-using System.Text.Json.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AppCore.Models;
 
@@ -11,7 +10,7 @@ public class Position
 
     public int ContractId { get; init; }
 
-    public string Symbol { get; init; }
+    public required string Symbol { get; init; }
 
     public string ContractDesciption { get; init; } = string.Empty;
 
@@ -27,12 +26,13 @@ public class Position
 
     #endregion
 
+    #region Properties
+
     public float Size { get; set; }
 
     public float MarketPrice { get; set; }
 
     public float MarketValue { get; set; }
-
 
     public bool IsDataStreaming { get; set; } = false;
 
@@ -48,6 +48,8 @@ public class Position
 
     public float Beta { get; set; } = 1;
 
+    #endregion
+
     #region Updates
 
     private Lock _lock = new();
@@ -55,6 +57,10 @@ public class Position
     public Position() {
     }
 
+    /// <summary>
+    /// Create a new position from an existing position.
+    /// </summary>
+    [SetsRequiredMembers]
     public Position(IPosition position) {
         _ = position ?? throw new ArgumentNullException(nameof(position));
         if (string.IsNullOrWhiteSpace(position.Symbol)) {
@@ -84,8 +90,9 @@ public class Position
     }
 
     /// <summary>
-    /// Create a new option position.
+    /// Create a new position.
     /// </summary>
+    [SetsRequiredMembers]
     public Position(string underlyingSymbol,
         AssetClass assetClass, bool isCall, float strike, float multiplier) {
         if (string.IsNullOrWhiteSpace(underlyingSymbol)) {
@@ -108,6 +115,7 @@ public class Position
         Multiplier = multiplier;
     }
 
+    [SetsRequiredMembers]
     public Position(Contract contract) {
         _ = contract ?? throw new ArgumentNullException(nameof(contract));
 
