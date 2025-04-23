@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace AppCore.Models;
 
-[DebuggerDisplay("{ContractDesciption} {PositionSize}")]
+[DebuggerDisplay("{ContractDesciption} {Size}")]
 public class Position
 {
     #region Immutable Properties

@@ -1,4 +1,4 @@
-﻿namespace AppCore.Math;
+﻿namespace AppCore.Statistics;
 
 /// <summary>
 /// Rolling standard deviation calculator using Welford's method.
@@ -24,6 +24,9 @@ public class RollingStandardDeviation
         _oldestValue = 0;
     }
 
+    /// <summary>
+    /// Adds a new value to the rolling standard deviation calculator.
+    /// </summary>
     public void AddValue(double value) {
         if (!double.IsFinite(value))
             return;

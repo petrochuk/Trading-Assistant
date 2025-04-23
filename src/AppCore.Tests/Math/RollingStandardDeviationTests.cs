@@ -1,4 +1,4 @@
-﻿using AppCore.Math;
+﻿using AppCore.Statistics;
 
 namespace AppCore.Tests.Math;
 
@@ -8,7 +8,7 @@ public sealed class RollingStandardDeviationTests
     [TestMethod]
     public void RollingStandardDeviation_Constructor_NullPeriod() {
         // Arrange
-        var rollingStdDev = new RollingStandardDeviation(null);
+        var rollingStdDev = new RollingStandardDeviation();
 
         // Act
         rollingStdDev.AddValue(1.0);

@@ -147,11 +147,20 @@ public sealed partial class RiskGraph : UserControl
             var pathFigure = new PathFigure() {
                 StartPoint = new Point(MapX(points.GetKeyAtIndex(0), minPrice, maxPrice), MapY(points.GetValueAtIndex(0), minPL, maxPL)),
             };
+            if (double.IsNaN(pathFigure.StartPoint.X) || double.IsNaN(pathFigure.StartPoint.Y)) {
+                _logger.LogWarning($"Invalid start point {points.GetKeyAtIndex(0)}, {points.GetValueAtIndex(0)}");
+                continue;
+            }
             ((PathGeometry)path.Data).Figures.Add(pathFigure);
             for (var pointIdx = 1; pointIdx < points.Count; pointIdx++) {
-                pathFigure.Segments.Add(new LineSegment() {
+                var lineSegment = new LineSegment() {
                     Point = new Point(MapX(points.GetKeyAtIndex(pointIdx), minPrice, maxPrice), MapY(points.GetValueAtIndex(pointIdx), minPL, maxPL)),
-                });
+                };
+                if (double.IsNaN(lineSegment.Point.X) || double.IsNaN(lineSegment.Point.Y)) {
+                    _logger.LogWarning($"Invalid line segment {points.GetKeyAtIndex(pointIdx)}, {points.GetValueAtIndex(pointIdx)}");
+                    continue;
+                }
+                pathFigure.Segments.Add(lineSegment);
             }
             Canvas.Children.Add(path);
         }
@@ -226,10 +235,15 @@ public sealed partial class RiskGraph : UserControl
             }
             else if (position.AssetClass == AssetClass.FutureOption) {
                 if (position.Delta.HasValue) {
-                    if (position.IsCall)
-                        position.DeltaEstimator = (float)Math.Log((1 - position.Delta.Value) / position.Delta.Value) / (position.Strike - midPrice);
-                    else
-                        position.DeltaEstimator = (float)Math.Log(1 / (1 + position.Delta.Value) - 1) / (position.Strike - midPrice);
+                    if (position.Strike == midPrice) {
+                        position.DeltaEstimator = null;
+                    }
+                    else {
+                        if (position.IsCall)
+                            position.DeltaEstimator = (float)System.Math.Log((1 - position.Delta.Value) / position.Delta.Value) / (position.Strike - midPrice);
+                        else
+                            position.DeltaEstimator = (float)System.Math.Log(1 / (1 + position.Delta.Value) - 1) / (position.Strike - midPrice);
+                    }
                 }
                 else {
                     _logger.LogWarning($"Delta is not available for position {position.ContractDesciption}");
@@ -253,7 +267,7 @@ public sealed partial class RiskGraph : UserControl
                     // We need to add all values as delta changes from mid price
                     if (position.DeltaEstimator.HasValue) { 
                         var incrementDirection = currentPrice > midPrice ? 1 : -1;
-                        var estimatedRange = Math.Abs(currentPrice - midPrice);
+                        var estimatedRange = System.Math.Abs(currentPrice - midPrice);
                         for (var deltaPrice = 0; deltaPrice < estimatedRange; deltaPrice += 1) {
                             var estimatedDelta = 1 / (1 + MathF.Exp(position.DeltaEstimator.Value * (position.Strike - (midPrice + incrementDirection * deltaPrice))));
                             if (!position.IsCall) {
@@ -263,6 +277,10 @@ public sealed partial class RiskGraph : UserControl
                         }
                     }
                 }
+            }
+            if (double.IsNaN(currentPrice) || double.IsNaN(totalPL)) {
+                _logger.LogWarning($"Invalid data");
+                continue;
             }
             riskCurve.Add(currentPrice, totalPL);
         }
