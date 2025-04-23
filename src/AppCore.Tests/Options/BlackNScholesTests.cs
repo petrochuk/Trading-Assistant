@@ -6,18 +6,38 @@ namespace AppCore.Tests.Options;
 public class BlackNScholesTests
 {
     [TestMethod]
-    [DataRow(0.1f, 0.2f, 0.3f, 0.4f, 0.5f)]
-    public void TestBlackNScholes(float stockPrice) {
+    [DataRow(5401.25f, 5470f, 54f, 0.279f)]
+    [DataRow(5401.25f, 5460f, 58.25f, 0.282f)]
+    [DataRow(5401.25f, 5450f, 62.75f, 0.284f)]
+    [DataRow(5401.25f, 5400f, 88f, 0.294f)]
+    public void TestBlackNScholes_CallRoundtrip(float stockPrice, float strikePrice, float optionPrice, float expectedIV) {
         var bls = new BlackNScholesCaculator();
         bls.StockPrice = stockPrice;
-        bls.Strike = 5450;
-        bls.ExpiryTime = 2.84f / 365f;
-        bls.ImpliedVolatility = 0.32244f;
+        bls.Strike = strikePrice;
+        bls.DaysLeft = 7.3f;
+        bls.RiskFreeInterestRate = -0.045f;
+        var iv = bls.GetCallIVBisections(optionPrice);
+        Assert.AreEqual(expectedIV, iv, 0.001f);
+        bls.ImpliedVolatility = iv;
 
-        var iv = bls.GetCallIVBisections(35.5f);
         var callPrice = bls.CalculateCall();
+        Assert.AreEqual(optionPrice, callPrice, 0.001f);
+    }
+
+    [TestMethod]
+    [DataRow(5401.25f, 5400f, 87.5f, 0.297f)]
+    [DataRow(5401.25f, 5350f, 67.25f, 0.305f)]
+    public void TestBlackNScholes_PutRoundtrip(float stockPrice, float strikePrice, float optionPrice, float expectedIV) {
+        var bls = new BlackNScholesCaculator();
+        bls.StockPrice = stockPrice;
+        bls.Strike = strikePrice;
+        bls.DaysLeft = 7.3f;
+        bls.RiskFreeInterestRate = 0.045f;
+        var iv = bls.GetPutIVBisections(optionPrice);
+        Assert.AreEqual(expectedIV, iv, 0.001f);
+        bls.ImpliedVolatility = iv;
+
         var putPrice = bls.CalculatePut();
-        Assert.IsTrue(callPrice > 0);
-        Assert.IsTrue(putPrice > 0);
+        Assert.AreEqual(optionPrice, putPrice, 0.001f);
     }
 }

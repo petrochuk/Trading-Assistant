@@ -14,6 +14,14 @@ public class BlackNScholesCaculator
 
     #region Properties
 
+    /// <summary>
+    /// When calculating implied volatility, this is how close the calculated price should be to the actual option price.
+    /// </summary>
+    public float IVCalculationPriceAccuracy { get; init; } = 0.001f;
+
+    /// <summary>
+    /// Call value after calculation
+    /// </summary>
     public float CallValue;
 
     /// <summary>
@@ -96,18 +104,18 @@ public class BlackNScholesCaculator
     /// <summary>
     /// The number of days left until the option expired!
     /// </summary>
-    public int DayLeft {
+    public float DaysLeft {
         get {
             return _dayLeft;
         }
         set {
             _dayLeft = value;
-            var dayLeft1 = _dayLeft - ((_dayLeft / 7) * 2);
+            var dayLeft1 = _dayLeft - ((_dayLeft / 7.0f) * 2.0f);
             ExpiryTimeWorking = (dayLeft1 / 250.0f);//= 365 - (2 * 53)==> get the year working days.
             ExpiryTime = _dayLeft / 365.0f;
         }
     }
-    private int _dayLeft;
+    private float _dayLeft;
 
     #endregion
 
@@ -262,10 +270,8 @@ public class BlackNScholesCaculator
     /// </summary>
     /// <param name="callOptionPrice">The Call option price.</param>
     /// <returns></returns>
-    public float? GetCallIVBisections(float callOptionPrice) {
-        float? impliedVolatility = CallOptionPriceIVBisections(StockPrice, Strike,
-            RiskFreeInterestRate, ExpiryTime, callOptionPrice);
-        return impliedVolatility;
+    public float GetCallIVBisections(float callOptionPrice) {
+        return CallOptionPriceIVBisections(StockPrice, Strike, RiskFreeInterestRate, ExpiryTime, callOptionPrice);
     }
 
     /// <summary>
@@ -275,9 +281,7 @@ public class BlackNScholesCaculator
     /// <param name="putOptionPrice">The Put option price.</param>
     /// <returns></returns>
     public float GetPutIVBisections(float putOptionPrice) {
-        float impliedVolatility = PutOptionPriceIVBisections(StockPrice, Strike,
-            RiskFreeInterestRate, ExpiryTime, putOptionPrice);
-        return impliedVolatility;
+        return PutOptionPriceIVBisections(StockPrice, Strike, RiskFreeInterestRate, ExpiryTime, putOptionPrice);
     }
 
     /// <summary>
@@ -299,7 +303,6 @@ public class BlackNScholesCaculator
 
         // simple binomial search for the implied volatility.
         // relies on the value of the option increasing in volatility
-        const float ACCURACY = 1.0e-5f; // make this smaller for higher accuracy
         const int MAX_ITERATIONS = 100;
         const float HIGH_VALUE = 1e10f;
 
@@ -337,7 +340,7 @@ public class BlackNScholesCaculator
             price = blackNScholesCaculator.CallValue;
 
             var test = (price - optionPrice);
-            if (System.Math.Abs(test) < ACCURACY) {
+            if (System.Math.Abs(test) < IVCalculationPriceAccuracy) {
                 IterationCounter = i;
                 return sigma;
             }
@@ -369,7 +372,6 @@ public class BlackNScholesCaculator
 
         // simple binomial search for the implied volatility.
         // relies on the value of the option increasing in volatility
-        const float ACCURACY = 1.0e-5f; // make this smaller for higher accuracy
         const int MAX_ITERATIONS = 100;
         const float HIGH_VALUE = 1e10f;
 
@@ -407,7 +409,7 @@ public class BlackNScholesCaculator
             price = blackNScholesCaculator.PutValue;
 
             var test = (price - optionPrice);
-            if (MathF.Abs(test) < ACCURACY) {
+            if (MathF.Abs(test) < IVCalculationPriceAccuracy) {
                 IterationCounter = i;
                 return sigma;
             }
