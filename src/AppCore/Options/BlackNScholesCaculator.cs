@@ -111,7 +111,7 @@ public class BlackNScholesCaculator
         set {
             _dayLeft = value;
             var dayLeft1 = _dayLeft - ((_dayLeft / 7.0f) * 2.0f);
-            ExpiryTimeWorking = (dayLeft1 / 250.0f);//= 365 - (2 * 53)==> get the year working days.
+            ExpiryTimeWorking = (dayLeft1 / 252.0f);
             ExpiryTime = _dayLeft / 365.0f;
         }
     }

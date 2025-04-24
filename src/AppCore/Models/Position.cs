@@ -22,7 +22,7 @@ public class Position
 
     public bool IsCall { get; init; }
 
-    public DateTime? Expiration { get; init; }
+    public DateTimeOffset? Expiration { get; init; }
 
     #endregion
 
@@ -93,8 +93,12 @@ public class Position
     /// Create a new position.
     /// </summary>
     [SetsRequiredMembers]
-    public Position(string underlyingSymbol,
+    public Position(int contractId, string underlyingSymbol,
         AssetClass assetClass, bool isCall, float strike, float multiplier) {
+
+        if (contractId <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
+        }
         if (string.IsNullOrWhiteSpace(underlyingSymbol)) {
             throw new ArgumentNullException(nameof(underlyingSymbol), "Underlying symbol is required.");
         }
@@ -108,6 +112,7 @@ public class Position
             throw new ArgumentOutOfRangeException(nameof(multiplier), $"Multiplier {multiplier} is not a valid option multiplier.");
         }
 
+        ContractId = contractId;
         Symbol = underlyingSymbol;
         AssetClass = assetClass;
         IsCall = isCall;

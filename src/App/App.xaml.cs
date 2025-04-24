@@ -65,6 +65,7 @@ public partial class App : Application
 
         // Views
         serviceCollection.AddSingleton<MainWindow>();
+        serviceCollection.AddSingleton(TimeProvider.System);
 
         serviceCollection.AddInteractiveBrokers();
         serviceCollection.AddAppCore();
