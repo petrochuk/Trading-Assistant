@@ -1,4 +1,5 @@
 ﻿using AppCore;
+using AppCore.Extenstions;
 using AppCore.Models;
 using System.Globalization;
 using System.Text.Json;
@@ -146,7 +147,7 @@ public class Position : IPosition, IJsonOnDeserialized
         }
     }
 
-    DateTime? IPosition.Expiration {
+    DateTimeOffset IPosition.Expiration {
         get {
             if (string.IsNullOrWhiteSpace(expiry))
                 throw new InvalidOperationException("Unable to determine expiration date. No expiry value available.");
@@ -154,7 +155,8 @@ public class Position : IPosition, IJsonOnDeserialized
             if (!DateTime.TryParseExact(expiry, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var result))
                 throw new InvalidOperationException($"Unable to parse expiration date: {expiry}");
 
-            return result;
+            // Add default expiration time of 16:00:00 EST
+            return new DateTimeOffset(result.Year, result.Month, result.Day, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset);
         }
     }
 

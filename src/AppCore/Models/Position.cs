@@ -83,6 +83,9 @@ public class Position
             Strike = position.Strike;
             Expiration = position.Expiration;
         }
+        else if (position.AssetClass == AssetClass.Future) {
+            Expiration = position.Expiration;
+        }
 
         Size = position.Size;
         MarketPrice = position.MarketPrice;

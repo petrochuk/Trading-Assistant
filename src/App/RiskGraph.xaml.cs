@@ -118,7 +118,7 @@ public sealed partial class RiskGraph : UserControl
         var maxPL = float.MinValue;
         var minPL = float.MaxValue;
         foreach (var interval in _riskIntervals) {
-            var riskCurve = CalculateRiskCurve(underlyingSymbol, interval.Key, minPrice, midPrice, maxPrice, priceIncrement);
+            var riskCurve = _positions.CalculateRiskCurve(underlyingSymbol, interval.Key, minPrice, midPrice, maxPrice, priceIncrement);
             if (riskCurve.MaxPL > maxPL) {
                 maxPL = riskCurve.MaxPL;
             }
@@ -221,71 +221,6 @@ public sealed partial class RiskGraph : UserControl
         var range = max - min;
         var mappedValue = (max - value) / range * Canvas.ActualHeight;
         return mappedValue;
-    }
-
-    private RiskCurve CalculateRiskCurve(string underlyingSymbol, TimeSpan timeSpan, float minPrice, float midPrice, float maxPrice, float priceIncrement) {
-
-        var riskCurve = new RiskCurve();
-
-        // Estimate deltas with sigmoid function
-        foreach (var position in _positions!.Values) {
-            // Skip any positions that are not in the same underlying
-            if (position.Symbol != underlyingSymbol) {
-                continue;
-            }
-            else if (position.AssetClass == AssetClass.FutureOption) {
-                if (position.Delta.HasValue) {
-                    if (position.Strike == midPrice) {
-                        position.DeltaEstimator = null;
-                    }
-                    else {
-                        if (position.IsCall)
-                            position.DeltaEstimator = (float)System.Math.Log((1 - position.Delta.Value) / position.Delta.Value) / (position.Strike - midPrice);
-                        else
-                            position.DeltaEstimator = (float)System.Math.Log(1 / (1 + position.Delta.Value) - 1) / (position.Strike - midPrice);
-                    }
-                }
-                else {
-                    _logger.LogWarning($"Delta is not available for position {position.ContractDesciption}");
-                }
-            }
-        }
-
-        // Go through the price range and calculate the P&L for each position
-        for (var currentPrice = minPrice; currentPrice < maxPrice; currentPrice += priceIncrement) {
-            var totalPL = 0f;
-            foreach (var position in _positions!.Values) {
-                // Skip any positions that are not in the same underlying
-                if (position.Symbol != underlyingSymbol) {
-                    continue;
-                }
-
-                if (position.AssetClass == AssetClass.Future) {
-                    totalPL += position.Size * (currentPrice - position.MarketPrice) * position.Multiplier;
-                }
-                else if (position.AssetClass == AssetClass.FutureOption ) {
-                    // We need to add all values as delta changes from mid price
-                    if (position.DeltaEstimator.HasValue) { 
-                        var incrementDirection = currentPrice > midPrice ? 1 : -1;
-                        var estimatedRange = System.Math.Abs(currentPrice - midPrice);
-                        for (var deltaPrice = 0; deltaPrice < estimatedRange; deltaPrice += 1) {
-                            var estimatedDelta = 1 / (1 + MathF.Exp(position.DeltaEstimator.Value * (position.Strike - (midPrice + incrementDirection * deltaPrice))));
-                            if (!position.IsCall) {
-                                estimatedDelta -= 1;
-                            }
-                            totalPL += estimatedDelta * incrementDirection * position.Size * position.Multiplier;
-                        }
-                    }
-                }
-            }
-            if (double.IsNaN(currentPrice) || double.IsNaN(totalPL)) {
-                _logger.LogWarning($"Invalid data");
-                continue;
-            }
-            riskCurve.Add(currentPrice, totalPL);
-        }
-
-        return riskCurve;
     }
 
     private void DrawBackground() {

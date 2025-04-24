@@ -296,10 +296,6 @@ public class BlackNScholesCaculator
     /// <returns>Sigma (implied volatility)</returns>
     public float CallOptionPriceIVBisections(float spot, float strike, float interestRate,
             float time, float optionPrice) {
-        // check for arbitrage violations.
-        if (optionPrice < 0.99f * (spot - strike * Math.ExpOpt(-time * interestRate))) {
-            return 0.0f; // Option price is too low if this happens
-        }
 
         // simple binomial search for the implied volatility.
         // relies on the value of the option increasing in volatility
@@ -365,10 +361,6 @@ public class BlackNScholesCaculator
     /// <returns>Sigma (implied volatility)</returns>
     public float PutOptionPriceIVBisections(float spot, float strike, float interestRate,
             float time, float optionPrice) {
-        // check for arbitrage violations.
-        if (optionPrice < 0.99f * (spot - strike * Math.ExpOpt(-time * interestRate))) {
-            return 0.0f; // Option price is too low if this happens
-        }
 
         // simple binomial search for the implied volatility.
         // relies on the value of the option increasing in volatility

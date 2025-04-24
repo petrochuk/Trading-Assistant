@@ -143,6 +143,6 @@ public sealed class PositionsCollectionTests
         var riskCurve = positions.CalculateRiskCurve("ES", TimeSpan.FromMinutes(5), 5300, 5401.25f, 5500, 10);
 
         // Assert
-        Assert.AreEqual(200, riskCurve.Points.Count);
+        Assert.AreEqual(20, riskCurve.Points.Count);
     }
 }
