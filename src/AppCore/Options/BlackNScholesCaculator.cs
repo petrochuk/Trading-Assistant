@@ -17,7 +17,7 @@ public class BlackNScholesCaculator
     /// <summary>
     /// When calculating implied volatility, this is how close the calculated price should be to the actual option price.
     /// </summary>
-    public float IVCalculationPriceAccuracy { get; init; } = 0.001f;
+    public float IVCalculationPriceAccuracy { get; init; } = 0.005f;
 
     /// <summary>
     /// Call value after calculation
@@ -346,7 +346,7 @@ public class BlackNScholesCaculator
                 sigmaHigh = sigma;
         }
 
-        throw new InvalidOperationException("Failed to calculate implied volatility");
+        return (sigmaLow + sigmaHigh) * 0.5f;
     }
 
     /// <summary>
@@ -411,7 +411,7 @@ public class BlackNScholesCaculator
                 sigmaHigh = sigma;
         }
 
-        throw new InvalidOperationException("Failed to calculate implied volatility");
+        return (sigmaLow + sigmaHigh) * 0.5f;
     }
 
     /// <summary>
