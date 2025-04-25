@@ -36,9 +36,10 @@ public sealed partial class RiskGraph : UserControl
         _logger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<RiskGraph>>();
 
         _riskIntervals.Add(TimeSpan.FromMinutes(5), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
+        _riskIntervals.Add(TimeSpan.FromDays(3), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
+        /* TODO
         _riskIntervals.Add(TimeSpan.FromMinutes(15), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromMinutes(30), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        /* TODO
         _riskIntervals.Add(TimeSpan.FromHours(1), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromHours(2), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromHours(3), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
@@ -46,7 +47,6 @@ public sealed partial class RiskGraph : UserControl
         _riskIntervals.Add(TimeSpan.FromHours(12), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromDays(1), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromDays(2), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromDays(3), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         */
 
         _drawRiskTimer.Tick += (s, args) => {
@@ -93,9 +93,12 @@ public sealed partial class RiskGraph : UserControl
         var greeks = _positions!.CalculateGreeks();
 
         if (_positions.DefaultUnderlying != null && _positions.DefaultUnderlying.RollingStdDev != null) {
-            // Annualize RV
-            var annualizalizedRV = _positions.DefaultUnderlying.RollingStdDev.Value * System.Math.Sqrt(365.0 * 24.0 * (60.0 / PositionsCollection.StdDevPeriod.TotalMinutes));
-            RVText.Text = annualizalizedRV.ToString("P2");
+
+            if (_positions.DefaultUnderlying.RollingStdDev.TryGetValue(out var rv)) {
+                // Annualize RV
+                var annualizalizedRV = _positions.DefaultUnderlying.RollingStdDev.Value * System.Math.Sqrt(365.0 * 24.0 * (60.0 / PositionsCollection.StdDevPeriod.TotalMinutes));
+                RVText.Text = annualizalizedRV.ToString("P2");
+            }
         }
 
         DeltaText.Text = $"{greeks.Delta:N2}";

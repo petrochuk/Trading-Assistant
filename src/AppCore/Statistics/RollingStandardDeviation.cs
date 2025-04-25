@@ -65,5 +65,16 @@ public class RollingStandardDeviation
         }
     }
 
+    public bool TryGetValue(out double value) {
+        if (_count < 2) {
+            value = 0;
+            return false;
+        }
+     
+        value = System.Math.Sqrt(_sum / (_count - 1));
+        
+        return true;
+    }
+
     public int Count => (int)_count;
 }
