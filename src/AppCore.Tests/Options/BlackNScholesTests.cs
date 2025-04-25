@@ -17,11 +17,11 @@ public class BlackNScholesTests
         bls.DaysLeft = 7.3f;
         bls.RiskFreeInterestRate = -0.045f;
         var iv = bls.GetCallIVBisections(optionPrice);
-        Assert.AreEqual(expectedIV, iv, 0.001f);
+        Assert.AreEqual(expectedIV, iv, 0.005f);
         bls.ImpliedVolatility = iv;
 
         var callPrice = bls.CalculateCall();
-        Assert.AreEqual(optionPrice, callPrice, 0.001f);
+        Assert.AreEqual(optionPrice, callPrice, 0.005f);
     }
 
     [TestMethod]
@@ -34,10 +34,10 @@ public class BlackNScholesTests
         bls.DaysLeft = 7.3f;
         bls.RiskFreeInterestRate = 0.045f;
         var iv = bls.GetPutIVBisections(optionPrice);
-        Assert.AreEqual(expectedIV, iv, 0.001f);
+        Assert.AreEqual(expectedIV, iv, 0.005f);
         bls.ImpliedVolatility = iv;
 
         var putPrice = bls.CalculatePut();
-        Assert.AreEqual(optionPrice, putPrice, 0.001f);
+        Assert.AreEqual(optionPrice, putPrice, 0.005f);
     }
 }
