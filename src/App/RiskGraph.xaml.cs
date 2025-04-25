@@ -1,3 +1,4 @@
+#region using
 using AppCore;
 using AppCore.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +11,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using Windows.Foundation;
+#endregion
 
 namespace TradingAssistant;
 
@@ -34,9 +36,9 @@ public sealed partial class RiskGraph : UserControl
         _logger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<RiskGraph>>();
 
         _riskIntervals.Add(TimeSpan.FromMinutes(5), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
-        /* TODO
         _riskIntervals.Add(TimeSpan.FromMinutes(15), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromMinutes(30), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
+        /* TODO
         _riskIntervals.Add(TimeSpan.FromHours(1), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromHours(2), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromHours(3), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
@@ -89,6 +91,12 @@ public sealed partial class RiskGraph : UserControl
     private void UpdateGreeks() {
 
         var greeks = _positions!.CalculateGreeks();
+
+        if (_positions.DefaultUnderlying != null && _positions.DefaultUnderlying.RollingStdDev != null) {
+            // Annualize RV
+            var annualizalizedRV = _positions.DefaultUnderlying.RollingStdDev.Value * System.Math.Sqrt(365.0 * 24.0 * (60.0 / PositionsCollection.StdDevPeriod.TotalMinutes));
+            RVText.Text = annualizalizedRV.ToString("P2");
+        }
 
         DeltaText.Text = $"{greeks.Delta:N2}";
         GammaText.Text = $"{greeks.Gamma:N4}";

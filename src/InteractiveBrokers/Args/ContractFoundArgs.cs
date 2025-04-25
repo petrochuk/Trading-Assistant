@@ -1,4 +1,4 @@
-﻿using AppCore;
+﻿using AppCore.Models;
 
 namespace InteractiveBrokers.Args;
 

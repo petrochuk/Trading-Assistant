@@ -16,6 +16,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
     private readonly TimeProvider _timeProvider;
     private readonly Lock _lock = new();
 
+    public static readonly TimeSpan StdDevPeriod = TimeSpan.FromMinutes(5);
+    private System.Timers.Timer _stdDevTimer;
+
     #endregion
 
     #region Constructors
@@ -23,6 +26,12 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
     public PositionsCollection(ILogger<PositionsCollection> logger, TimeProvider timeProvider) {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+
+        _stdDevTimer = new(StdDevPeriod) {
+            AutoReset = true, Enabled = true
+        };
+        _stdDevTimer.Elapsed += OnStdDevTimer;
+        _stdDevTimer.Start();
     }
 
     #endregion
@@ -212,59 +221,97 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
         return greeks;
     }
 
-    public RiskCurve CalculateRiskCurve(string underlyingSymbol, TimeSpan timeSpan, float minPrice, float midPrice, float maxPrice, float priceIncrement)
+    public RiskCurve CalculateRiskCurve(string underlyingSymbol, TimeSpan lookaheadSpan, float minPrice, float midPrice, float maxPrice, float priceIncrement)
     {
         var riskCurve = new RiskCurve();
-        var bls = new BlackNScholesCaculator();
         var currentTime = _timeProvider.EstNow();
 
         // Go through the price range and calculate the P&L for each position
-        for (var currentPrice = minPrice; currentPrice < maxPrice; currentPrice += priceIncrement)
-        {
-            var totalPL = 0f;
-            foreach (var position in Values)
-            {
-                // Skip any positions that are not in the same underlying
-                if (position.Symbol != underlyingSymbol)
-                    continue;
+        for (var currentPrice = minPrice; currentPrice < maxPrice; currentPrice += priceIncrement) {
+            var totalPL = CalculatePL(underlyingSymbol, lookaheadSpan, midPrice, currentTime, currentPrice);
 
-                if (position.AssetClass == AssetClass.Future)
-                {
-                    totalPL += position.Size * (currentPrice - position.MarketPrice) * position.Multiplier;
-                }
-                else if (position.AssetClass == AssetClass.FutureOption)
-                {
-                    float optionPrice = 0f;
-                    bls.DaysLeft = (float)(position.Expiration!.Value - currentTime).TotalDays;
-                    bls.StockPrice = midPrice;
-                    bls.Strike = position.Strike;
-                    if (position.IsCall)
-                    {
-                        // Estimate IV
-                        var currentIV = bls.GetCallIVBisections(position.MarketPrice);
-                        bls.ImpliedVolatility = currentIV;
-                        bls.StockPrice = currentPrice;
-                        bls.DaysLeft -= (float)timeSpan.TotalDays;
-                        optionPrice = bls.CalculateCall();
-                    }
-                    else
-                    {
-                        // Estimate IV
-                        var currentIV = bls.GetPutIVBisections(position.MarketPrice);
-                        // Keep existing IV and move market price to calculate new option price
-                        bls.ImpliedVolatility = currentIV;
-                        bls.StockPrice = currentPrice;
-                        bls.DaysLeft -= (float)timeSpan.TotalDays;
-                        optionPrice = bls.CalculatePut();
-                    }
-
-                    totalPL += position.Size * (optionPrice - position.MarketPrice) * position.Multiplier;
-                }
-            }
             riskCurve.Add(currentPrice, totalPL);
         }
 
         return riskCurve;
+    }
+
+    private float CalculatePL(string underlyingSymbol, TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice) {
+
+        var bls = new BlackNScholesCaculator();
+        float totalPL = 0f;
+        foreach (var position in Values) {
+            // Skip any positions that are not in the same underlying
+            if (position.Symbol != underlyingSymbol)
+                continue;
+
+            if (position.AssetClass == AssetClass.Future) {
+                totalPL += position.Size * (currentPrice - position.MarketPrice) * position.Multiplier;
+            } 
+            else if (position.AssetClass == AssetClass.FutureOption) {
+                float optionPrice = CalculateOptionPrice(lookaheadSpan, midPrice, currentTime, currentPrice, bls, position);
+
+                totalPL += position.Size * (optionPrice - position.MarketPrice) * position.Multiplier;
+            }
+        }
+
+        return totalPL;
+    }
+
+    private float CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCaculator bls, Position position) {
+        // Past expiration calculate realized value
+        if (position.Expiration!.Value  < currentTime + lookaheadSpan) {
+            if (position.IsCall) {
+                if (currentPrice <= position.Strike)
+                    return 0;
+
+                return currentPrice - position.Strike;
+            } 
+            else {
+                if (position.Strike <= currentPrice)
+                    return 0;
+
+                return position.Strike - currentPrice;
+            }
+        }
+        
+        float optionPrice = 0f;
+        bls.DaysLeft = (float)(position.Expiration!.Value - currentTime).TotalDays;
+        bls.StockPrice = midPrice;
+        bls.Strike = position.Strike;
+        if (position.IsCall) {
+            // Estimate IV
+            var currentIV = bls.GetCallIVBisections(position.MarketPrice);
+            bls.ImpliedVolatility = currentIV;
+            bls.StockPrice = currentPrice;
+            bls.DaysLeft -= (float)lookaheadSpan.TotalDays;
+            optionPrice = bls.CalculateCall();
+        } else {
+            // Estimate IV
+            var currentIV = bls.GetPutIVBisections(position.MarketPrice);
+            // Keep existing IV and move market price to calculate new option price
+            bls.ImpliedVolatility = currentIV;
+            bls.StockPrice = currentPrice;
+            bls.DaysLeft -= (float)lookaheadSpan.TotalDays;
+            optionPrice = bls.CalculatePut();
+        }
+
+        return optionPrice;
+    }
+
+    #endregion
+
+    #region Private methods
+
+    private void OnStdDevTimer(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        foreach (var position in Values)
+        {
+            if (position.AssetClass != AssetClass.Stock && position.AssetClass != AssetClass.Future)
+                continue;
+
+            position.UpdateStdDev();
+        }
     }
 
     #endregion

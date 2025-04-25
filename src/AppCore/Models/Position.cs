@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using AppCore.Statistics;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace AppCore.Models;
@@ -8,13 +9,25 @@ public class Position
 {
     #region Immutable Properties
 
+    private Lock _lock = new();
+
     public int ContractId { get; init; }
 
     public required string Symbol { get; init; }
 
     public string ContractDesciption { get; init; } = string.Empty;
 
-    public AssetClass AssetClass { get; init; }
+    private AssetClass _assetClass;
+    public AssetClass AssetClass
+    {
+        get => _assetClass;
+        init
+        {
+            _assetClass = value;
+            if (_assetClass == AssetClass.Stock || _assetClass == AssetClass.Future)
+                RollingStdDev = new RollingStandardDeviation();
+        }
+    }
 
     public float Multiplier { get; init; } = 1;
 
@@ -24,6 +37,8 @@ public class Position
 
     public DateTimeOffset? Expiration { get; init; }
 
+    public RollingStandardDeviation? RollingStdDev { get; private set; }
+
     #endregion
 
     #region Properties
@@ -31,6 +46,11 @@ public class Position
     public float Size { get; set; }
 
     public float MarketPrice { get; set; }
+
+    /// <summary>
+    /// Used for StdDev to calculate log return
+    /// </summary>
+    public float? MarketPriceLast { get; set; }
 
     public float MarketValue { get; set; }
 
@@ -50,9 +70,7 @@ public class Position
 
     #endregion
 
-    #region Updates
-
-    private Lock _lock = new();
+    #region Constructors
 
     public Position() {
     }
@@ -136,6 +154,10 @@ public class Position
         Multiplier = contract.Multiplier;
     }
 
+    #endregion
+
+    #region Updates
+
     /// <summary>
     /// Update the position with the values from another position.
     /// </summary>
@@ -164,6 +186,19 @@ public class Position
             Theta = theta ?? Theta;
             Vega = vega ?? Vega;
         }
+    }
+
+    public void UpdateStdDev()
+    {
+        if (RollingStdDev == null)
+            return;
+
+        if (MarketPriceLast.HasValue) {
+            var logReturn = System.Math.Log(MarketPrice / MarketPriceLast.Value);
+            RollingStdDev.AddValue(logReturn);
+        }
+
+        MarketPriceLast = MarketPrice;
     }
 
     #endregion

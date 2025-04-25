@@ -1,4 +1,4 @@
-﻿using AppCore;
+﻿using AppCore.Models;
 using AppCore.Extenstions;
 using InteractiveBrokers.Args;
 using Microsoft.Extensions.DependencyInjection;

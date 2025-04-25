@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace AppCore;
+﻿namespace AppCore.Models;
 
 public class Contract
 {
