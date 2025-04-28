@@ -25,7 +25,7 @@ public class Position
         {
             _assetClass = value;
             if (_assetClass == AssetClass.Stock || _assetClass == AssetClass.Future)
-                RollingStdDev = new RollingStandardDeviation();
+                RealizedVol = new RVwithSubsampling(PositionsCollection.RealizedVolPeriod, PositionsCollection.RealizedVolSamples);
         }
     }
 
@@ -37,7 +37,7 @@ public class Position
 
     public DateTimeOffset? Expiration { get; init; }
 
-    public RollingStandardDeviation? RollingStdDev { get; private set; }
+    public RVwithSubsampling? RealizedVol { get; private set; }
 
     #endregion
 
@@ -190,15 +190,7 @@ public class Position
 
     public void UpdateStdDev()
     {
-        if (RollingStdDev == null)
-            return;
-
-        if (MarketPriceLast.HasValue) {
-            var logReturn = System.Math.Log(MarketPrice / MarketPriceLast.Value);
-            RollingStdDev.AddValue(logReturn);
-        }
-
-        MarketPriceLast = MarketPrice;
+        RealizedVol?.AddValue(MarketPrice);
     }
 
     #endregion

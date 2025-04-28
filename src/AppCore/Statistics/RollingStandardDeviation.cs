@@ -12,6 +12,7 @@ public class RollingStandardDeviation
     private double _mean;
     private double _sum;
     private double _oldestValue;
+    private double? _lastValue;
 
     public RollingStandardDeviation(int? period = null) {
         if (period != null && period <= 1)
@@ -22,6 +23,15 @@ public class RollingStandardDeviation
         _mean = 0;
         _sum = 0;
         _oldestValue = 0;
+    }
+
+    public void AddLogReturn(double value) {
+        if (_lastValue.HasValue) {
+            var logReturn = System.Math.Log(value / _lastValue.Value);
+            AddValue(logReturn);
+        }
+
+        _lastValue = value;
     }
 
     /// <summary>
@@ -77,4 +87,11 @@ public class RollingStandardDeviation
     }
 
     public int Count => (int)_count;
+
+    public override string ToString() {
+        if (_count < 2)
+            return "Not enough data";
+
+        return $"StdDev: {Value}, Count: {Count}, Mean: {Mean}";
+    }
 }
