@@ -5,9 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Serilog;
-using System.Diagnostics;
 using System.IO;
-
 namespace TradingAssistant;
 
 /// <summary>

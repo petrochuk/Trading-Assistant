@@ -260,19 +260,19 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
     }
 
     private float CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCaculator bls, Position position) {
-        // Past expiration calculate realized value
+        // Past expiration calculate realized value at mid price (market price)
         if (position.Expiration!.Value  < currentTime + lookaheadSpan) {
             if (position.IsCall) {
-                if (currentPrice <= position.Strike)
+                if (midPrice <= position.Strike)
                     return 0;
 
-                return currentPrice - position.Strike;
+                return midPrice - position.Strike;
             } 
             else {
-                if (position.Strike <= currentPrice)
+                if (position.Strike <= midPrice)
                     return 0;
 
-                return position.Strike - currentPrice;
+                return position.Strike - midPrice;
             }
         }
         

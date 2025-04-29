@@ -36,7 +36,7 @@ public sealed partial class RiskGraph : UserControl
         _logger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<RiskGraph>>();
 
         _riskIntervals.Add(TimeSpan.FromMinutes(5), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
-        _riskIntervals.Add(TimeSpan.FromDays(3), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
+        _riskIntervals.Add(TimeSpan.FromDays(1), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
         /* TODO
         _riskIntervals.Add(TimeSpan.FromMinutes(15), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
         _riskIntervals.Add(TimeSpan.FromMinutes(30), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
