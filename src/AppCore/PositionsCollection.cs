@@ -203,7 +203,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                             if (extrinsicValue < absTheta)
                                 absTheta = extrinsicValue;
 
-                            greeks.Charm += ((position.IsCall ? 1f : -1f) - position.Delta.Value) * (absTheta / extrinsicValue) * position.Size;
+                            if (0 < absTheta)
+                                greeks.Charm += ((position.IsCall ? 1f : -1f) - position.Delta.Value) * (absTheta / extrinsicValue) * position.Size;
                         }
                     }
                     if (position.Gamma.HasValue) {
@@ -227,9 +228,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
         var riskCurve = new RiskCurve();
         var currentTime = _timeProvider.EstNow();
 
+        var staticDelta = CalculateStaticDelta(underlyingSymbol, currentTime, lookaheadSpan, midPrice);
+
         // Go through the price range and calculate the P&L for each position
         for (var currentPrice = minPrice; currentPrice < maxPrice; currentPrice += priceIncrement) {
-            var totalPL = CalculatePL(underlyingSymbol, lookaheadSpan, midPrice, currentTime, currentPrice);
+            var totalPL = CalculatePL(underlyingSymbol, currentTime, lookaheadSpan, staticDelta, midPrice, currentPrice);
 
             riskCurve.Add(currentPrice, totalPL);
         }
@@ -237,10 +240,38 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
         return riskCurve;
     }
 
-    private float CalculatePL(string underlyingSymbol, TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice) {
+    /// <summary>
+    /// Calculate the static delta created from expired positions.
+    /// </summary>
+    private float CalculateStaticDelta(string underlyingSymbol, DateTimeOffset currentTime, TimeSpan lookaheadSpan, float midPrice) {
+        float staticDelta = 0f;
+        foreach (var position in Values) {
+            // Skip any positions that are not in the same underlying
+            if (position.Symbol != underlyingSymbol)
+                continue;
+            // Skip any positions that are not expired
+            if (currentTime + lookaheadSpan < position.Expiration!.Value)
+                continue;
+
+            if (position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option) {
+                if (position.IsCall) {
+                    if (position.Strike < midPrice)
+                        staticDelta += position.Size * position.Multiplier;
+                }
+                else {
+                    if (midPrice < position.Strike)
+                        staticDelta -= position.Size * position.Multiplier;
+                }
+            }
+        }
+
+        return staticDelta;
+    }
+
+    private float CalculatePL(string underlyingSymbol, DateTimeOffset currentTime, TimeSpan lookaheadSpan, float staticDelta, float midPrice, float currentPrice) {
 
         var bls = new BlackNScholesCaculator();
-        float totalPL = 0f;
+        float totalPL = staticDelta * (currentPrice - midPrice);
         foreach (var position in Values) {
             // Skip any positions that are not in the same underlying
             if (position.Symbol != underlyingSymbol)

@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using Windows.Foundation;
+using Windows.UI;
 #endregion
 
 namespace TradingAssistant;
@@ -35,19 +36,17 @@ public sealed partial class RiskGraph : UserControl
 
         _logger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<RiskGraph>>();
 
-        _riskIntervals.Add(TimeSpan.FromMinutes(5), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
-        _riskIntervals.Add(TimeSpan.FromDays(1), (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"]);
-        /* TODO
-        _riskIntervals.Add(TimeSpan.FromMinutes(15), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromMinutes(30), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromHours(1), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromHours(2), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromHours(3), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromHours(6), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromHours(12), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromDays(1), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        _riskIntervals.Add(TimeSpan.FromDays(2), (Brush)App.Current.Resources["SystemFillColorSuccessBackgroundBrush"]);
-        */
+        _riskIntervals.Add(TimeSpan.FromMinutes(5), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xff, 0xff)));
+        _riskIntervals.Add(TimeSpan.FromMinutes(15), new SolidColorBrush(Color.FromArgb(0xff, 0xf2, 0xf5, 0xf8)));
+        _riskIntervals.Add(TimeSpan.FromMinutes(30), new SolidColorBrush(Color.FromArgb(0xff, 0xe6, 0xed, 0xf2)));
+        _riskIntervals.Add(TimeSpan.FromHours(1), new SolidColorBrush(Color.FromArgb(0xff, 0xd9, 0xe7, 0xee)));
+        _riskIntervals.Add(TimeSpan.FromHours(2), new SolidColorBrush(Color.FromArgb(0xff, 0xcc, 0xe1, 0xe7)));
+        _riskIntervals.Add(TimeSpan.FromHours(3), new SolidColorBrush(Color.FromArgb(0xff, 0xb3, 0xd9, 0xe0)));
+        _riskIntervals.Add(TimeSpan.FromHours(6), new SolidColorBrush(Color.FromArgb(0xff, 0x99, 0xd2, 0xdb)));
+        _riskIntervals.Add(TimeSpan.FromHours(12), new SolidColorBrush(Color.FromArgb(0xff, 0x80, 0xc9, 0xd4)));
+        _riskIntervals.Add(TimeSpan.FromDays(1), new SolidColorBrush(Color.FromArgb(0xff, 0x66, 0xc2, 0xcc)));
+        _riskIntervals.Add(TimeSpan.FromDays(2), new SolidColorBrush(Color.FromArgb(0xff, 0x4c, 0xa9, 0xc4)));
+        _riskIntervals.Add(TimeSpan.FromDays(3), new SolidColorBrush(Color.FromArgb(0xff, 0x34, 0xa1, 0xbf)));
 
         _drawRiskTimer.Tick += (s, args) => {
             Redraw();
