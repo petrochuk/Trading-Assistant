@@ -23,7 +23,7 @@ public sealed partial class RiskGraph : UserControl
     private readonly ILogger<RiskGraph> _logger;
     private SortedList<TimeSpan, Brush> _riskIntervals = new ();
 
-    DispatcherTimer _drawRiskTimer = new DispatcherTimer() {
+    DispatcherTimer _drawRiskTimer = new () {
         Interval = TimeSpan.FromSeconds(15),
     };
 
@@ -91,11 +91,11 @@ public sealed partial class RiskGraph : UserControl
 
         var greeks = _positions!.CalculateGreeks();
 
-        if (_positions.DefaultUnderlying != null && _positions.DefaultUnderlying.RollingStdDev != null) {
+        if (_positions.DefaultUnderlying != null && _positions.DefaultUnderlying.RealizedVol != null) {
 
-            if (_positions.DefaultUnderlying.RollingStdDev.TryGetValue(out var rv)) {
+            if (_positions.DefaultUnderlying.RealizedVol.TryGetValue(out var rv)) {
                 // Annualize RV
-                var annualizalizedRV = _positions.DefaultUnderlying.RollingStdDev.Value * System.Math.Sqrt(365.0 * 24.0 * (60.0 / PositionsCollection.StdDevPeriod.TotalMinutes));
+                var annualizalizedRV = rv * System.Math.Sqrt(365.0 * 24.0 * (60.0 / PositionsCollection.RealizedVolPeriod.TotalMinutes));
                 RVText.Text = annualizalizedRV.ToString("P2");
             }
         }

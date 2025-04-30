@@ -18,7 +18,7 @@ public sealed partial class MainWindow : Window
     private Account? _account = null;
     private string _ibClientSession = string.Empty;
 
-    private System.Timers.Timer _positionsTimer = new(TimeSpan.FromMinutes(1)) {
+    private System.Timers.Timer _positionsRefreshTimer = new(TimeSpan.FromMinutes(1)) {
         AutoReset = true,
         Enabled = true
     };
@@ -43,14 +43,14 @@ public sealed partial class MainWindow : Window
 
         _positions.OnPositionAdded += OnPositionAdded;
         _positions.OnPositionRemoved += OnPositionRemoved;
-        _positionsTimer.Elapsed += (s, args) => {
+        _positionsRefreshTimer.Elapsed += (s, args) => {
             if (_account == null) {
                 return;
             }
             App.Instance.IBClient.RequestAccountPositions(_account.Id);
             App.Instance.IBClient.RequestAccountSummary(_account.Id);
         };
-        _positionsTimer.Start();
+        _positionsRefreshTimer.Start();
         RiskGraphControl.SetPositions(_positions);
 
         // Subscribe to client events

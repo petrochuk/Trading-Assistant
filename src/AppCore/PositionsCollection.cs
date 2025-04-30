@@ -16,7 +16,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
     private readonly TimeProvider _timeProvider;
     private readonly Lock _lock = new();
 
-    public static readonly TimeSpan StdDevPeriod = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan RealizedVolPeriod = TimeSpan.FromMinutes(5);
+    public const int RealizedVolSamples = 20;
     private System.Timers.Timer _stdDevTimer;
 
     #endregion
@@ -27,10 +28,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
 
-        _stdDevTimer = new(StdDevPeriod) {
+        _stdDevTimer = new(RealizedVolPeriod / RealizedVolSamples) {
             AutoReset = true, Enabled = true
         };
-        _stdDevTimer.Elapsed += OnStdDevTimer;
+        _stdDevTimer.Elapsed += RealizedVolTimer;
         _stdDevTimer.Start();
     }
 
@@ -259,19 +260,19 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
     }
 
     private float CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCaculator bls, Position position) {
-        // Past expiration calculate realized value
+        // Past expiration calculate realized value at mid price (market price)
         if (position.Expiration!.Value  < currentTime + lookaheadSpan) {
             if (position.IsCall) {
-                if (currentPrice <= position.Strike)
+                if (midPrice <= position.Strike)
                     return 0;
 
-                return currentPrice - position.Strike;
+                return midPrice - position.Strike;
             } 
             else {
-                if (position.Strike <= currentPrice)
+                if (position.Strike <= midPrice)
                     return 0;
 
-                return position.Strike - currentPrice;
+                return position.Strike - midPrice;
             }
         }
         
@@ -303,7 +304,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 
     #region Private methods
 
-    private void OnStdDevTimer(object? sender, System.Timers.ElapsedEventArgs e)
+    private void RealizedVolTimer(object? sender, System.Timers.ElapsedEventArgs e)
     {
         foreach (var position in Values)
         {
