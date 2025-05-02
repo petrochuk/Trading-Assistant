@@ -156,7 +156,8 @@ public class Position : IPosition, IJsonOnDeserialized
                 throw new InvalidOperationException($"Unable to parse expiration date: {expiry}");
 
             // Add default expiration time of 16:00:00 EST
-            return new DateTimeOffset(result.Year, result.Month, result.Day, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset);
+            var expirationDate = new DateTime(result.Year, result.Month, result.Day, 16, 0, 0, DateTimeKind.Unspecified);
+            return new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(result));
         }
     }
 
