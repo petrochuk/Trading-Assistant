@@ -288,7 +288,7 @@ public class IBWebSocket : IDisposable
     protected virtual void Dispose(bool disposing) {
         if (!_isDisposed) {
             if (disposing) {
-                if (_clientWebSocket != null) {
+                if (_clientWebSocket != null && _clientWebSocket.State != WebSocketState.Closed) {
                     _clientWebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "App closed", CancellationToken.None);
                 }
                 if (_mainThread.IsAlive) {
