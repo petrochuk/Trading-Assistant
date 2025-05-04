@@ -52,7 +52,12 @@ public class IBClient : IDisposable
 
         // Set up the tickle timer
         _tickleTimer.Elapsed += (s, args) => {
-            _tickleRequest?.Execute(_httpClient);
+            try {
+                _tickleRequest?.Execute(_httpClient);
+            }
+            catch (Exception ex) {
+                _logger.LogError(ex, $"Error sending tickle request: {ex.Message}");
+            }
         };
 
         // Initialize the main thread

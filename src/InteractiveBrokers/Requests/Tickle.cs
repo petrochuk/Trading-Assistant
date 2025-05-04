@@ -14,7 +14,7 @@ internal class Tickle : Request
     }
 
     public override void Execute(HttpClient httpClient) {
-        var response = httpClient.PostAsync("tickle", null).ConfigureAwait(true).GetAwaiter().GetResult();
+        var response = httpClient.PostAsync(Uri, null).ConfigureAwait(true).GetAwaiter().GetResult();
         response.EnsureSuccessStatusCode();
 
         var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
