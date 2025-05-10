@@ -1,9 +1,11 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Diagnostics;
+using System.Text.Json.Serialization;
 
 namespace InteractiveBrokers.Responses;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
+[DebuggerDisplay("{Alias} ({AccountId})")]
 public class Account
 {
     public required string Id { get; init; }
@@ -15,6 +17,12 @@ public class Account
     [JsonPropertyName("accountAlias")]
     public required string Alias { get; set; }
 
+    [JsonPropertyName("businessType")]
+    public string BusinessType { get; set; }
+
+    [JsonPropertyName("acctCustType")]
+    public string CustomerType { get; set; }
+
     public bool brokerageAccess { get; set; }
 
     public string accountVan { get; set; }
@@ -23,7 +31,6 @@ public class Account
     public string currency { get; set; }
     public string type { get; set; }
     public string tradingType { get; set; }
-    public string businessType { get; set; }
     public string category { get; set; }
     public string ibEntity { get; set; }
     public bool faclient { get; set; }
@@ -31,7 +38,6 @@ public class Account
     public bool covestor { get; set; }
     public bool noClientTrading { get; set; }
     public bool trackVirtualFXPortfolio { get; set; }
-    public string acctCustType { get; set; }
     public AccountParent parent { get; set; }
     public string desc { get; set; }
 }
