@@ -205,7 +205,9 @@ public class IBWebSocket : IDisposable
         position.IsDataStreaming = false;
         var request = $@"umd+{position.ContractId}+{{}}";
         _logger.LogTrace($"Stopping market data for {position.ContractDesciption}");
-        _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
+        if (_clientWebSocket != null && _clientWebSocket.State == WebSocketState.Open) {
+            _clientWebSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
+        }
     }
 
     /// <summary>
