@@ -1,4 +1,5 @@
 ﻿using AppCore;
+using AppCore.Configuration;
 using InteractiveBrokers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,9 +41,11 @@ public partial class App : Application
         var serviceCollection = new ServiceCollection();
 
         // App configuration
+        var userAppSettings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Work", "TradingAssistant", "appsettings.json");
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", false, true)
+            .AddJsonFile(userAppSettings, true, true)
 #if DEBUG
             .AddJsonFile("appsettings.Debug.json", true, true)
 #endif
@@ -50,6 +53,9 @@ public partial class App : Application
 
         // Uncomment to enable SelfLog self diagnostics
         // Serilog.Debugging.SelfLog.Enable(msg => Debug.WriteLine(msg));
+        serviceCollection
+            .AddSingleton(configuration)
+            .Configure<AuthenticationConfiguration>(configuration.GetSection("Authentication"));
 
         // Logging
         var Logger = new LoggerConfiguration()
@@ -60,7 +66,6 @@ public partial class App : Application
                opt => {
                    opt.AddSerilog(dispose: true, logger: Logger);
                });
-
         // Views
         serviceCollection.AddSingleton<MainWindow>();
         serviceCollection.AddSingleton(TimeProvider.System);

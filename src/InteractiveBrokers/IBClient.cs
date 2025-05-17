@@ -4,6 +4,8 @@ using InteractiveBrokers.Args;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Threading.Channels;
+using AppCore.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace InteractiveBrokers;
 
@@ -34,7 +36,7 @@ public class IBClient : IDisposable
     private Requests.Tickle? _tickleRequest;
     private ILogger<IBClient> _logger;
 
-    public IBClient(ILogger<IBClient> logger, string host = "localhost", int port = 5000) {
+    public IBClient(ILogger<IBClient> logger, IOptions<AuthenticationConfiguration> authConfiguration, string host = "localhost", int port = 5000) {
 
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _host = string.IsNullOrWhiteSpace(host) ? "localhost" : host;
