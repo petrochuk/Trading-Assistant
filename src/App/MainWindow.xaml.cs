@@ -44,7 +44,7 @@ public sealed partial class MainWindow : Window
         _positions.OnPositionAdded += OnPositionAdded;
         _positions.OnPositionRemoved += OnPositionRemoved;
         _positionsRefreshTimer.Elapsed += (s, args) => {
-            if (_account == null) {
+            if (_account == null || App.Instance == null) {
                 return;
             }
             App.Instance.IBClient.RequestAccountPositions(_account.Id);
