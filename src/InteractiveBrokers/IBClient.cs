@@ -1,11 +1,12 @@
-﻿using AppCore.Models;
+﻿using AppCore.Configuration;
 using AppCore.Extenstions;
+using AppCore.Models;
 using InteractiveBrokers.Args;
+using InteractiveBrokers.Requests;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Threading.Channels;
-using AppCore.Configuration;
 using Microsoft.Extensions.Options;
+using System.Threading.Channels;
 
 namespace InteractiveBrokers;
 
@@ -16,8 +17,7 @@ public class IBClient : IDisposable
 {
     #region Fields
 
-    private readonly string _host;
-    private readonly int _port;
+    private readonly Uri _baseUri;
     private HttpClient _httpClient;
     private bool _isDisposed;
     private readonly Thread _mainThread;
@@ -35,19 +35,23 @@ public class IBClient : IDisposable
     };
     private Requests.Tickle? _tickleRequest;
     private ILogger<IBClient> _logger;
+    private readonly BrokerConfiguration _brokerConfiguration;
+    private readonly AuthenticationConfiguration _authConfiguration;
 
-    public IBClient(ILogger<IBClient> logger, IOptions<AuthenticationConfiguration> authConfiguration, string host = "localhost", int port = 5000) {
+    public IBClient(ILogger<IBClient> logger, IOptions<BrokerConfiguration> brokerConfiguration, IOptions<AuthenticationConfiguration> authConfiguration) {
 
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _host = string.IsNullOrWhiteSpace(host) ? "localhost" : host;
-        _port = port <= 0 ? 5000 : port;
+        _brokerConfiguration = brokerConfiguration?.Value ?? throw new ArgumentNullException(nameof(brokerConfiguration));
+        _authConfiguration = authConfiguration?.Value ?? throw new ArgumentNullException(nameof(authConfiguration));
+
+        _authConfiguration.PrivateKeyPath = _authConfiguration.PrivateKeyPath.Replace("<MyDocuments>", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
 
         // Disable SSL certificate validation IB Client Portal API Gateway
         var handler = new HttpClientHandler {
             ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true,
         };
-        var uriBuilder = new UriBuilder("https", _host, _port, "v1/api/");
-        _httpClient = new HttpClient(handler) { BaseAddress = uriBuilder.Uri };
+        _baseUri = new Uri(brokerConfiguration.Value.BaseUrl);
+        _httpClient = new HttpClient(handler) { BaseAddress = _baseUri };
 
         // Set default headers
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "Trading-Assistant");
@@ -117,17 +121,27 @@ public class IBClient : IDisposable
     /// Connects to the IB client.
     /// </summary>
     public void Connect() {
-        // Initialize the tickle request
-        _tickleRequest = new Requests.Tickle(OnTickle);
 
-        // Immediately send a tickle request to the IB client
-        // which will test the connection
-        _tickleRequest.Execute(_httpClient);
+        if (_authConfiguration.Type == AuthenticationConfiguration.AuthenticationType.OAuth2) {
+            var authRequest = new Requests.Authenticate(null, _authConfiguration);
+            _logger.LogInformation($"Starting authentication");
+            if (!_channel.Writer.TryWrite(authRequest)) {
+                throw new IBClientException("Failed to start authentication");
+            }
+        }
+        else {
+            // Initialize the tickle request
+            _tickleRequest = new Requests.Tickle(OnTickle);
 
-        OnConnected?.Invoke(this, EventArgs.Empty);
+            // Immediately send a tickle request to the IB client
+            // which will test the connection
+            _tickleRequest.Execute(_httpClient);
 
-        // Start the tickle timer if connection is successful to keep the connection alive
-        _tickleTimer.Start();
+            OnConnected?.Invoke(this, EventArgs.Empty);
+
+            // Start the tickle timer if connection is successful to keep the connection alive
+            _tickleTimer.Start();
+        }
     }
 
     #endregion

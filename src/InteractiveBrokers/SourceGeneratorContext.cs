@@ -9,6 +9,7 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Responses.HMDS))]
 [JsonSerializable(typeof(Responses.AuthStatus))]
 [JsonSerializable(typeof(Responses.ServerInfo))]
+[JsonSerializable(typeof(Responses.Authenticate))]
 [JsonSerializable(typeof(List<Responses.Position>))]
 [JsonSerializable(typeof(Dictionary<string, List<Models.Contract>>))]
 [JsonSerializable(typeof(List<Models.Contract>))]

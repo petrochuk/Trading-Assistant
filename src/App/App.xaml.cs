@@ -55,6 +55,7 @@ public partial class App : Application
         // Serilog.Debugging.SelfLog.Enable(msg => Debug.WriteLine(msg));
         serviceCollection
             .AddSingleton(configuration)
+            .Configure<BrokerConfiguration>(configuration.GetSection("Broker"))
             .Configure<AuthenticationConfiguration>(configuration.GetSection("Authentication"));
 
         // Logging
