@@ -16,4 +16,7 @@ public class Authenticate
 
     [JsonPropertyName("expires_in")]
     public int ExpiresIn { get; set; } = 0;
+
+    [JsonPropertyName("active")]
+    public bool IsActive { get; set; }
 }

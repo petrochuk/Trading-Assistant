@@ -10,6 +10,10 @@ public class AuthenticationConfiguration
 
     public AuthenticationType Type { get; set; } = AuthenticationType.Gateway;
     public string TokenUrl { get; set; } = string.Empty;
+    public string SessionUrl { get; set; } = string.Empty;
+    public string ValidateUrl { get; set; } = string.Empty;
+
     public string PrivateKeyPath { get; set; } = string.Empty;
     public string ClientId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
 }
