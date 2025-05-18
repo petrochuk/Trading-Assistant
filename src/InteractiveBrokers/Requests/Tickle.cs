@@ -8,35 +8,28 @@ internal class Tickle : Request
     private EventHandler<Args.TickleArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public Tickle(EventHandler<Args.TickleArgs>? responseHandler) {
-        Uri = "tickle";
+    public Tickle(EventHandler<Args.TickleArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
+        Uri = "v1/api/tickle";
         _responseHandler = responseHandler;
     }
 
     public override void Execute(HttpClient httpClient) {
-        var response = httpClient.PostAsync(Uri, null).ConfigureAwait(true).GetAwaiter().GetResult();
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
-        var tickleResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.Tickle);
-        if (tickleResponse == null) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid response");
+        var response = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.Tickle);
+        if (!string.IsNullOrWhiteSpace(response.Error)) {
+            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) response: {response.Error}");
         }
-        if (!string.IsNullOrWhiteSpace(tickleResponse.Error)) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) response: {tickleResponse.Error}");
-        }
-        if (tickleResponse.IServer == null) {
+        if (response.IServer == null) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) not connected to local server");
         }
-        if (!tickleResponse.IServer.AuthStatus.connected) {
+        if (!response.IServer.AuthStatus.connected) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) not connected");
         }
-        if (!tickleResponse.IServer.AuthStatus.authenticated) {
+        if (!response.IServer.AuthStatus.authenticated) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) not authenticated");
         }
 
         _responseHandler?.Invoke(this, new Args.TickleArgs {
-            Session = tickleResponse.Session
+            Session = response.Session
         });
     }
 }

@@ -1,6 +1,8 @@
 ﻿using AppCore;
+using AppCore.Configuration;
 using AppCore.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
@@ -12,8 +14,6 @@ public class IBWebSocket : IDisposable
 {
     #region Fields
 
-    private readonly string _host;
-    private readonly int _port;
     private readonly Uri _uri;
     private readonly Thread _mainThread;
     private readonly ILogger<IBWebSocket> _logger;
@@ -44,16 +44,24 @@ public class IBWebSocket : IDisposable
     };
     private string _stockFieldsString;
     private PositionsCollection? _positions;
+    private readonly BrokerConfiguration _brokerConfiguration;
+    private readonly AuthenticationConfiguration _authConfiguration;
 
     #endregion
 
     #region Constructors
 
-    public IBWebSocket(ILogger<IBWebSocket> logger, string host = "localhost", int port = 5000) {
+    public IBWebSocket(ILogger<IBWebSocket> logger, IOptions<BrokerConfiguration> brokerConfiguration, IOptions<AuthenticationConfiguration> authConfiguration) {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _host = string.IsNullOrWhiteSpace(host) ? "localhost" : host;
-        _port = port <= 0 ? 5000 : port;
-        _uri = new UriBuilder("wss", _host, _port, "v1/api/ws").Uri;
+        _brokerConfiguration = brokerConfiguration?.Value ?? throw new ArgumentNullException(nameof(brokerConfiguration));
+        _authConfiguration = authConfiguration?.Value ?? throw new ArgumentNullException(nameof(authConfiguration));
+        if (_authConfiguration.Type == AuthenticationConfiguration.AuthenticationType.OAuth2) {
+            var ub = new UriBuilder("wss", _brokerConfiguration.HostName);
+            ub.Path = _authConfiguration.WebSocketUrl;
+            _uri = ub.Uri;
+        }
+        else
+            _uri = new UriBuilder("wss", _brokerConfiguration.HostName, 5000, authConfiguration.Value.WebSocketUrl).Uri;
 
         // Initialize the main thread
         _mainThread = new Thread(new ThreadStart(MainThread)) {
@@ -67,7 +75,16 @@ public class IBWebSocket : IDisposable
 
     #endregion
 
+    #region Public Properties
+
+    /// <summary>
+    /// Gets or sets the IB client bearer token.
+    /// </summary>
+    public string BearerToken { get; set; } = string.Empty;
+
     public string ClientSession { get; set; } = string.Empty;
+
+    #endregion
 
     public void RequestPositionMarketData(PositionsCollection positions) {
         _positions = positions ?? throw new ArgumentNullException(nameof(positions));
@@ -103,9 +120,12 @@ public class IBWebSocket : IDisposable
         try {
             using (_clientWebSocket = new ClientWebSocket()) {
                 // Set options
+                if (!string.IsNullOrWhiteSpace(BearerToken))
+                    _clientWebSocket.Options.SetRequestHeader("Authorization", $"Bearer {BearerToken}");
+                _clientWebSocket.Options.SetRequestHeader("User-Agent", IBClient.UserAgent);
                 _clientWebSocket.Options.RemoteCertificateValidationCallback += (o, c, ch, er) => true;
                 _clientWebSocket.Options.Cookies = new CookieContainer();
-                _clientWebSocket.Options.Cookies.Add(new Cookie("api", ClientSession, "/", _host));
+                _clientWebSocket.Options.Cookies.Add(new Cookie("api", ClientSession, "/", _brokerConfiguration.HostName));
 
                 // Connect to the WebSocket server
                 _logger.LogInformation($"Connecting to WebSocket server at {_uri}...");

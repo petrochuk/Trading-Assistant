@@ -2,7 +2,6 @@
 using AppCore.Extenstions;
 using AppCore.Models;
 using InteractiveBrokers.Args;
-using InteractiveBrokers.Requests;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,6 +15,8 @@ namespace InteractiveBrokers;
 public class IBClient : IDisposable
 {
     #region Fields
+
+    public const string UserAgent = "Trading-Assistant";
 
     private readonly Uri _baseUri;
     private HttpClient _httpClient;
@@ -50,11 +51,11 @@ public class IBClient : IDisposable
         var handler = new HttpClientHandler {
             ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true,
         };
-        _baseUri = new Uri(brokerConfiguration.Value.BaseUrl);
+        _baseUri = new UriBuilder("https", brokerConfiguration.Value.HostName).Uri;
         _httpClient = new HttpClient(handler) { BaseAddress = _baseUri };
 
         // Set default headers
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Trading-Assistant");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
 
         // Set up the tickle timer
         _tickleTimer.Elapsed += (s, args) => {
@@ -76,6 +77,15 @@ public class IBClient : IDisposable
 
     #endregion
 
+    #region Public Properties
+
+    /// <summary>
+    /// Gets or sets the IB client bearer token.
+    /// </summary>
+    public string BearerToken { get; set; } = string.Empty;
+
+    #endregion
+
     #region Public Events
 
     /// <summary>
@@ -92,6 +102,11 @@ public class IBClient : IDisposable
     /// On account connected event.
     /// </summary>
     public event EventHandler<AccountConnectedArgs>? OnAccountConnected;
+
+    /// <summary>
+    /// On authenticated event.
+    /// </summary>
+    public event EventHandler<AuthenticatedArgs>? OnAuthenticated;
 
     /// <summary>
     /// On account positions event.
@@ -123,25 +138,34 @@ public class IBClient : IDisposable
     public void Connect() {
 
         if (_authConfiguration.Type == AuthenticationConfiguration.AuthenticationType.OAuth2) {
-            var authRequest = new Requests.Authenticate(null, _authConfiguration);
+            var authRequest = new Requests.Authenticate(OnAuthenticated, _authConfiguration) {
+                Logger = AppCore.ServiceProvider.Instance.GetService<ILogger<Requests.Request>>()
+            };
             _logger.LogInformation($"Starting authentication");
             if (!_channel.Writer.TryWrite(authRequest)) {
                 throw new IBClientException("Failed to start authentication");
             }
         }
         else {
-            // Initialize the tickle request
-            _tickleRequest = new Requests.Tickle(OnTickle);
-
-            // Immediately send a tickle request to the IB client
-            // which will test the connection
-            _tickleRequest.Execute(_httpClient);
+            // Start the tickle timer if connection is successful to keep the connection alive
+            StartTickle();
 
             OnConnected?.Invoke(this, EventArgs.Empty);
-
-            // Start the tickle timer if connection is successful to keep the connection alive
-            _tickleTimer.Start();
         }
+    }
+
+    public void StartTickle() {
+        // Initialize the tickle request
+        _tickleRequest = new Requests.Tickle(OnTickle, BearerToken);
+
+        // Immediately send a tickle request to the IB client
+        // which will test the connection
+        _tickleRequest.Execute(_httpClient);
+
+        if (_tickleTimer == null) {
+            return;
+        }
+        _tickleTimer.Start();
     }
 
     #endregion
@@ -149,7 +173,7 @@ public class IBClient : IDisposable
     #region Account management
 
     public void RequestAccounts() {
-        var request = new Requests.Accounts(OnAccountConnected);
+        var request = new Requests.Accounts(OnAccountConnected, BearerToken);
 
         _logger.LogInformation($"Requesting accounts");
         if (!_channel.Writer.TryWrite(request)) {
@@ -177,7 +201,7 @@ public class IBClient : IDisposable
             throw new IBClientException("Account cannot be null or empty");
         }
 
-        var request = new Requests.AccountSummary(accountId, OnAccountSummary);
+        var request = new Requests.AccountSummary(accountId, OnAccountSummary, BearerToken);
 
         _logger.LogInformation($"Requesting summary for account {accountId.Mask()}");
         if (!_channel.Writer.TryWrite(request)) {

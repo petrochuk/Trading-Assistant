@@ -8,40 +8,20 @@ internal class Accounts : Request
     EventHandler<Args.AccountConnectedArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public Accounts(EventHandler<Args.AccountConnectedArgs>? responseHandler) {
-        Uri = "portfolio/accounts";
+    public Accounts(EventHandler<Args.AccountConnectedArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
+        Uri = "v1/api/portfolio/accounts";
         _responseHandler = responseHandler;
     }
 
     public override void Execute(HttpClient httpClient) {
-        var response = httpClient.GetAsync(Uri).ConfigureAwait(true).GetAwaiter().GetResult();
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
-        if (string.IsNullOrWhiteSpace(responseContent)) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty accounts response");
-        }
-        var accountsResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.ListAccount);
-        if (accountsResponse == null) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid accounts response");
-        }
+        var accountsResponse = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.ListAccount);
         if (accountsResponse.Count != 1) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {accountsResponse.Count} accounts response");
         }
 
         // If this is Financial Advisor (FA) account, we want to request the sub-accounts
         if (accountsResponse[0].BusinessType == "FA") {
-            response = httpClient.GetAsync("portfolio/subaccounts").ConfigureAwait(true).GetAwaiter().GetResult();
-            response.EnsureSuccessStatusCode();
-            
-            responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
-            if (string.IsNullOrWhiteSpace(responseContent)) {
-                throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty subaccounts response");
-            }
-            accountsResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.ListAccount);
-            if (accountsResponse == null) {
-                throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid subaccounts response");
-            }
+            accountsResponse = GetResponse(httpClient, "v1/api/portfolio/subaccounts", SourceGeneratorContext.Default.ListAccount);
 
             // Get first individual account
             var individualAccount = accountsResponse.FirstOrDefault(a => a.BusinessType != "FA" && a.CustomerType == "INDIVIDUAL");

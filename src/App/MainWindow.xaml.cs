@@ -55,6 +55,7 @@ public sealed partial class MainWindow : Window
 
         // Subscribe to client events
         App.Instance.IBClient.OnConnected += IBClient_Connected;
+        App.Instance.IBClient.OnAuthenticated += IBClient_Authenticated;
         App.Instance.IBClient.OnTickle += IBClient_Tickle;
         App.Instance.IBClient.OnAccountConnected += IBClient_AccountConnected;
         App.Instance.IBClient.OnAccountPositions += IBClient_AccountPositions;
@@ -103,6 +104,14 @@ public sealed partial class MainWindow : Window
     #endregion
 
     #region IBClient Event Handlers
+
+    private void IBClient_Authenticated(object? sender, AuthenticatedArgs e) {
+        App.Instance.IBClient.BearerToken = e.BearerToken;
+        App.Instance.IBWebSocket.BearerToken = e.BearerToken;
+
+        IBClient_Connected(null, EventArgs.Empty);
+        App.Instance.IBClient.StartTickle();
+    }
 
     private void IBClient_Connected(object? sender, EventArgs e) {
         // Change the button text to "Connected" on main thread

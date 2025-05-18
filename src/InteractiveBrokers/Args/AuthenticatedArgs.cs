@@ -1,7 +1,6 @@
-﻿using InteractiveBrokers.Responses;
-
-namespace InteractiveBrokers.Args;
+﻿namespace InteractiveBrokers.Args;
 
 public class AuthenticatedArgs : EventArgs
 {
+    public required string BearerToken { get; init; }
 }

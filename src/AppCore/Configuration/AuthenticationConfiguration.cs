@@ -12,6 +12,8 @@ public class AuthenticationConfiguration
     public string TokenUrl { get; set; } = string.Empty;
     public string SessionUrl { get; set; } = string.Empty;
     public string ValidateUrl { get; set; } = string.Empty;
+    public string SessionInitUrl { get; set; } = string.Empty;
+    public string WebSocketUrl { get; set; } = string.Empty;
 
     public string PrivateKeyPath { get; set; } = string.Empty;
     public string ClientId { get; set; } = string.Empty;

@@ -33,6 +33,7 @@ internal class Authenticate : Request
         RequestAccessToken(httpClient, _authConfiguration.TokenUrl);
         RequestBearerToken(httpClient, _authConfiguration.SessionUrl);
         ValidateToken(httpClient, _authConfiguration.ValidateUrl);
+        InitializeBrokerageSession(httpClient, _authConfiguration.SessionInitUrl);
     }
 
     private void GetPublicIP(HttpClient httpClient) {
@@ -110,6 +111,24 @@ internal class Authenticate : Request
         }
 
         Logger?.LogInformation($"Validated bearer token");
+    }
+
+    private void InitializeBrokerageSession(HttpClient httpClient, string sessionInitUrl) {
+        var request = new HttpRequestMessage(HttpMethod.Post, sessionInitUrl);
+        request.Headers.Add("Authorization", $"Bearer {_bearerToken}");
+
+        var response = httpClient.SendAsync(request).ConfigureAwait(true).GetAwaiter().GetResult();
+        var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
+        response.EnsureSuccessStatusCode();
+        if (string.IsNullOrWhiteSpace(responseContent)) {
+            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty session initialization response");
+        }
+
+        Logger?.LogInformation($"Initialized brokerage session");
+
+        _responseHandler?.Invoke(this, new Args.AuthenticatedArgs {
+            BearerToken = _bearerToken,
+        });
     }
 
     private string ComputeClientAssertion(string uri) {

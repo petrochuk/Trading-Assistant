@@ -2,5 +2,5 @@
 
 public class BrokerConfiguration
 {
-    public string BaseUrl { get; set; } = string.Empty;
+    public string HostName { get; set; } = string.Empty;
 }

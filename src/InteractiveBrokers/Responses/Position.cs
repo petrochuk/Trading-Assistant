@@ -92,7 +92,10 @@ public class Position : IPosition, IJsonOnDeserialized
 
     float IPosition.Multiplier {
         get {
-            if (!multiplier.HasValue) {
+            if (!multiplier.HasValue || multiplier.Value == 0) {
+                if (assetClass == AssetClass.Stock)
+                    return 1;
+
                 throw new InvalidOperationException("No multiplier value available.");
             }
 

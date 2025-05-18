@@ -14,22 +14,12 @@ internal class AccountPositions : Request
         if (string.IsNullOrWhiteSpace(account)) {
             throw new IBClientException("Account ID cannot be null or empty");
         }
-        Uri = $"portfolio/{account}/positions/0";
+        Uri = $"v1/api/portfolio/{account}/positions/0";
         _responseHandler = responseHandler;
     }
 
     public override void Execute(HttpClient httpClient) {
-        var response = httpClient.GetAsync(Uri).ConfigureAwait(true).GetAwaiter().GetResult();
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
-        if (string.IsNullOrWhiteSpace(responseContent)) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty account positions response");
-        }
-        var positionsResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.ListPosition);
-        if (positionsResponse == null) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid accounts response");
-        }
+        var positionsResponse = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.ListPosition);
 
         // Sometimes IB returns all positions as invalid. Ignore this case.
         var allInvalid = true;
