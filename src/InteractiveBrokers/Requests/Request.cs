@@ -18,17 +18,16 @@ internal abstract class Request
 
     public abstract void Execute(HttpClient httpClient);
 
-    protected T GetResponse<T>(HttpClient httpClient, string uri, JsonTypeInfo<T> jsonTypeInfo) {
+    protected T GetResponse<T>(HttpClient httpClient, string uri, JsonTypeInfo<T> jsonTypeInfo, HttpMethod? httpMethod = null) {
         _ = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         if (string.IsNullOrWhiteSpace(uri)) {
             throw new ArgumentNullException(nameof(uri), "URI cannot be null or empty.");
         }
 
-        var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        var request = new HttpRequestMessage(httpMethod ?? HttpMethod.Get, uri);
         if (!string.IsNullOrWhiteSpace(BearerToken)) {
             request.Headers.Add("Authorization", $"Bearer {BearerToken}");
         }
-        request.Headers.Add("Accept", "*/*");
         var response = httpClient.SendAsync(request).ConfigureAwait(true).GetAwaiter().GetResult();
         var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
         response.EnsureSuccessStatusCode();

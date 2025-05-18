@@ -10,7 +10,7 @@ internal class AccountPositions : Request
     EventHandler<AccountPositionsArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public AccountPositions(string account, EventHandler<AccountPositionsArgs>? responseHandler) {
+    public AccountPositions(string account, EventHandler<AccountPositionsArgs>? responseHandler, string bearerToken) : base (bearerToken) {
         if (string.IsNullOrWhiteSpace(account)) {
             throw new IBClientException("Account ID cannot be null or empty");
         }

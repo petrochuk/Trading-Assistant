@@ -12,7 +12,7 @@ public class Account
 
     public required string AccountId { get; init; }
 
-    public required string DisplayName { get; init; }
+    public string? DisplayName { get; init; }
 
     [JsonPropertyName("accountAlias")]
     public required string Alias { get; set; }

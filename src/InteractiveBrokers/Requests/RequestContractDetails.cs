@@ -11,22 +11,15 @@ internal class RequestContractDetails : Request
     EventHandler<ContractDetailsArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public RequestContractDetails(int contractId, EventHandler<ContractDetailsArgs>? responseHandler) {
+    public RequestContractDetails(int contractId, EventHandler<ContractDetailsArgs>? responseHandler, string? bearerToken) : base(bearerToken) {
 
-        Uri = $"trsrv/secdef?conids={contractId}";
+        Uri = $"v1/api/trsrv/secdef?conids={contractId}";
         _responseHandler = responseHandler;
     }
 
     public override void Execute(HttpClient httpClient) {
-        var response = httpClient.GetAsync(Uri).ConfigureAwait(true).GetAwaiter().GetResult();
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
-        if (string.IsNullOrWhiteSpace(responseContent)) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty contracts response");
-        }
-        var contractsResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.DictionaryStringListSecurityDefinition);
-        if (contractsResponse == null || contractsResponse.Count != 1) {
+        var contractsResponse = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.DictionaryStringListSecurityDefinition);
+        if (contractsResponse.Count != 1) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid contracts response");
         }
         var contracts = contractsResponse.First().Value;

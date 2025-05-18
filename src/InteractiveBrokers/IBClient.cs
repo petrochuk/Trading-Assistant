@@ -2,6 +2,7 @@
 using AppCore.Extenstions;
 using AppCore.Models;
 using InteractiveBrokers.Args;
+using InteractiveBrokers.Requests;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -56,6 +57,7 @@ public class IBClient : IDisposable
 
         // Set default headers
         _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
+        _httpClient.DefaultRequestHeaders.Add("Accept", "*/*");
 
         // Set up the tickle timer
         _tickleTimer.Elapsed += (s, args) => {
@@ -186,7 +188,7 @@ public class IBClient : IDisposable
             throw new IBClientException("Account cannot be null or empty");
         }
 
-        var request = new Requests.AccountPositions(accountId, OnAccountPositions) {
+        var request = new Requests.AccountPositions(accountId, OnAccountPositions, BearerToken) {
             Logger = AppCore.ServiceProvider.Instance.GetService<ILogger<Requests.Request>>()
         };
 
@@ -214,7 +216,7 @@ public class IBClient : IDisposable
     #region Contract management
 
     public void FindContract(Contract contract) {
-        var request = new Requests.FindContract(contract, OnContractFound);
+        var request = new Requests.FindContract(contract, OnContractFound, BearerToken);
 
         _logger.LogInformation($"Looking for {contract}");
         if (!_channel.Writer.TryWrite(request)) {
@@ -223,7 +225,7 @@ public class IBClient : IDisposable
     }
     
     public void RequestContractDetails(int contractId) {
-        var request = new Requests.RequestContractDetails(contractId, OnContractDetails);
+        var request = new Requests.RequestContractDetails(contractId, OnContractDetails, BearerToken);
 
         _logger.LogInformation($"Requesting {contractId} details");
         if (!_channel.Writer.TryWrite(request)) {

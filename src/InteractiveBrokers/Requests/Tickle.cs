@@ -14,7 +14,7 @@ internal class Tickle : Request
     }
 
     public override void Execute(HttpClient httpClient) {
-        var response = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.Tickle);
+        var response = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.Tickle, HttpMethod.Post);
         if (!string.IsNullOrWhiteSpace(response.Error)) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) response: {response.Error}");
         }

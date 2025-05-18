@@ -14,16 +14,16 @@ internal class FindContract : Request
     private readonly AssetClass _assetClass;
 
     [SetsRequiredMembers]
-    public FindContract(Contract contract, EventHandler<ContractFoundArgs>? responseHandler) {
+    public FindContract(Contract contract, EventHandler<ContractFoundArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
         _ = contract ?? throw new ArgumentNullException(nameof(contract));
         if (string.IsNullOrWhiteSpace(contract.Symbol))
             throw new ArgumentNullException(nameof(contract.Symbol), "Contract symbol cannot be null or empty");
 
         if (contract.AssetClass == AssetClass.Stock) {
-            Uri = $"trsrv/stocks?symbols={contract.Symbol}";
+            Uri = $"v1/api/trsrv/stocks?symbols={contract.Symbol}";
         }
         else if (contract.AssetClass == AssetClass.Future) {
-            Uri = $"trsrv/futures?symbols={contract.Symbol}";
+            Uri = $"v1/api/trsrv/futures?symbols={contract.Symbol}";
         }
         else
             throw new IBClientException($"Invalid contract asset class {contract.AssetClass} for contract request");
@@ -33,17 +33,7 @@ internal class FindContract : Request
     }
 
     public override void Execute(HttpClient httpClient) {
-        var response = httpClient.GetAsync(Uri).ConfigureAwait(true).GetAwaiter().GetResult();
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
-        if (string.IsNullOrWhiteSpace(responseContent)) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty contracts response");
-        }
-        var contractsResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.DictionaryStringListContract);
-        if (contractsResponse == null) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid contracts response");
-        }
+        var contractsResponse = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.DictionaryStringListContract);
         if (contractsResponse.Count != 1) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {contractsResponse.Count} contracts response");
         }
