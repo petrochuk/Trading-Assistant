@@ -161,10 +161,13 @@ public sealed partial class MainWindow : Window
     private void IBClient_AccountPositions(object? sender, AccountPositionsArgs e) {
         DispatcherQueue?.TryEnqueue(() => {
             _positions.Reconcile(e.Positions);
-            // Make sure we have positions for each underlying
-            foreach (var underlying in _positions.Underlyings.Values) {
-                if (underlying.Position == null) {
-                    App.Instance.IBClient.FindContract(underlying.Contract);
+
+            if (_positions.DefaultUnderlying != null) {
+                // Make sure we have positions for each underlying
+                foreach (var underlying in _positions.Underlyings.Values) {
+                    if (underlying.Position == null && _positions.DefaultUnderlying.ContractId == underlying.Contract.ContractId) {
+                        App.Instance.IBClient.FindContract(underlying.Contract);
+                    }
                 }
             }
 
