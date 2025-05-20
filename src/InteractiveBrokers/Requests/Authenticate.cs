@@ -15,7 +15,6 @@ internal class Authenticate : Request
     EventHandler<Args.AuthenticatedArgs>? _responseHandler;
     private AuthenticationConfiguration _authConfiguration;
     private string _accessToken = string.Empty;
-    private string _bearerToken = string.Empty;
     private string _publicIP = string.Empty;
 
     [SetsRequiredMembers]
@@ -95,14 +94,14 @@ internal class Authenticate : Request
         if (authenticationResponse.TokenType != "Bearer") {
             throw new IBClientException($"IB Client returned invalid token type: {authenticationResponse.TokenType}");
         }
-        _bearerToken = authenticationResponse.AccessToken;
+        BearerToken = authenticationResponse.AccessToken;
 
         Logger?.LogInformation($"Received bearer token");
     }
 
     private void ValidateToken(HttpClient httpClient, string validateUrl) {
         var postRequest = new HttpRequestMessage(HttpMethod.Get, validateUrl);
-        postRequest.Headers.Add("Authorization", $"Bearer {_bearerToken}");
+        postRequest.Headers.Add("Authorization", $"Bearer {BearerToken}");
         var response = httpClient.SendAsync(postRequest).ConfigureAwait(true).GetAwaiter().GetResult();
         var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
         response.EnsureSuccessStatusCode();
@@ -114,20 +113,13 @@ internal class Authenticate : Request
     }
 
     private void InitializeBrokerageSession(HttpClient httpClient, string sessionInitUrl) {
-        var request = new HttpRequestMessage(HttpMethod.Post, sessionInitUrl);
-        request.Headers.Add("Authorization", $"Bearer {_bearerToken}");
 
-        var response = httpClient.SendAsync(request).ConfigureAwait(true).GetAwaiter().GetResult();
-        var responseContent = response.Content.ReadAsStringAsync().ConfigureAwait(true).GetAwaiter().GetResult();
-        response.EnsureSuccessStatusCode();
-        if (string.IsNullOrWhiteSpace(responseContent)) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided empty session initialization response");
-        }
-
+        var content = new StringContent("{\"publish\": true, \"compete\": true}");
+        var response = GetResponse(httpClient, sessionInitUrl, SourceGeneratorContext.Default.SessionInit, HttpMethod.Post, content);
         Logger?.LogInformation($"Initialized brokerage session");
 
         _responseHandler?.Invoke(this, new Args.AuthenticatedArgs {
-            BearerToken = _bearerToken,
+            BearerToken = BearerToken!,
         });
     }
 
