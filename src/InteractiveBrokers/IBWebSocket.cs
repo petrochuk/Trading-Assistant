@@ -161,6 +161,9 @@ public class IBWebSocket : IDisposable
                             else if (topicString == "system") {
                                 HandleSystemMessage(message);
                             }
+                            else if (topicString == "smd") {
+                                HandleDataNotification(message);
+                            }
                             else {
                                 _logger.LogWarning($"Unknown topic: {topicString}");
                             }
@@ -182,6 +185,15 @@ public class IBWebSocket : IDisposable
             _logger.LogError($"Error: {ex.Message}");
         }
         _logger.LogInformation($"WebSocket thread finished");
+    }
+
+    private void HandleDataNotification(Dictionary<string, JsonElement> message) {
+        if (message.TryGetValue("error", out var errorElement)) {
+            _logger.LogError($"Data error: {errorElement.GetString()}");
+            return;
+        }
+
+        _logger.LogWarning($"Unknown data notification");
     }
 
     private void HandleSystemMessage(Dictionary<string, JsonElement> message) {
