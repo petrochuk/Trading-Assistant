@@ -6,7 +6,7 @@ Trading Assistant is an application designed to provide a user-friendly interfac
 
 <img src="docs/media/main-view.png" alt="Trading Assistant Screenshot" width="500" height="349" style="margin-right: 10px;">  
 
-It is a modern Windows application built with .NET 9 and WinUI, designed to provide advanced trading functionalities by integrating with Interactive Brokers. The solution is modular, leveraging best practices in dependency injection, configuration, and logging, and is structured for maintainability and extensibility.
+It is a modern Windows application built with C#, .NET and WinUI, designed to provide advanced trading functionalities by integrating with Interactive Brokers via Web API. The solution is modular, leveraging best practices in dependency injection, configuration, and logging, and is structured for maintainability and extensibility.
 
 ---
 
@@ -19,7 +19,7 @@ It is a modern Windows application built with .NET 9 and WinUI, designed to prov
 - [Logging](#logging)
 - [Testing](#testing)
 - [Contributing](#contributing)
-- [License](#license)
+- [Feedback or Questions?](#feedback-or-questions)
 
 ---
 
@@ -64,6 +64,27 @@ git clone https://github.com/petrochuk/Trading-Assistant.git
 **Open the solution in Visual Studio:**  
 
 To run the application, press `F5` in Visual Studio or use the **Start** button.
+
+## Configuration
+
+Configuration is managed via `appsettings.json` and `appsettings.Debug.json`. The application supports layered configuration, allowing you to override settings in `appsettings.Debug.json` for development purposes.
+
+## Logging
+
+Logging is handled using Serilog, with configuration defined in `appsettings.json`. The application logs to a rolling file located in the `Logs` directory. You can customize the logging level and output format in the configuration files.
+
+## Testing
+
+Unit tests are located in the `AppCore.Tests` project. To run the tests, open the Test Explorer in Visual Studio and execute all tests. The tests use MSTest framework and cover core functionalities of the application.
+
+## Contributing
+
+We welcome contributions to the Trading Assistant project! If you would like to contribute, please follow these steps:
+- Fork the repository on GitHub.
+- Create a new branch for your feature or bug fix.
+- Make your changes and commit them with clear messages.
+- Push your changes to your forked repository.
+- Open a pull request against the `main` branch of the original repository.
 
 ## Feedback or Questions?
 
