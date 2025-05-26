@@ -9,7 +9,7 @@
     mc:Ignorable="d"
     Title="Trading-Assistant">
 
-    <Grid>
+    <Grid x:Name="MainGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -17,16 +17,34 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Grid.Row="0" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}" >
-            <CommandBar DefaultLabelPosition="Right" IsOpen="True" IsSticky="True" 
-                        Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
-                        BorderBrush="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
-                        HorizontalAlignment="Left"
+        <StackPanel Grid.Column="0" Grid.Row="0" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}" Orientation="Horizontal">
+            <CommandBar x:Name="GeneralCommandBar"
+                DefaultLabelPosition="Right" IsOpen="True" IsSticky="True" 
+                Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                HorizontalAlignment="Left"
                 >
                 <AppBarButton Label="Connect" Click="Play_Click" x:Name="ConnectButton">
                     <AppBarButton.Icon>
                         <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE703;" />
                     </AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar>
+            <CommandBar x:Name="AccountCommandBar"
+                DefaultLabelPosition="Right" IsOpen="True" IsSticky="True" 
+                Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+                HorizontalAlignment="Left">
+                <AppBarButton Label="{Binding ActiveAccountLabel}" x:Name="ActiveAccountButton" IsEnabled="False">
+                    <!--
+                    <AppBarButton.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <MenuFlyoutItem Text="By rating" Click="ActiveAccount_Click" Tag="rating"/>
+                            <MenuFlyoutItem Text="By match" Click="ActiveAccount_Click" Tag="match"/>
+                            <MenuFlyoutItem Text="By distance" Click="ActiveAccount_Click" Tag="distance"/>
+                        </MenuFlyout>
+                    </AppBarButton.Flyout>
+                    -->
                 </AppBarButton>
             </CommandBar>
         </StackPanel>

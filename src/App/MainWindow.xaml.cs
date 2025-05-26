@@ -4,13 +4,14 @@ using InteractiveBrokers.Args;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.ComponentModel;
 
 namespace TradingAssistant;
 
 /// <summary>
 /// An empty window that can be used on its own or navigated to within a Frame.
 /// </summary>
-public sealed partial class MainWindow : Window
+public sealed partial class MainWindow : Window, INotifyPropertyChanged
 {
     #region Fields
 
@@ -35,6 +36,8 @@ public sealed partial class MainWindow : Window
         _positions = positions ?? throw new ArgumentNullException(nameof(positions));
 
         InitializeComponent();
+
+        MainGrid.DataContext = this;
 
         AppWindow.SetIcon("Resources/icons8-bell-curve-office-xs.ico");
 
@@ -66,6 +69,26 @@ public sealed partial class MainWindow : Window
 
     #endregion
 
+    #region UX Properties
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private string _activeAccountLabel = "Select Account";
+
+    public string ActiveAccountLabel {
+        get => _activeAccountLabel;
+        set
+        {
+            if (_activeAccountLabel != value)
+            {
+                _activeAccountLabel = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveAccountLabel)));
+            }
+        }
+    }
+
+    #endregion
+
     #region UX Event Handlers
 
     private async void Play_Click(object sender, RoutedEventArgs e) {
@@ -87,6 +110,10 @@ public sealed partial class MainWindow : Window
             await contentDialog.ShowAsync();
             ConnectButton.IsEnabled = true;
         }
+    }
+    
+    private async void ActiveAccount_Click(object sender, RoutedEventArgs e) {
+
     }
 
     #endregion
@@ -136,9 +163,13 @@ public sealed partial class MainWindow : Window
             }
             _account = new Account() {
                 Id = e.Account.Id,
-                Name = e.Account.DisplayName,
+                Name = string.IsNullOrWhiteSpace(e.Account.Alias) ? e.Account.DisplayName : e.Account.Alias,
             };
             RiskGraphControl.Account = _account;
+            DispatcherQueue.TryEnqueue(() => {
+                ActiveAccountLabel = _account.Name;
+                ActiveAccountButton.IsEnabled = true;
+            });
         }
 
         // Request account positions and summary

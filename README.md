@@ -40,10 +40,10 @@ The solution is organized into the following projects:
 
 | Project                | Description                                                                 |
 |------------------------|-----------------------------------------------------------------------------|
-| **[App](https://github.com/petrochuk/Trading-Assistant/tree/main/src/App)**                | Main WinUI application, entry point, and DI setup.                          |
-| **[AppCore](https://github.com/petrochuk/Trading-Assistant/tree/main/src/AppCore)**            | Core logic, shared utilities, and abstractions.                             |
-| **[InteractiveBrokers](https://github.com/petrochuk/Trading-Assistant/tree/main/src/InteractiveBrokers)** | Integration layer for Interactive Brokers API (REST and WebSocket).         |
-| **[AppCore.Tests](https://github.com/petrochuk/Trading-Assistant/tree/main/src/AppCore.Tests)**      | Unit tests for AppCore using MSTest.                                        |
+| **[App](https://github.com/petrochuk/Trading-Assistant/tree/main/src/App)** | Main WinUI application, entry point, and DI setup. |
+| **[AppCore](https://github.com/petrochuk/Trading-Assistant/tree/main/src/AppCore)** | Core logic, shared utilities, and abstractions. |
+| **[InteractiveBrokers](https://github.com/petrochuk/Trading-Assistant/tree/main/src/InteractiveBrokers)** | Integration layer for Interactive Brokers API (REST and WebSocket). |
+| **[AppCore.Tests](https://github.com/petrochuk/Trading-Assistant/tree/main/src/AppCore.Tests)** | Unit tests for AppCore using MSTest. |
 
 ---
 
