@@ -1,10 +1,15 @@
 using AppCore;
+using AppCore.Interfaces;
 using AppCore.Models;
 using InteractiveBrokers.Args;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
+using System.Timers;
 
 namespace TradingAssistant;
 
@@ -16,24 +21,22 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     #region Fields
 
     private readonly ILogger<MainWindow> _logger;
-    private Account? _account = null;
+    private Account? _activeAccount = null;
+    private List<Account> _accounts = new();
     private string _ibClientSession = string.Empty;
 
-    private System.Timers.Timer _positionsRefreshTimer = new(TimeSpan.FromMinutes(1)) {
+    private Timer _positionsRefreshTimer = new(TimeSpan.FromMinutes(1)) {
         AutoReset = true,
         Enabled = true
     };
-
-    private readonly PositionsCollection _positions;
 
     #endregion
 
     #region Constructors
 
-    public MainWindow(ILogger<MainWindow> logger, PositionsCollection positions)
+    public MainWindow(ILogger<MainWindow> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _positions = positions ?? throw new ArgumentNullException(nameof(positions));
 
         InitializeComponent();
 
@@ -44,27 +47,20 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         // Set the background color of the title bar to system color for current theme
         AppWindow.TitleBar.BackgroundColor = (Windows.UI.Color)App.Current.Resources["SystemAccentColorDark3"];
 
-        _positions.OnPositionAdded += OnPositionAdded;
-        _positions.OnPositionRemoved += OnPositionRemoved;
-        _positionsRefreshTimer.Elapsed += (s, args) => {
-            if (_account == null || App.Instance == null) {
-                return;
-            }
-            App.Instance.IBClient.RequestAccountPositions(_account.Id);
-            App.Instance.IBClient.RequestAccountSummary(_account.Id);
-        };
+        _positionsRefreshTimer.Elapsed += PositionsRefreshTimer_Elapsed;
         _positionsRefreshTimer.Start();
-        RiskGraphControl.SetPositions(_positions);
 
         // Subscribe to client events
         App.Instance.IBClient.OnConnected += IBClient_Connected;
         App.Instance.IBClient.OnAuthenticated += IBClient_Authenticated;
         App.Instance.IBClient.OnTickle += IBClient_Tickle;
-        App.Instance.IBClient.OnAccountConnected += IBClient_AccountConnected;
+        App.Instance.IBClient.OnAccountsConnected += IBClient_AccountsConnected;
         App.Instance.IBClient.OnAccountPositions += IBClient_AccountPositions;
         App.Instance.IBClient.OnAccountSummary += IBClient_AccountSummary;
         App.Instance.IBClient.OnContractFound += IBClient_OnContractFound;
         App.Instance.IBClient.OnContractDetails += IBClient_OnContractDetails;
+
+        App.Instance.IBWebSocket.Connected += IBWebSocket_Connected;
     }
 
     #endregion
@@ -91,7 +87,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
     #region UX Event Handlers
 
-    private async void Play_Click(object sender, RoutedEventArgs e) {
+    private async void Connect_Click(object sender, RoutedEventArgs e) {
         try {
             ConnectButton.IsEnabled = false;
             _logger.LogInformation("Connecting to IBKR...");
@@ -112,8 +108,12 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
     
-    private async void ActiveAccount_Click(object sender, RoutedEventArgs e) {
-
+    private void ActiveAccount_Click(Account account) {
+        _activeAccount = account;
+        RiskGraphControl.Account = _activeAccount;
+        ActiveAccountLabel = _activeAccount.Name;
+        PositionsRefreshTimer_Elapsed(null, new ElapsedEventArgs(DateTime.Now));
+        RequestMarketDataForAccount(_activeAccount);    
     }
 
     #endregion
@@ -126,6 +126,15 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
     private void OnPositionRemoved(object? sender, Position position) {
         App.Instance.IBWebSocket.StopPositionMarketData(position);
+    }
+
+    private void PositionsRefreshTimer_Elapsed(object? sender, ElapsedEventArgs e) {
+        if (_activeAccount == null || App.Instance == null) {
+            return;
+        }
+        App.Instance.IBClient.RequestAccountPositions(_activeAccount.Id);
+        App.Instance.IBClient.RequestAccountSummary(_activeAccount.Id);
+        return;
     }
 
     #endregion
@@ -156,53 +165,92 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         });
     }
 
-    private void IBClient_AccountConnected(object? sender, AccountConnectedArgs e) {
-        if (_account == null || _account.Id != e.Account.Id) {
-            if (_account != null) {
-                _logger.LogInformation($"Account changed from {_account.Id} to {e.Account.Id}");
+    private void IBClient_AccountsConnected(object? sender, AccountsArgs e) {
+        _logger.LogInformation($"Received {e.Accounts.Count} accounts from IBKR");
+
+        _accounts.Clear();
+        foreach (var brokerAccount in e.Accounts) {
+            // Skip FA (Financial Advisor) accounts
+            if (brokerAccount.BusinessType == "FA") {
+                continue;
             }
-            _account = new Account() {
-                Id = e.Account.Id,
-                Name = string.IsNullOrWhiteSpace(e.Account.Alias) ? e.Account.DisplayName : e.Account.Alias,
-            };
-            RiskGraphControl.Account = _account;
-            DispatcherQueue.TryEnqueue(() => {
-                ActiveAccountLabel = _account.Name;
-                ActiveAccountButton.IsEnabled = true;
-            });
+
+            var accountFactory = AppCore.ServiceProvider.Instance.GetRequiredService<IAccountFactory>();
+            var accountLogger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<Account>>();
+            var timeProvider = AppCore.ServiceProvider.Instance.GetRequiredService<TimeProvider>();
+            var account = accountFactory.CreateAccount(brokerAccount.Id, 
+                string.IsNullOrWhiteSpace(brokerAccount.Alias) ? brokerAccount.DisplayName : brokerAccount.Alias,
+                accountLogger, timeProvider);
+            account.Positions.OnPositionAdded += OnPositionAdded;
+            account.Positions.OnPositionRemoved += OnPositionRemoved;
+            _accounts.Add(account);
+
+            if (brokerAccount.CustomerType == "INDIVIDUAL") {
+                // If this is an Individual account, we want to select the first one
+                _activeAccount = account;
+            }
         }
 
-        // Request account positions and summary
-        App.Instance.IBClient.RequestAccountPositions(_account.Id);
-        App.Instance.IBClient.RequestAccountSummary(_account.Id);
+        if (_activeAccount == null) {
+            // If no individual account found, select the first one
+            _activeAccount = _accounts.FirstOrDefault();
+        }
+
+        RiskGraphControl.Account = _activeAccount;
+        DispatcherQueue.TryEnqueue(() => {
+            if (_activeAccount == null) {
+                ActiveAccountLabel = "No Accounts";
+                ActiveAccountButton.IsEnabled = false;
+                return;
+            }
+            ActiveAccountLabel = _activeAccount.Name;
+            var menuFlyout = new MenuFlyout();
+            foreach (var account in _accounts) {
+                var menuItem = new MenuFlyoutItem() {
+                    Text = account.Name,
+                    Command = new RelayCommand<Account>(ActiveAccount_Click),
+                    CommandParameter = account
+                };
+                menuFlyout.Items.Add(menuItem);
+            }
+            ActiveAccountButton.Flyout = menuFlyout;
+            ActiveAccountButton.IsEnabled = true;
+        });
+
+        App.Instance.IBWebSocket.RequestMarketData(_accounts);
+        PositionsRefreshTimer_Elapsed(null, new ElapsedEventArgs(DateTime.Now));
     }
 
     private void IBClient_AccountSummary(object? sender, AccountSummaryArgs e) {
-        if (_account == null || _account.Id != e.accountcode.Value) {
+        if (_activeAccount == null || _activeAccount.Id != e.accountcode.Value) {
             _logger.LogInformation($"Summary for account {e.accountcode.Value} not found");
             return;
         }
 
-        _account.NetLiquidationValue = e.NetLiquidation.Amount;
+        _activeAccount.NetLiquidationValue = e.NetLiquidation.Amount;
         DispatcherQueue?.TryEnqueue(() => {
             RiskGraphControl.Redraw();
         });
     }
 
     private void IBClient_AccountPositions(object? sender, AccountPositionsArgs e) {
-        DispatcherQueue?.TryEnqueue(() => {
-            _positions.Reconcile(e.Positions);
+        if (_activeAccount == null || _activeAccount.Id != e.AccountId) {
+            _logger.LogInformation($"Positions for account {e.AccountId} not found");
+            return;
+        }
 
-            if (_positions.DefaultUnderlying != null) {
+        DispatcherQueue?.TryEnqueue(() => {
+            _activeAccount.Positions.Reconcile(e.Positions);
+
+            if (_activeAccount.Positions.DefaultUnderlying != null) {
                 // Make sure we have positions for each underlying
-                foreach (var underlying in _positions.Underlyings.Values) {
-                    if (underlying.Position == null && _positions.DefaultUnderlying.ContractId == underlying.Contract.ContractId) {
+                foreach (var underlying in _activeAccount.Positions.Underlyings.Values) {
+                    if (underlying.Position == null && _activeAccount.Positions.DefaultUnderlying.ContractId == underlying.Contract.ContractId) {
                         App.Instance.IBClient.FindContract(underlying.Contract);
                     }
                 }
             }
 
-            App.Instance.IBWebSocket.RequestPositionMarketData(_positions);
             RiskGraphControl.Redraw();
         });
     }
@@ -212,7 +260,12 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     private void IBClient_OnContractDetails(object? sender, ContractDetailsArgs e) {
-        var position = _positions.AddPosition(e.Contract);
+        if (_activeAccount == null) {
+            return;
+        }
+
+        // This needs improvement to handle multiple accounts and positions
+        var position = _activeAccount.Positions.AddPosition(e.Contract);
         if (position != null) {
             App.Instance.IBWebSocket.RequestPositionMarketData(position);
         }
@@ -221,6 +274,26 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     private void IBClient_Tickle(object? sender, TickleArgs e) {
         _ibClientSession = e.Session;
         App.Instance.IBWebSocket.ClientSession = _ibClientSession;
+    }
+
+    private void IBWebSocket_Connected(object? sender, EventArgs e) {
+        _logger.LogInformation("Connected to IBKR WebSocket");
+        if (_accounts == null || _accounts.Count == 0 || _activeAccount == null) {
+            _logger.LogInformation("No accounts found, cannot request market data");
+            return;
+        }
+
+        RequestMarketDataForAccount(_activeAccount);
+    }
+
+    #endregion
+
+    #region Private Methods
+
+    private void RequestMarketDataForAccount(Account account) {
+        foreach (var position in account.Positions) {
+            App.Instance.IBWebSocket.RequestPositionMarketData(position.Value);
+        }
     }
 
     #endregion

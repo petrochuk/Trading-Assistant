@@ -1,19 +1,20 @@
 ﻿using InteractiveBrokers.Args;
-using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics.CodeAnalysis;
 
 namespace InteractiveBrokers.Requests;
 
 internal class AccountPositions : Request
 {
     EventHandler<AccountPositionsArgs>? _responseHandler;
+    private string AccountId;
 
     [SetsRequiredMembers]
     public AccountPositions(string account, EventHandler<AccountPositionsArgs>? responseHandler, string bearerToken) : base (bearerToken) {
         if (string.IsNullOrWhiteSpace(account)) {
             throw new IBClientException("Account ID cannot be null or empty");
         }
+        AccountId = account;
         Uri = $"v1/api/portfolio/{account}/positions/0";
         _responseHandler = responseHandler;
     }
@@ -34,7 +35,9 @@ internal class AccountPositions : Request
             return;
         }
 
-        var args = new AccountPositionsArgs();
+        var args = new AccountPositionsArgs {
+            AccountId = AccountId
+        };
 
         foreach (var position in positionsResponse) {
             if (!position.IsValid) {

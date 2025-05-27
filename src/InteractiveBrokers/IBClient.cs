@@ -103,7 +103,7 @@ public class IBClient : IDisposable
     /// <summary>
     /// On account connected event.
     /// </summary>
-    public event EventHandler<AccountConnectedArgs>? OnAccountConnected;
+    public event EventHandler<AccountsArgs>? OnAccountsConnected;
 
     /// <summary>
     /// On authenticated event.
@@ -175,7 +175,7 @@ public class IBClient : IDisposable
     #region Account management
 
     public void RequestAccounts() {
-        var request = new Requests.Accounts(OnAccountConnected, BearerToken);
+        var request = new Requests.Accounts(OnAccountsConnected, BearerToken);
 
         _logger.LogInformation($"Requesting accounts");
         if (!_channel.Writer.TryWrite(request)) {

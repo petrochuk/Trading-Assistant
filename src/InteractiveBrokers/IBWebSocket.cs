@@ -43,7 +43,7 @@ public class IBWebSocket : IDisposable
         MarketDataFields.MarkPrice,
     };
     private string _stockFieldsString;
-    private PositionsCollection? _positions;
+    private IReadOnlyList<Account>? _accounts;
     private readonly BrokerConfiguration _brokerConfiguration;
     private readonly AuthenticationConfiguration _authConfiguration;
 
@@ -75,7 +75,7 @@ public class IBWebSocket : IDisposable
 
     #endregion
 
-    #region Public Properties
+    #region Public Events and Properties
 
     /// <summary>
     /// Gets or sets the IB client bearer token.
@@ -84,10 +84,15 @@ public class IBWebSocket : IDisposable
 
     public string ClientSession { get; set; } = string.Empty;
 
+    public event EventHandler? Connected;
+
     #endregion
 
-    public void RequestPositionMarketData(PositionsCollection positions) {
-        _positions = positions ?? throw new ArgumentNullException(nameof(positions));
+    public void RequestMarketData(IReadOnlyList<Account> accounts) {
+        if (accounts == null || accounts.Count == 0) {
+            throw new ArgumentNullException(nameof(accounts));
+        }
+        _accounts = accounts;
 
         EnsureSocketConnected();
     }
@@ -200,12 +205,7 @@ public class IBWebSocket : IDisposable
         if (message.TryGetValue("success", out var successElement)) {
             _logger.LogInformation($"success message: {successElement.GetString()}");
             _connectedEvent.Set();
-            if (_positions != null) {
-                _logger.LogInformation($"Requesting market data for {_positions.Count} positions");
-                foreach (var position in _positions) {
-                    RequestMarketData(position.Value);
-                }
-            }
+            Connected?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -246,7 +246,7 @@ public class IBWebSocket : IDisposable
     /// Handles the data message received from Client Portal API.
     /// </summary>
     private void HandleDataMessage(Dictionary<string, JsonElement> message) {
-        if (_positions == null) {
+        if (_accounts == null) {
             return;
         }
 
@@ -256,8 +256,15 @@ public class IBWebSocket : IDisposable
             return;
         }
         var contractId = contractIdElement.GetInt32();
-        if (!_positions.TryGetValue(contractId, out var position)) {
-            _logger.LogWarning($"Position with contract ID {contractId} not found");
+
+        Position? position = null;
+        foreach (var account in _accounts) {
+            if (account.Positions.TryGetValue(contractId, out position)) {
+                break;
+            }
+        }
+        if (position == null) {
+            _logger.LogWarning($"Position with contract ID {contractId} not found in any account");
             return;
         }
 

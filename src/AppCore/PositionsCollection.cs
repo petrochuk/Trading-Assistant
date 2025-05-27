@@ -12,7 +12,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 {
     #region Fields
 
-    private readonly ILogger<PositionsCollection> _logger;
+    private readonly ILogger _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Lock _lock = new();
 
@@ -24,7 +24,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 
     #region Constructors
 
-    public PositionsCollection(ILogger<PositionsCollection> logger, TimeProvider timeProvider) {
+    public PositionsCollection(ILogger logger, TimeProvider timeProvider) {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
 

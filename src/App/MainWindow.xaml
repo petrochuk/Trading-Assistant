@@ -24,7 +24,7 @@
                 BorderBrush="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
                 HorizontalAlignment="Left"
                 >
-                <AppBarButton Label="Connect" Click="Play_Click" x:Name="ConnectButton">
+                <AppBarButton Label="Connect" Click="Connect_Click" x:Name="ConnectButton">
                     <AppBarButton.Icon>
                         <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE703;" />
                     </AppBarButton.Icon>

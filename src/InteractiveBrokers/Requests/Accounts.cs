@@ -5,10 +5,10 @@ namespace InteractiveBrokers.Requests;
 
 internal class Accounts : Request
 {
-    EventHandler<Args.AccountConnectedArgs>? _responseHandler;
+    EventHandler<Args.AccountsArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public Accounts(EventHandler<Args.AccountConnectedArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
+    public Accounts(EventHandler<Args.AccountsArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
         Uri = "v1/api/portfolio/accounts";
         _responseHandler = responseHandler;
     }
@@ -28,14 +28,14 @@ internal class Accounts : Request
             if (individualAccount == null) {
                 throw new IBClientException($"Individual account not found in subaccounts response");
             }
-            var accountsArgs = new Args.AccountConnectedArgs {
-                Account = individualAccount
+            var accountsArgs = new Args.AccountsArgs {
+                Accounts = accountsResponse
             };
             _responseHandler?.Invoke(this, accountsArgs);
         }
         else {
-            var accountsArgs = new Args.AccountConnectedArgs {
-                Account = accountsResponse[0]
+            var accountsArgs = new Args.AccountsArgs {
+                Accounts = accountsResponse
             };
 
             _responseHandler?.Invoke(this, accountsArgs);

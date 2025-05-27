@@ -8,7 +8,8 @@ namespace AppCore.Models;
 public class Account
 {
     [SetsRequiredMembers]
-    public Account() { 
+    public Account(PositionsCollection positionsCollection) { 
+        Positions = positionsCollection;
     }
 
     public required string Name { get; init; } = string.Empty;
@@ -20,4 +21,6 @@ public class Account
     public override string ToString() {
         return $"{Name} ({Id})";
     }
+
+    public PositionsCollection Positions { get; init; }
 }

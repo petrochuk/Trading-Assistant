@@ -56,11 +56,6 @@ public sealed partial class RiskGraph : UserControl
 
     #endregion
 
-    PositionsCollection? _positions;
-    public void SetPositions(PositionsCollection? positions) {
-        _positions = positions;
-    }
-
     [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
     public Account? Account { get; set; }
 
@@ -76,7 +71,8 @@ public sealed partial class RiskGraph : UserControl
 
             UpdateGreeks();
 
-            if (_positions == null || !_positions.Any()) {
+            if (Account == null || !Account.Positions.Any()) {
+                _logger.LogWarning("No positions available for the active account.");
                 return;
             }
 
@@ -88,12 +84,19 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void UpdateGreeks() {
+        if (Account == null) {
+            DeltaText.Text = string.Empty;
+            GammaText.Text = string.Empty;
+            CharmText.Text = string.Empty;
+            ThetaText.Text = string.Empty;
+            return;
+        }
 
-        var greeks = _positions!.CalculateGreeks();
+        var greeks = Account.Positions!.CalculateGreeks();
 
-        if (_positions.DefaultUnderlying != null && _positions.DefaultUnderlying.RealizedVol != null) {
+        if (Account.Positions.DefaultUnderlying != null && Account.Positions.DefaultUnderlying.RealizedVol != null) {
 
-            if (_positions.DefaultUnderlying.RealizedVol.TryGetValue(out var rv)) {
+            if (Account.Positions.DefaultUnderlying.RealizedVol.TryGetValue(out var rv)) {
                 // Annualize RV
                 var annualizalizedRV = rv * System.Math.Sqrt(365.0 * 24.0 * (60.0 / PositionsCollection.RealizedVolPeriod.TotalMinutes));
                 RVText.Text = annualizalizedRV.ToString("P2");
@@ -109,18 +112,18 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void DrawRiskIntervals() {
-        if (_positions == null || _positions.DefaultUnderlying == null) {
+        if (Account == null || !Account.Positions.Any() || Account.Positions.DefaultUnderlying == null) {
             return;
         }
 
         // First calculate the risk curves for each interval
-        var midPrice = _positions.DefaultUnderlying.MarketPrice;
+        var midPrice = Account.Positions.DefaultUnderlying.MarketPrice;
         if (midPrice == 0) {
             _logger.LogTrace("No market price available for underlying");
             return;
         }
 
-        var underlyingSymbol = _positions.DefaultUnderlying.Symbol;
+        var underlyingSymbol = Account.Positions.DefaultUnderlying.Symbol;
         var minPrice = midPrice * 0.95f;
         var maxPrice = midPrice * 1.05f;
         var priceIncrement = (maxPrice - minPrice) / 100f;
@@ -128,7 +131,7 @@ public sealed partial class RiskGraph : UserControl
         var maxPL = float.MinValue;
         var minPL = float.MaxValue;
         foreach (var interval in _riskIntervals) {
-            var riskCurve = _positions.CalculateRiskCurve(underlyingSymbol, interval.Key, minPrice, midPrice, maxPrice, priceIncrement);
+            var riskCurve = Account.Positions.CalculateRiskCurve(underlyingSymbol, interval.Key, minPrice, midPrice, maxPrice, priceIncrement);
             if (riskCurve.MaxPL > maxPL) {
                 maxPL = riskCurve.MaxPL;
             }
