@@ -245,7 +245,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             if (_activeAccount.Positions.DefaultUnderlying != null) {
                 // Make sure we have positions for each underlying
                 foreach (var underlying in _activeAccount.Positions.Underlyings.Values) {
-                    if (underlying.Position == null && _activeAccount.Positions.DefaultUnderlying.ContractId == underlying.Contract.ContractId) {
+                    if (underlying.Position == null && _activeAccount.Positions.DefaultUnderlying.Contract.Id == underlying.Contract.Id) {
                         App.Instance.IBClient.FindContract(underlying.Contract);
                     }
                 }
@@ -256,7 +256,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     private void IBClient_OnContractFound(object? sender, ContractFoundArgs e) {
-        App.Instance.IBClient.RequestContractDetails(e.Contract.ContractId);
+        App.Instance.IBClient.RequestContractDetails(e.Contract.Id);
     }
 
     private void IBClient_OnContractDetails(object? sender, ContractDetailsArgs e) {

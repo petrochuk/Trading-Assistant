@@ -37,7 +37,7 @@ internal class RequestContractDetails : Request
                     "FUT" => AssetClass.Future,
                     _ => throw new IBClientException($"Invalid contract asset class {contract.assetClass} for contract request"),
                 },
-                ContractId = contract.conid,
+                Id = contract.conid,
                 UnderlyingContractId = contract.undConid,
                 Expiration = DateTime.ParseExact(contract.expiry, "yyyyMMdd", CultureInfo.InvariantCulture),
                 Multiplier = contract.multiplier,

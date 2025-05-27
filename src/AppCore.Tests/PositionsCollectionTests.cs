@@ -14,13 +14,8 @@ public sealed class PositionsCollectionTests
         // Arrange
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider());
 
-        var underlyingPosition = new Position {
-            ContractId = 1,
-            Size = 0,
-            Symbol = "ES",
-            AssetClass = AssetClass.Future
-        };
-        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, isCall: true, 5000, 50);
+        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
+        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, 5000, isCall: true, 50);
         position1.Size = 1;
 
         // 0 DTE theta = -market price
@@ -44,15 +39,10 @@ public sealed class PositionsCollectionTests
         // Arrange
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider());
 
-        var underlyingPosition = new Position {
-            ContractId = 1,
-            Size = 0,
-            Symbol = "ES",
-            AssetClass = AssetClass.Future
-        };
+        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
         underlyingPosition.MarketPrice = 5050f;
 
-        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, isCall: true, 5000, 50);
+        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, 5000, isCall: true, 50);
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 60.0f;
@@ -75,15 +65,10 @@ public sealed class PositionsCollectionTests
         // Arrange
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider());
 
-        var underlyingPosition = new Position {
-            ContractId = 1,
-            Size = 0,
-            Symbol = "ES",
-            AssetClass = AssetClass.Future
-        };
+        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
         underlyingPosition.MarketPrice = 4950f;
 
-        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, isCall: false, 5000, 50);
+        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, 5000, isCall: false, 50);
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 60.0f;
@@ -122,22 +107,22 @@ public sealed class PositionsCollectionTests
         // Arrange
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, 
             new FakeTimeProvider(new DateTimeOffset(2025, 4, 23, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)));
-        
-        var underlyingPosition = new Position {
-            ContractId = 1, Size = 1, Symbol = "ES", Multiplier = 50,
-            AssetClass = AssetClass.Future
+
+        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future, multiplier: 50) {
+            Size = 1,
+            Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
         };
         underlyingPosition.MarketPrice = 5401.25f;
-        positions.TryAdd(underlyingPosition.ContractId, underlyingPosition);
+        positions.TryAdd(underlyingPosition.Contract.Id, underlyingPosition);
 
-        var put = new Position(2, underlyingPosition.Symbol, AssetClass.FutureOption, isCall: false, 5350, 50)
+        var put = new Position(2, underlyingPosition.Symbol, AssetClass.FutureOption, 5350, isCall: false, 50)
         {
             Expiration = new DateTimeOffset(2025, 5, 2, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
         };
         put.MarketPrice = 65.0f;
         put.Size = 1;
         put.UpdateGreeks(delta: -0.7f, gamma: 0.0f, theta: -put.MarketPrice, vega: 0.0f);
-        positions.TryAdd(put.ContractId, put);
+        positions.TryAdd(put.Contract.Id, put);
 
         // Act
         var riskCurve = positions.CalculateRiskCurve("ES", TimeSpan.FromMinutes(5), 5300, 5401.25f, 5500, 10);

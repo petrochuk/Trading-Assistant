@@ -46,7 +46,7 @@ internal class FindContract : Request
             Contract = new () {
                 Symbol = contract.symbol,
                 AssetClass = _assetClass,
-                ContractId = contract.conid,
+                Id = contract.conid,
                 UnderlyingContractId = contract.underlyingConid,
                 Expiration = DateTime.ParseExact(contract.expirationDate.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture),
             }

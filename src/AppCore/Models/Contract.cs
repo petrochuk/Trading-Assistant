@@ -6,13 +6,17 @@ public class Contract
 
     public AssetClass AssetClass { get; init; }
 
-    public int ContractId { get; set; }
+    public int Id { get; set; }
 
     public int? UnderlyingContractId { get; set; }
 
-    public DateTime? Expiration { get; set; }
+    public DateTimeOffset? Expiration { get; set; }
 
     public float Multiplier { get; set; } = 1;
+
+    public float Strike { get; init; }
+
+    public bool IsCall { get; init; }
 
     public override string ToString() {
         return $"{Symbol} {Expiration:d}";

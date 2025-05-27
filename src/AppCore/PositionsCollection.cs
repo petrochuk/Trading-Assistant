@@ -59,7 +59,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
             // Remove positions that are not in the new list
             foreach (var contractId in Keys.ToList()) {
                 if (!positions.ContainsKey(contractId)) {
-                    if (contractId != DefaultUnderlying?.ContractId) {
+                    if (contractId != DefaultUnderlying?.Contract.Id) {
                         RemovePosition(contractId);
                     }
                 }
@@ -90,12 +90,12 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 
     public Position? AddPosition(Contract contract) {
         lock (_lock) {
-            if (ContainsKey(contract.ContractId)) {
+            if (ContainsKey(contract.Id)) {
                 _logger.LogTrace($"Position {contract} already exists");
                 return null;
             }
             var position = new Position(contract);
-            TryAdd(contract.ContractId, position);
+            TryAdd(contract.Id, position);
             _logger.LogInformation($"Added empty position for {contract}");
             DefaultUnderlying = position;
 
@@ -120,7 +120,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                         Contract = new Contract() {
                             Symbol = position.Symbol,
                             AssetClass = position.AssetClass,
-                            ContractId = position.ContractId
+                            Id = position.Contract.Id
                         },
                         Position = position });
                     break;
@@ -133,7 +133,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                                 {
                                     Symbol = position.Symbol,
                                     AssetClass = position.AssetClass,
-                                    ContractId = position.ContractId,
+                                    Id = position.Contract.Id,
                                     Expiration = position.Expiration!.Value.DateTime
                                 },
                                 Position = position
@@ -146,7 +146,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                                     Contract = new Contract() {
                                         Symbol = position.Symbol,
                                         AssetClass = position.AssetClass,
-                                        ContractId = position.ContractId,
+                                        Id = position.Contract.Id,
                                         Expiration = position.Expiration!.Value.DateTime
                                     },
                                     Position = position

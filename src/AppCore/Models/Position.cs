@@ -11,7 +11,7 @@ public class Position
 
     private Lock _lock = new();
 
-    public int ContractId { get; init; }
+    public required Contract Contract { get; init; }
 
     public required string Symbol { get; init; }
 
@@ -91,7 +91,6 @@ public class Position
             throw new ArgumentOutOfRangeException(nameof(position.Multiplier), "Multiplier should be greater than 0.");
         }
 
-        ContractId = position.ContractId;
         Symbol = position.Symbol;
         ContractDesciption = position.ContractDesciption;
         AssetClass = position.AssetClass;
@@ -105,6 +104,16 @@ public class Position
             Expiration = position.Expiration;
         }
 
+        Contract = new Contract {
+            Id = position.ContractId,
+            Symbol = position.Symbol,
+            AssetClass = position.AssetClass,
+            Multiplier = position.Multiplier,
+            Strike = position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option ? position.Strike : 0,
+            IsCall = position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option ? position.IsCall : false,
+            Expiration = position.AssetClass == AssetClass.Future || position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option ? position.Expiration : null
+        };
+
         Size = position.Size;
         MarketPrice = position.MarketPrice;
         MarketValue = position.MarketValue;
@@ -115,7 +124,7 @@ public class Position
     /// </summary>
     [SetsRequiredMembers]
     public Position(int contractId, string underlyingSymbol,
-        AssetClass assetClass, bool isCall, float strike, float multiplier) {
+        AssetClass assetClass, float strike, bool isCall = true, float multiplier = 100) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -133,7 +142,15 @@ public class Position
             throw new ArgumentOutOfRangeException(nameof(multiplier), $"Multiplier {multiplier} is not a valid option multiplier.");
         }
 
-        ContractId = contractId;
+        Contract = new Contract {
+            Id = contractId,
+            Symbol = underlyingSymbol,
+            AssetClass = assetClass,
+            IsCall = isCall,
+            Strike = strike,
+            Multiplier = multiplier
+        };
+
         Symbol = underlyingSymbol;
         AssetClass = assetClass;
         IsCall = isCall;
@@ -141,11 +158,41 @@ public class Position
         Multiplier = multiplier;
     }
 
+    /// <summary>
+    /// Create a new position.
+    /// </summary>
+    [SetsRequiredMembers]
+    public Position(int contractId, string underlyingSymbol, AssetClass assetClass, float multiplier = 1) {
+
+        if (contractId <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
+        }
+        if (string.IsNullOrWhiteSpace(underlyingSymbol)) {
+            throw new ArgumentNullException(nameof(underlyingSymbol), "Underlying symbol is required.");
+        }
+        if (assetClass == AssetClass.FutureOption || assetClass == AssetClass.Option) {
+            throw new ArgumentOutOfRangeException(nameof(assetClass), $"Asset class {assetClass} is not a valid asset class.");
+        }
+        if (multiplier <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(multiplier), $"Multiplier {multiplier} is not a valid option multiplier.");
+        }
+
+        Contract = new Contract {
+            Id = contractId,
+            Symbol = underlyingSymbol,
+            AssetClass = assetClass,
+            Multiplier = multiplier
+        };
+
+        Symbol = underlyingSymbol;
+        AssetClass = assetClass;
+        Multiplier = multiplier;
+    }
+
     [SetsRequiredMembers]
     public Position(Contract contract) {
-        _ = contract ?? throw new ArgumentNullException(nameof(contract));
+        Contract = contract ?? throw new ArgumentNullException(nameof(contract));
 
-        ContractId = contract.ContractId;
         Symbol = contract.Symbol;
         AssetClass = contract.AssetClass;
         Size = 0;

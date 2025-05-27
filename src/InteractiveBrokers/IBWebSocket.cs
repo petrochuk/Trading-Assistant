@@ -217,14 +217,14 @@ public class IBWebSocket : IDisposable
         position.IsDataStreaming = true;
         if (position.AssetClass == AssetClass.Option || position.AssetClass == AssetClass.FutureOption) {
             // Request market data for options
-            var request = $@"smd+{position.ContractId}+{{""fields"":[""{_optionFieldsString}""]}}";
+            var request = $@"smd+{position.Contract.Id}+{{""fields"":[""{_optionFieldsString}""]}}";
             _logger.LogTrace($"Requesting market data for option {position.ContractDesciption}");
 
             _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
         else if (position.AssetClass == AssetClass.Stock || position.AssetClass == AssetClass.Future) {
             // Request market data for stocks and futures
-            var request = $@"smd+{position.ContractId}+{{""fields"":[""{_stockFieldsString}""]}}";
+            var request = $@"smd+{position.Contract.Id}+{{""fields"":[""{_stockFieldsString}""]}}";
             _logger.LogTrace($"Requesting market data for stock {position.ContractDesciption}");
             _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
@@ -235,7 +235,7 @@ public class IBWebSocket : IDisposable
             return;
         }
         position.IsDataStreaming = false;
-        var request = $@"umd+{position.ContractId}+{{}}";
+        var request = $@"umd+{position.Contract.Id}+{{}}";
         _logger.LogTrace($"Stopping market data for {position.ContractDesciption}");
         if (_clientWebSocket != null && _clientWebSocket.State == WebSocketState.Open) {
             _clientWebSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
@@ -257,38 +257,42 @@ public class IBWebSocket : IDisposable
         }
         var contractId = contractIdElement.GetInt32();
 
-        Position? position = null;
+        List<Position> positions = new List<Position>();
         foreach (var account in _accounts) {
-            if (account.Positions.TryGetValue(contractId, out position)) {
-                break;
+            if (account.Positions.TryGetValue(contractId, out var position)) {
+                positions.Add(position);
             }
         }
-        if (position == null) {
-            _logger.LogWarning($"Position with contract ID {contractId} not found in any account");
+        if (positions.Count == 0) {
+            _logger.LogWarning($"Position(s) with contract ID {contractId} not found in any account");
             return;
         }
 
         // Beta
         if (message.TryGetValue(((int)MarketDataFields.Beta).ToString(), out var betaElement) && betaElement.ValueKind == JsonValueKind.String) {
             if (float.TryParse(betaElement.GetString(), out var beta)) {
-                position.Beta = beta;
+                foreach (var position in positions) {
+                    position.Beta = beta;
+                }
             }
             else {
-                _logger.LogError($"Invalid beta value for {position.ContractDesciption}");
+                _logger.LogError($"Invalid beta value for {contractId}");
             }
         }
 
         if (message.TryGetValue(((int)MarketDataFields.MarkPrice).ToString(), out var markElement) && markElement.ValueKind == JsonValueKind.String) {
             if (!string.IsNullOrWhiteSpace(markElement.GetString()) && float.TryParse(markElement.GetString(), out var markPrice)) {
-                position.MarketPrice = markPrice;
+                foreach (var position in positions) {
+                    position.MarketPrice = markPrice;
+                }
             }
         }
 
         // Update greeks for options
-        if (position.AssetClass == AssetClass.Option || position.AssetClass == AssetClass.FutureOption) {
+        if (positions[0].AssetClass == AssetClass.Option || positions[0].AssetClass == AssetClass.FutureOption) {
             float? delta = null;
             if (!message.TryGetValue(((int)MarketDataFields.Delta).ToString(), out var deltaElement) || deltaElement.ValueKind != JsonValueKind.String) {
-                _logger.LogTrace($"Missing delta for {position.ContractDesciption}");
+                _logger.LogTrace($"Missing delta for {contractId}");
             }
             else {
                 delta = float.Parse(deltaElement.GetString()!);
@@ -296,7 +300,7 @@ public class IBWebSocket : IDisposable
 
             float? gamma = null;
             if (!message.TryGetValue(((int)MarketDataFields.Gamma).ToString(), out var gammaElement) || gammaElement.ValueKind != JsonValueKind.String) {
-                _logger.LogTrace($"Missing gamma for {position.ContractDesciption}");
+                _logger.LogTrace($"Missing gamma for {contractId}");
             }
             else {
                 gamma = float.Parse(gammaElement.GetString()!);
@@ -304,7 +308,7 @@ public class IBWebSocket : IDisposable
 
             float? theta = null;
             if (!message.TryGetValue(((int)MarketDataFields.Theta).ToString(), out var thetaElement) || thetaElement.ValueKind != JsonValueKind.String) {
-                _logger.LogTrace($"Missing theta for {position.ContractDesciption}");
+                _logger.LogTrace($"Missing theta for {contractId}");
             }
             else {
                 theta = float.Parse(thetaElement.GetString()!);
@@ -312,15 +316,15 @@ public class IBWebSocket : IDisposable
 
             float? vega = null;
             if (!message.TryGetValue(((int)MarketDataFields.Vega).ToString(), out var vegaElement) || vegaElement.ValueKind != JsonValueKind.String) {
-                _logger.LogTrace($"Missing vega for {position.ContractDesciption}");
+                _logger.LogTrace($"Missing vega for {contractId}");
             }
             else {
                 vega = float.Parse(vegaElement.GetString()!);
             }
 
-            position.UpdateGreeks(delta, gamma, theta, vega);
-        }
-        else if (position.AssetClass == AssetClass.Stock || position.AssetClass == AssetClass.Future) {
+            foreach (var position in positions) {
+                position.UpdateGreeks(delta, gamma, theta, vega);
+            }
         }
     }
 
