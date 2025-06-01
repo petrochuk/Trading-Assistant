@@ -2,7 +2,6 @@
 using AppCore.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
-using System.Collections.Generic;
 
 namespace AppCore.Tests;
 

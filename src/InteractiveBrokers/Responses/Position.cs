@@ -1,6 +1,7 @@
 ﻿using AppCore;
 using AppCore.Extenstions;
 using AppCore.Models;
+using InteractiveBrokers.Models;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -175,35 +176,7 @@ public class Position : IPosition, IJsonOnDeserialized
             }
         }
 
-        // Deserialize expiry
-        switch (assetClass) {
-            case AssetClass.Option:
-            case AssetClass.FutureOption:
-            case AssetClass.Future:
-                if (string.IsNullOrWhiteSpace(ExpiryString)) {
-                    if (descriptionParts.Length >= 2) {
-                        ExpiryString = descriptionParts[1];
-                    }
-                    else {
-                        throw new InvalidOperationException($"Unable to determine expiration date from description: {contractDesc}");
-                    }
-                }
-
-                if (DateTime.TryParseExact(ExpiryString, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var expiration)) {
-                    // Add default expiration time of 16:00:00 EST
-                    var expirationDate = new DateTime(expiration.Year, expiration.Month, expiration.Day, 16, 0, 0, DateTimeKind.Unspecified);
-                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expiration));
-                }
-                else if (DateTime.TryParseExact(ExpiryString, "MMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out expiration)) {
-                    var thirdFriday = expiration.NextThirdFriday();
-                    // Add default expiration time of 16:00:00 EST
-                    var expirationDate = new DateTime(thirdFriday.Year, thirdFriday.Month, thirdFriday.Day, 16, 0, 0, DateTimeKind.Unspecified);
-                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(thirdFriday));
-                }
-                else
-                    throw new InvalidOperationException($"Unable to parse expiration date from description: {contractDesc}");
-                break;
-        }
+        DeserializeExpiry(descriptionParts);
 
         // Deserialize strike
         float result = 0;
@@ -240,6 +213,68 @@ public class Position : IPosition, IJsonOnDeserialized
                         putOrCall = descriptionParts[3];
                     break;
             }
+        }
+    }
+
+    private void DeserializeExpiry(string[] descriptionParts) {
+        // Deserialize expiry
+        switch (assetClass) {
+            case AssetClass.Option:
+            case AssetClass.FutureOption:
+            case AssetClass.Future:
+                if (string.IsNullOrWhiteSpace(ExpiryString)) {
+                    if (descriptionParts.Length >= 2) {
+                        ExpiryString = descriptionParts[1];
+                    }
+                    else {
+                        throw new InvalidOperationException($"Unable to determine expiration date from description: {contractDesc}");
+                    }
+                }
+
+                if (DateTime.TryParseExact(ExpiryString, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var expiration)) {
+                    // Add default expiration time of 16:00:00 EST
+                    var expirationDate = new DateTime(expiration.Year, expiration.Month, expiration.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expiration));
+                }
+                else if (DateTime.TryParseExact(ExpiryString, "MMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out expiration)) {
+
+                    if (assetClass == AssetClass.Future) {
+                        var thirdFriday = expiration.NextThirdFriday();
+                        // Add default expiration time of 16:00:00 EST
+                        var expirationDate = new DateTime(thirdFriday.Year, thirdFriday.Month, thirdFriday.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                        _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(thirdFriday));
+                    }
+                    else if (assetClass == AssetClass.FutureOption) {
+                        if (descriptionParts.Length < 5)
+                            throw new InvalidOperationException($"Unable to determine expiration date from description: {contractDesc}");
+                        var optionSymbol = descriptionParts[4].Trim(['(', ')']);
+                        if (optionSymbol.Length != 3)
+                            throw new InvalidOperationException($"Invalid option symbol format: {optionSymbol}");
+
+                        switch (Symbol) {
+                            case "ES":
+                            case "NQ":
+                            case "RTY":
+                            case "YM":
+                                var dayCode = optionSymbol[1] == 'W' ? 'W' : optionSymbol[2];
+                                var weekNumber = dayCode == 'W' ? optionSymbol[2] - '0' : optionSymbol[1] - '0'; // Convert char to int
+                                if (weekNumber < 1 || weekNumber > 5)
+                                    throw new InvalidOperationException($"Invalid week number in option symbol: {optionSymbol}");
+
+                                var expirationDate = TimeExtensions.NthDayOfMonth(expiration.Year, expiration.Month, SecurityDefinition.WeekCodeToDayOfWeek(dayCode), weekNumber);
+                                // Add default expiration time of 16:00:00 EST
+                                expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                                _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+
+                                break;
+                            default:
+                                throw new InvalidOperationException($"Unsupported future option symbol: {Symbol}");
+                        }
+                    }
+                }
+                else
+                    throw new InvalidOperationException($"Unable to parse expiration date from description: {contractDesc}");
+                break;
         }
     }
 

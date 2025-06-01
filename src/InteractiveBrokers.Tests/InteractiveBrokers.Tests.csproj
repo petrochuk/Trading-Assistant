@@ -10,11 +10,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
     <PackageReference Include="MSTest" Version="3.9.1" />
-    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.5.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AppCore\AppCore.csproj" />
+    <ProjectReference Include="..\InteractiveBrokers\InteractiveBrokers.csproj" />
   </ItemGroup>
 
   <ItemGroup>

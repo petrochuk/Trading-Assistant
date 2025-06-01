@@ -42,14 +42,14 @@ internal class AccountPositions : Request
 
         foreach (var position in positionsResponse) {
             if (!position.IsValid) {
-                Logger?.LogWarning($"IBKR provided invalid position in response: {position.contractDesc}");
+                Logger?.LogWarning($"IBKR returned invalid position in response: {position.contractDesc}");
                 continue;
             }
 
             args.Positions.Add(position.conid, position);
         }
 
-        Logger?.LogInformation($"IBKR provided {args.Positions.Count} positions for account {AccountId.Mask()}");
+        Logger?.LogInformation($"IBKR returned {args.Positions.Count} position(s) for account {AccountId.Mask()}");
 
         _responseHandler?.Invoke(this, args);
     }

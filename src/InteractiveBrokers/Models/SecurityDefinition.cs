@@ -35,5 +35,17 @@ public class SecurityDefinition
     public string fullName { get; set; }
     public bool isEventContract { get; set; }
     public int pageSize { get; set; }
+
+    public static DayOfWeek WeekCodeToDayOfWeek(char weekCode) {
+        return weekCode switch
+        {
+            'A' => DayOfWeek.Monday,
+            'B' => DayOfWeek.Tuesday,
+            'C' => DayOfWeek.Wednesday,
+            'D' => DayOfWeek.Thursday,
+            'W' => DayOfWeek.Friday,
+            _ => throw new ArgumentException($"Invalid week code: {weekCode}")
+        };
+    }
 }
 
