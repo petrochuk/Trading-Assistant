@@ -1,4 +1,5 @@
-﻿using InteractiveBrokers.Args;
+﻿using AppCore.Extenstions;
+using InteractiveBrokers.Args;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.CodeAnalysis;
 
@@ -30,7 +31,7 @@ internal class AccountPositions : Request
                 break;
             }
         }
-        if (allInvalid) {
+        if (allInvalid && positionsResponse.Any()) {
             Logger?.LogWarning($"IBKR returned only invalid positions in response");
             return;
         }
@@ -48,10 +49,7 @@ internal class AccountPositions : Request
             args.Positions.Add(position.conid, position);
         }
 
-        // Sometimes IBKR returns an empty list of positions. Ignore this case.
-        if (args.Positions.Count == 0) {
-            return;
-        }
+        Logger?.LogInformation($"IBKR provided {args.Positions.Count} positions for account {AccountId.Mask()}");
 
         _responseHandler?.Invoke(this, args);
     }

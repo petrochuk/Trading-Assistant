@@ -1,6 +1,7 @@
 ﻿using AppCore;
 using AppCore.Extenstions;
 using AppCore.Models;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,6 +10,7 @@ namespace InteractiveBrokers.Responses;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
+[DebuggerDisplay("{contractDesc}")]
 public class Position : IPosition, IJsonOnDeserialized
 {
     public string acctId { get; set; }
@@ -23,10 +25,16 @@ public class Position : IPosition, IJsonOnDeserialized
     public float realizedPnl { get; set; }
     public float unrealizedPnl { get; set; }
     public object exchs { get; set; }
-    public string expiry { get; set; }
+
+    [JsonPropertyName("expiry")]
+    public string ExpiryString { get; set; }
+
     public string putOrCall { get; set; }
     public float? multiplier { get; set; }
-    public JsonElement strike { get; set; }
+
+    [JsonPropertyName("strike")]
+    public JsonElement JsonStrike { get; set; }
+
     public object exerciseStyle { get; set; }
     public object[] conExchMap { get; set; }
     public AssetClass assetClass { get; set; }
@@ -68,20 +76,10 @@ public class Position : IPosition, IJsonOnDeserialized
 
     string IPosition.ContractDesciption => contractDesc;
 
-    string IPosition.Symbol {
+    public string Symbol {
         get {
             if (!string.IsNullOrWhiteSpace(undSym)) {
                 return undSym;
-            }
-
-            // Try to parse the symbol from the description
-            if (string.IsNullOrWhiteSpace(contractDesc)) {
-                throw new InvalidOperationException("Unable to determine symbol. No description available.");
-            }
-
-            var descriptionParts = contractDesc.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (descriptionParts.Length > 0 && descriptionParts[0].Length > 0) {
-                return descriptionParts[0];
             }
 
             throw new InvalidOperationException($"Unable to determine symbol from description: {contractDesc}");
@@ -119,49 +117,14 @@ public class Position : IPosition, IJsonOnDeserialized
         }
     }
 
+    float _strike = 0;
     float IPosition.Strike {
-        get {
-            float result = 0;
-            if (strike.ValueKind == JsonValueKind.Number) {
-                result = strike.GetSingle();
-                if (result != 0) {
-                    return result;
-                }
-            }
-            else if (strike.ValueKind == JsonValueKind.String) {
-                if (float.TryParse(strike.GetString(), out result) && result != 0) {
-                    return result;
-                }
-            }
-
-            // Last resort, try to parse description
-            if (string.IsNullOrWhiteSpace(contractDesc)) {
-                throw new InvalidOperationException("Unable to determine strike price. No description available.");
-            }
-            var descriptionParts = contractDesc.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (descriptionParts.Length < 3) {
-                throw new InvalidOperationException($"Unable to determine strike price from description: {contractDesc}");
-            }
-            if (float.TryParse(descriptionParts[2], out result) && result != 0) {
-                return result;
-            }
-
-            throw new InvalidOperationException($"Unable to determine strike price from description: {contractDesc}");
-        }
+        get => _strike;
     }
 
-    DateTimeOffset IPosition.Expiration {
-        get {
-            if (string.IsNullOrWhiteSpace(expiry))
-                throw new InvalidOperationException("Unable to determine expiration date. No expiry value available.");
-
-            if (!DateTime.TryParseExact(expiry, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var result))
-                throw new InvalidOperationException($"Unable to parse expiration date: {expiry}");
-
-            // Add default expiration time of 16:00:00 EST
-            var expirationDate = new DateTime(result.Year, result.Month, result.Day, 16, 0, 0, DateTimeKind.Unspecified);
-            return new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(result));
-        }
+    DateTimeOffset? _expiration;
+    DateTimeOffset? IPosition.Expiration {
+        get => _expiration;
     }
 
     float IPosition.Size => position;
@@ -172,8 +135,9 @@ public class Position : IPosition, IJsonOnDeserialized
 
     public bool IsValid {
         get {
-            if (!multiplier.HasValue)
+            if (!multiplier.HasValue) {
                 return false;
+            }
 
             if (string.IsNullOrWhiteSpace(undSym) && position == 0)
                 return false;
@@ -183,6 +147,100 @@ public class Position : IPosition, IJsonOnDeserialized
     }
 
     void IJsonOnDeserialized.OnDeserialized() {
+
+        var descriptionParts = contractDesc.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        // Fix symbol
+        if (string.IsNullOrWhiteSpace(undSym)) {
+            if (descriptionParts.Length > 0)
+                undSym = descriptionParts[0];
+        }
+
+        // Fix multiplier
+        if (!multiplier.HasValue) {
+            switch (assetClass) {
+                case AssetClass.Future:
+                case AssetClass.FutureOption:
+                    // For futures and future options, we can use the known multiplier
+                    if (KnownContracts.FutureMultiplier.TryGetValue(Symbol, out var knownMultiplier)) {
+                        multiplier = knownMultiplier;
+                    }
+                    break;
+                case AssetClass.Option:
+                    multiplier = 100;
+                    break;
+                case AssetClass.Stock:
+                    multiplier = 1;
+                    break;
+            }
+        }
+
+        // Deserialize expiry
+        switch (assetClass) {
+            case AssetClass.Option:
+            case AssetClass.FutureOption:
+            case AssetClass.Future:
+                if (string.IsNullOrWhiteSpace(ExpiryString)) {
+                    if (descriptionParts.Length >= 2) {
+                        ExpiryString = descriptionParts[1];
+                    }
+                    else {
+                        throw new InvalidOperationException($"Unable to determine expiration date from description: {contractDesc}");
+                    }
+                }
+
+                if (DateTime.TryParseExact(ExpiryString, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var expiration)) {
+                    // Add default expiration time of 16:00:00 EST
+                    var expirationDate = new DateTime(expiration.Year, expiration.Month, expiration.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expiration));
+                }
+                else if (DateTime.TryParseExact(ExpiryString, "MMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out expiration)) {
+                    var thirdFriday = expiration.NextThirdFriday();
+                    // Add default expiration time of 16:00:00 EST
+                    var expirationDate = new DateTime(thirdFriday.Year, thirdFriday.Month, thirdFriday.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(thirdFriday));
+                }
+                else
+                    throw new InvalidOperationException($"Unable to parse expiration date from description: {contractDesc}");
+                break;
+        }
+
+        // Deserialize strike
+        float result = 0;
+        if (JsonStrike.ValueKind == JsonValueKind.Number) {
+            result = JsonStrike.GetSingle();
+        }
+        else if (JsonStrike.ValueKind == JsonValueKind.String) {
+            float.TryParse(JsonStrike.GetString(), out result);
+        }
+
+        switch (assetClass) {
+            case AssetClass.Option:
+            case AssetClass.FutureOption:
+                if (result != 0) {
+                    _strike = result;
+                }
+                else {
+                    if (descriptionParts.Length >= 3 && float.TryParse(descriptionParts[2], out result) && result != 0) {
+                        _strike = result;
+                    }
+                    else {
+                        throw new InvalidOperationException($"Unable to determine strike price from description: {contractDesc}");
+                    }
+                }
+                break;
+        }
+
+        // Fix put/call
+        if (string.IsNullOrWhiteSpace(putOrCall)) {
+            switch (assetClass) {
+                case AssetClass.Option:
+                case AssetClass.FutureOption:
+                    if (descriptionParts.Length >= 4 && (descriptionParts[3] == "C" || descriptionParts[3] == "P"))
+                        putOrCall = descriptionParts[3];
+                    break;
+            }
+        }
     }
 
     #endregion

@@ -1,5 +1,6 @@
 ﻿using AppCore;
 using AppCore.Configuration;
+using AppCore.Extenstions;
 using InteractiveBrokers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,8 +34,17 @@ public partial class App : Application
         _logger.LogInformation("");
         _logger.LogInformation("******* Application started *******");
 
+        InitializeHolidays();
+
         _ibClient = AppCore.ServiceProvider.Instance.GetRequiredService<IBClient>();
         _ibWebSocket = AppCore.ServiceProvider.Instance.GetRequiredService<IBWebSocket>();
+    }
+
+    private void InitializeHolidays() {
+        for (int year = DateTime.Now.Year - 10; year <= DateTime.Now.Year + 10; year++)
+        {
+            TimeExtensions.LoadHolidays(year);
+        }
     }
 
     private void InitializeDI() {

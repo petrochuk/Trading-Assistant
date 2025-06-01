@@ -16,7 +16,7 @@ public interface IPosition
 
     float Strike { get; }
 
-    DateTimeOffset Expiration { get; }
+    DateTimeOffset? Expiration { get; }
 
     float Size { get; }
 

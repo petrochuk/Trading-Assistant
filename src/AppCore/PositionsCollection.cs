@@ -138,7 +138,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                                     Symbol = position.Contract.Symbol,
                                     AssetClass = position.Contract.AssetClass,
                                     Id = position.Contract.Id,
-                                    Expiration = position.Contract.Expiration!.Value.DateTime
+                                    Expiration = position.Contract.Expiration
                                 },
                                 Position = position
                             };
@@ -151,7 +151,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                                         Symbol = position.Contract.Symbol,
                                         AssetClass = position.Contract.AssetClass,
                                         Id = position.Contract.Id,
-                                        Expiration = position.Contract.Expiration!.Value.DateTime
+                                        Expiration = position.Contract.Expiration
                                     },
                                     Position = position
                                 };
