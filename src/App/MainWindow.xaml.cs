@@ -1,4 +1,3 @@
-using AppCore;
 using AppCore.Interfaces;
 using AppCore.Models;
 using InteractiveBrokers.Args;
@@ -83,6 +82,18 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    public Account? ActiveAccount {
+        get => _activeAccount;
+        set
+        {
+            if (_activeAccount != value)
+            {
+                _activeAccount = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveAccount)));
+            }
+        }
+    }
+
     #endregion
 
     #region UX Event Handlers
@@ -109,8 +120,9 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     }
     
     private void ActiveAccount_Click(Account account) {
-        _activeAccount = account;
+        ActiveAccount = account;
         RiskGraphControl.Account = _activeAccount;
+        PositionsControl.Positions = _activeAccount.Positions;
         ActiveAccountLabel = _activeAccount.Name;
         PositionsRefreshTimer_Elapsed(null, new ElapsedEventArgs(DateTime.Now));
         RequestMarketDataForAccount(_activeAccount);    

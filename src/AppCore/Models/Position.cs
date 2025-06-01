@@ -4,40 +4,16 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace AppCore.Models;
 
-[DebuggerDisplay("{ContractDesciption} {Size}")]
+[DebuggerDisplay("{Contract} {Size}")]
 public class Position
 {
     #region Immutable Properties
 
     private Lock _lock = new();
 
-    public required Contract Contract { get; init; }
+    public Contract Contract { get; set; }
 
-    public required string Symbol { get; init; }
-
-    public string ContractDesciption { get; init; } = string.Empty;
-
-    private AssetClass _assetClass;
-    public AssetClass AssetClass
-    {
-        get => _assetClass;
-        init
-        {
-            _assetClass = value;
-            if (_assetClass == AssetClass.Stock || _assetClass == AssetClass.Future)
-                RealizedVol = new RVwithSubsampling(PositionsCollection.RealizedVolPeriod, PositionsCollection.RealizedVolSamples);
-        }
-    }
-
-    public float Multiplier { get; init; } = 1;
-
-    public float Strike { get; init; }
-
-    public bool IsCall { get; init; }
-
-    public DateTimeOffset? Expiration { get; init; }
-
-    public RVwithSubsampling? RealizedVol { get; private set; }
+    public RVwithSubsampling? RealizedVol { get; private set; } = new RVwithSubsampling(PositionsCollection.RealizedVolPeriod, PositionsCollection.RealizedVolSamples);
 
     #endregion
 
@@ -73,6 +49,9 @@ public class Position
     #region Constructors
 
     public Position() {
+        Contract = new Contract() { 
+            Symbol = string.Empty 
+        };
     }
 
     /// <summary>
@@ -89,19 +68,6 @@ public class Position
         }
         if (position.Multiplier <= 0) {
             throw new ArgumentOutOfRangeException(nameof(position.Multiplier), "Multiplier should be greater than 0.");
-        }
-
-        Symbol = position.Symbol;
-        ContractDesciption = position.ContractDesciption;
-        AssetClass = position.AssetClass;
-        Multiplier = position.Multiplier;
-        if (position.AssetClass == AssetClass.Option || position.AssetClass == AssetClass.FutureOption) {
-            IsCall = position.IsCall;
-            Strike = position.Strike;
-            Expiration = position.Expiration;
-        }
-        else if (position.AssetClass == AssetClass.Future) {
-            Expiration = position.Expiration;
         }
 
         Contract = new Contract {
@@ -124,7 +90,7 @@ public class Position
     /// </summary>
     [SetsRequiredMembers]
     public Position(int contractId, string underlyingSymbol,
-        AssetClass assetClass, float strike, bool isCall = true, float multiplier = 100) {
+        AssetClass assetClass, DateTimeOffset? expiration, float strike, bool isCall = true, float multiplier = 100) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -148,21 +114,16 @@ public class Position
             AssetClass = assetClass,
             IsCall = isCall,
             Strike = strike,
-            Multiplier = multiplier
+            Multiplier = multiplier,
+            Expiration = expiration
         };
-
-        Symbol = underlyingSymbol;
-        AssetClass = assetClass;
-        IsCall = isCall;
-        Strike = strike;
-        Multiplier = multiplier;
     }
 
     /// <summary>
     /// Create a new position.
     /// </summary>
     [SetsRequiredMembers]
-    public Position(int contractId, string underlyingSymbol, AssetClass assetClass, float multiplier = 1) {
+    public Position(int contractId, string underlyingSymbol, AssetClass assetClass, DateTimeOffset? expiration = null, float multiplier = 1) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -181,24 +142,16 @@ public class Position
             Id = contractId,
             Symbol = underlyingSymbol,
             AssetClass = assetClass,
-            Multiplier = multiplier
+            Multiplier = multiplier,
+            Expiration = expiration
         };
-
-        Symbol = underlyingSymbol;
-        AssetClass = assetClass;
-        Multiplier = multiplier;
     }
 
     [SetsRequiredMembers]
     public Position(Contract contract) {
         Contract = contract ?? throw new ArgumentNullException(nameof(contract));
 
-        Symbol = contract.Symbol;
-        AssetClass = contract.AssetClass;
         Size = 0;
-        Expiration = contract.Expiration;
-        ContractDesciption = contract.ToString();
-        Multiplier = contract.Multiplier;
     }
 
     #endregion
@@ -225,8 +178,8 @@ public class Position
     public void UpdateGreeks(float? delta, float? gamma, float? theta, float? vega) {
         lock (_lock) {
             if (delta != null) { 
-                if (IsCall && delta < 0 || !IsCall && delta > 0)
-                    throw new ArgumentOutOfRangeException(nameof(delta), $"Delta {delta} is not in the expected range for the option type iscall: {IsCall}");
+                if (Contract.IsCall && delta < 0 || !Contract.IsCall && delta > 0)
+                    throw new ArgumentOutOfRangeException(nameof(delta), $"Delta {delta} is not in the expected range for the option type iscall: {Contract.IsCall}");
                 Delta = delta;
             }
             Gamma = gamma ?? Gamma;
@@ -241,4 +194,8 @@ public class Position
     }
 
     #endregion
+
+    public override string ToString() {
+        return $"{Contract} {Size} @ {MarketPrice:C}";
+    }
 }

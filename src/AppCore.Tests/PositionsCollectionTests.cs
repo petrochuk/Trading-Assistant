@@ -15,7 +15,7 @@ public sealed class PositionsCollectionTests
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider());
 
         var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
-        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, 5000, isCall: true, 50);
+        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, null, 5000, isCall: true, 50);
         position1.Size = 1;
 
         // 0 DTE theta = -market price
@@ -30,7 +30,7 @@ public sealed class PositionsCollectionTests
 
         // Assert
         Assert.AreEqual(0.1f, greeks.Delta);
-        Assert.AreEqual(-position1.MarketPrice * position1.Multiplier, greeks.Theta);
+        Assert.AreEqual(-position1.MarketPrice * position1.Contract.Multiplier, greeks.Theta);
         Assert.AreEqual(-0.1f, greeks.Charm);
     }
 
@@ -42,7 +42,7 @@ public sealed class PositionsCollectionTests
         var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
         underlyingPosition.MarketPrice = 5050f;
 
-        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, 5000, isCall: true, 50);
+        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, null, 5000, isCall: true, 50);
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 60.0f;
@@ -68,7 +68,7 @@ public sealed class PositionsCollectionTests
         var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
         underlyingPosition.MarketPrice = 4950f;
 
-        var position1 = new Position(1, underlyingPosition.Symbol, AssetClass.FutureOption, 5000, isCall: false, 50);
+        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, null, 5000, isCall: false, 50);
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 60.0f;
@@ -108,17 +108,17 @@ public sealed class PositionsCollectionTests
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, 
             new FakeTimeProvider(new DateTimeOffset(2025, 4, 23, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)));
 
-        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future, multiplier: 50) {
+        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future,
+            new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
+            multiplier: 50) {
             Size = 1,
-            Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
         };
         underlyingPosition.MarketPrice = 5401.25f;
         positions.TryAdd(underlyingPosition.Contract.Id, underlyingPosition);
 
-        var put = new Position(2, underlyingPosition.Symbol, AssetClass.FutureOption, 5350, isCall: false, 50)
-        {
-            Expiration = new DateTimeOffset(2025, 5, 2, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
-        };
+        var put = new Position(2, underlyingPosition.Contract.Symbol, AssetClass.FutureOption,
+            new DateTimeOffset(2025, 5, 2, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
+            5350, isCall: false, 50);
         put.MarketPrice = 65.0f;
         put.Size = 1;
         put.UpdateGreeks(delta: -0.7f, gamma: 0.0f, theta: -put.MarketPrice, vega: 0.0f);

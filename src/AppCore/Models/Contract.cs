@@ -2,7 +2,7 @@
 
 public class Contract
 {
-    public required string Symbol { get; init; }
+    public string Symbol { get; set; } = string.Empty;
 
     public AssetClass AssetClass { get; init; }
 

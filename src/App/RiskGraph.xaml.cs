@@ -125,7 +125,7 @@ public sealed partial class RiskGraph : UserControl
             return;
         }
 
-        var underlyingSymbol = Account.Positions.DefaultUnderlying.Symbol;
+        var underlyingSymbol = Account.Positions.DefaultUnderlying.Contract.Symbol;
         var minPrice = midPrice * 0.95f;
         var maxPrice = midPrice * 1.05f;
         var priceIncrement = (maxPrice - minPrice) / 100f;

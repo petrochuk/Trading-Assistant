@@ -11,13 +11,14 @@
 
     <Grid x:Name="MainGrid">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Grid.Row="0" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}" Orientation="Horizontal">
+        <StackPanel Grid.Column="0" Grid.Row="0" Grid.ColumnSpan="2" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}" Orientation="Horizontal">
             <CommandBar x:Name="GeneralCommandBar"
                 DefaultLabelPosition="Right" IsOpen="True" IsSticky="True" 
                 Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
@@ -50,5 +51,7 @@
         </StackPanel>
         <local:RiskGraph Grid.Column="0" Grid.Row="1" x:Name="RiskGraphControl">
         </local:RiskGraph>
+        <local:PositionsControl Grid.Column="1" Grid.Row="1" x:Name="PositionsControl">
+        </local:PositionsControl>
     </Grid>
 </Window>
