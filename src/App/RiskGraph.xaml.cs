@@ -74,7 +74,6 @@ public sealed partial class RiskGraph : UserControl
             UpdateGreeks();
 
             if (Account == null || !Account.Positions.Any()) {
-                _logger.LogWarning("No positions available for the active account.");
                 return;
             }
 

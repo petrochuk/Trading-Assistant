@@ -21,7 +21,12 @@ public sealed partial class PositionsControl : UserControl
     [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
     public PositionsCollection? Positions {
         get => _positions;
-        set => _positions = value;
+        set {
+            _positions = value;
+            DispatcherQueue.TryEnqueue(() => {
+                NavigationView_Navigate(string.Empty);
+            });
+        }
     }
 
     private void NavigationView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args) {

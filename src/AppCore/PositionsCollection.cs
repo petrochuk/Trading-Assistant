@@ -3,12 +3,13 @@ using AppCore.Models;
 using AppCore.Options;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Collections.Specialized;
 using System.Diagnostics;
 
 namespace AppCore;
 
 [DebuggerDisplay("c:{Count}")]
-public class PositionsCollection : ConcurrentDictionary<int, Position>
+public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyCollectionChanged
 {
     #region Fields
 
@@ -41,6 +42,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
 
     public event EventHandler<Position>? OnPositionAdded;
     public event EventHandler<Position>? OnPositionRemoved;
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     #endregion
 
@@ -79,6 +81,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
                     if (TryAdd(positionKV.Key, position)) {
                         _logger.LogInformation($"Added {position.Size} position {position.Contract}");
                         OnPositionAdded?.Invoke(this, position);
+                        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, position));
                     }
                 }
             }
@@ -107,6 +110,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>
         if (TryRemove(contractId, out var removedPosition)) {
             _logger.LogInformation($"Removed position {removedPosition!.Contract}");
             OnPositionRemoved?.Invoke(this, removedPosition);
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedPosition));
         }
     }
 

@@ -121,11 +121,11 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     
     private void ActiveAccount_Click(Account account) {
         ActiveAccount = account;
-        RiskGraphControl.Account = _activeAccount;
-        PositionsControl.Positions = _activeAccount.Positions;
-        ActiveAccountLabel = _activeAccount.Name;
+        RiskGraphControl.Account = account;
+        PositionsControl.Positions = account.Positions;
+        ActiveAccountLabel = account.Name;
         PositionsRefreshTimer_Elapsed(null, new ElapsedEventArgs(DateTime.Now));
-        RequestMarketDataForAccount(_activeAccount);    
+        RequestMarketDataForAccount(account);
     }
 
     #endregion
@@ -209,6 +209,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         RiskGraphControl.Account = _activeAccount;
+        PositionsControl.Positions = _activeAccount != null ? _activeAccount.Positions : null;
         DispatcherQueue.TryEnqueue(() => {
             if (_activeAccount == null) {
                 ActiveAccountLabel = "No Accounts";
