@@ -11,6 +11,8 @@ namespace InteractiveBrokers.Tests
             2025, 6, 12, 16, 0)]
         [DataRow("""{"acctId":"U2168587","conid":784391272,"contractDesc":"ES     JUN2025 6010 C (EW2)","position":-1.0,"mktPrice":28.3278103,"mktValue":-1416.39,"currency":"USD","avgCost":1448.58,"avgPrice":28.9716,"realizedPnl":0.0,"unrealizedPnl":32.19,"exchs":null,"expiry":null,"putOrCall":null,"multiplier":null,"strike":0.0,"exerciseStyle":null,"conExchMap":[],"assetClass":"FOP","undConid":0,"model":""}""",
             2025, 6, 13, 16, 0)]
+        [DataRow("""{"acctId":"U2168587","conid":785625295,"contractDesc":"ZN     JUN2025 112.75 C (ZN2)","position":-1.0,"mktPrice":0.0578679,"mktValue":-57.87,"currency":"USD","avgCost":45.155,"avgPrice":0.045155,"realizedPnl":0.0,"unrealizedPnl":-12.71,"exchs":null,"expiry":null,"putOrCall":null,"multiplier":null,"strike":0.0,"exerciseStyle":null,"conExchMap":[],"assetClass":"FOP","undConid":0,"model":""}""",
+            2025, 6, 13, 16, 0)]
         public void ParsePosition(string positionJson, int expectedYear, int expectedMonth, int expectedDay, int expectedHour, int expectedMinute) {
 
             // Act

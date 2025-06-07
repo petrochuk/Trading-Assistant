@@ -36,16 +36,28 @@ public class SecurityDefinition
     public bool isEventContract { get; set; }
     public int pageSize { get; set; }
 
-    public static DayOfWeek WeekCodeToDayOfWeek(char weekCode) {
-        return weekCode switch
-        {
-            'A' => DayOfWeek.Monday,
-            'B' => DayOfWeek.Tuesday,
-            'C' => DayOfWeek.Wednesday,
-            'D' => DayOfWeek.Thursday,
-            'W' => DayOfWeek.Friday,
-            _ => throw new ArgumentException($"Invalid week code: {weekCode}")
-        };
+    public static DayOfWeek WeekCodeToDayOfWeek(string symbol, char weekCode) {
+        if (symbol == "ES") {
+            return weekCode switch {
+                'A' => DayOfWeek.Monday,
+                'B' => DayOfWeek.Tuesday,
+                'C' => DayOfWeek.Wednesday,
+                'D' => DayOfWeek.Thursday,
+                'W' => DayOfWeek.Friday,
+                _ => throw new ArgumentException($"Invalid week code: {weekCode}")
+            };
+        }
+        else if (symbol == "ZN") {
+            return weekCode switch {
+                'V' => DayOfWeek.Monday,
+                'W' => DayOfWeek.Wednesday,
+                'Z' => DayOfWeek.Friday,
+                _ => throw new ArgumentException($"Invalid week code: {weekCode}")
+            };
+
+        }
+
+        throw new ArgumentException($"Unsupported symbol: {symbol}");
     }
 }
 
