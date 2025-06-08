@@ -9,7 +9,8 @@ public static class IServiceCollectionExtension
     public static IServiceCollection AddAppCore(this IServiceCollection services) {
 
         services
-            .AddTransient<IAccountFactory, AccountFactory>();
+            .AddTransient<IAccountFactory, AccountFactory>()
+            .AddSingleton<ExpirationCalendar>();
 
         return services;
     }

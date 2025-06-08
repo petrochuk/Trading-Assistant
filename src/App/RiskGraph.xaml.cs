@@ -95,9 +95,9 @@ public sealed partial class RiskGraph : UserControl
 
         var greeks = Account.Positions!.CalculateGreeks();
 
-        if (Account.Positions.DefaultUnderlying != null && Account.Positions.DefaultUnderlying.RealizedVol != null) {
+        if (Account.Positions.SelectedPosition != null && Account.Positions.SelectedPosition.RealizedVol != null) {
 
-            if (Account.Positions.DefaultUnderlying.RealizedVol.TryGetValue(out var rv)) {
+            if (Account.Positions.SelectedPosition.RealizedVol.TryGetValue(out var rv)) {
                 // Annualize RV
                 var annualizalizedRV = rv * System.Math.Sqrt(365.0 * 24.0 * (60.0 / PositionsCollection.RealizedVolPeriod.TotalMinutes));
                 RVText.Text = annualizalizedRV.ToString("P2");
@@ -113,18 +113,18 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void DrawRiskIntervals() {
-        if (Account == null || !Account.Positions.Any() || Account.Positions.DefaultUnderlying == null) {
+        if (Account == null || !Account.Positions.Any() || Account.Positions.SelectedPosition == null) {
             return;
         }
 
         // First calculate the risk curves for each interval
-        var midPrice = Account.Positions.DefaultUnderlying.MarketPrice;
+        var midPrice = Account.Positions.SelectedPosition.MarketPrice;
         if (midPrice == 0) {
             _logger.LogTrace("No market price available for underlying");
             return;
         }
 
-        var underlyingSymbol = Account.Positions.DefaultUnderlying.Contract.Symbol;
+        var underlyingSymbol = Account.Positions.SelectedPosition.Contract.Symbol;
         var minPrice = midPrice * 0.95f;
         var maxPrice = midPrice * 1.05f;
         var priceIncrement = (maxPrice - minPrice) / 100f;

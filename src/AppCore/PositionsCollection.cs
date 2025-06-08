@@ -3,18 +3,21 @@ using AppCore.Models;
 using AppCore.Options;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace AppCore;
 
 [DebuggerDisplay("c:{Count}")]
-public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyCollectionChanged
+public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyCollectionChanged, INotifyPropertyChanged
 {
     #region Fields
 
     private readonly ILogger _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly ExpirationCalendar _expirationCalendar;
     private readonly Lock _lock = new();
 
     public static readonly TimeSpan RealizedVolPeriod = TimeSpan.FromMinutes(5);
@@ -25,9 +28,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
     #region Constructors
 
-    public PositionsCollection(ILogger logger, TimeProvider timeProvider) {
+    public PositionsCollection(ILogger logger, TimeProvider timeProvider, ExpirationCalendar expirationCalendar) {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _expirationCalendar = expirationCalendar ?? throw new ArgumentNullException(nameof(expirationCalendar));
 
         _stdDevTimer = new(RealizedVolPeriod / RealizedVolSamples) {
             AutoReset = true, Enabled = true
@@ -43,14 +47,24 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     public event EventHandler<Position>? OnPositionAdded;
     public event EventHandler<Position>? OnPositionRemoved;
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     #endregion
 
     #region Properties
 
-    public SortedList<string, (Contract Contract, Position? Position)> Underlyings { get; set; } = new();
+    public ObservableCollection<Position> Underlyings { get; set; } = new();
 
-    public Position? DefaultUnderlying { get; set; } = null;
+    Position? _selectedPosition = null;
+    public Position? SelectedPosition { 
+        get => _selectedPosition;
+        set {
+            if (_selectedPosition != value) {
+                _selectedPosition = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedPosition)));
+            }
+        }
+    }
 
     #endregion
 
@@ -61,8 +75,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             // Remove positions that are not in the new list
             foreach (var contractId in Keys.ToList()) {
                 if (!positions.ContainsKey(contractId)) {
-                    if (contractId != DefaultUnderlying?.Contract.Id) {
-                        RemovePosition(contractId);
+                    if (_selectedPosition != null && contractId != _selectedPosition.Contract.Id) {
+                        SelectedPosition = null;
                     }
                 }
             }
@@ -99,8 +113,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             }
             var position = new Position(contract);
             TryAdd(contract.Id, position);
-            _logger.LogInformation($"Added empty position for {contract}");
-            DefaultUnderlying = position;
 
             return position;
         }
@@ -115,73 +127,64 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     }
 
     private void UpdateUnderlyings() {
-        Underlyings.Clear();
+        var newUnderlyings = new Dictionary<string, string>();
 
         foreach (var position in Values) {
+            var existingUnderlying = Underlyings.FirstOrDefault(u => u.Contract.Symbol == position.Contract.Symbol);
+
             switch (position.Contract.AssetClass) {
                 case AssetClass.Stock:
-                    Underlyings.Add(position.Contract.Symbol, new() {
-                        Contract = new Contract() {
-                            Symbol = position.Contract.Symbol,
-                            AssetClass = position.Contract.AssetClass,
-                            Id = position.Contract.Id
-                        },
-                        Position = position });
+                    if (existingUnderlying == null)
+                        Underlyings.Add(position);
+                    newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
                     break;
                 case AssetClass.Future:
-                    if (Underlyings.TryGetValue(position.Contract.Symbol, out var existingUnderlying)) {
-                        if (existingUnderlying.Position == null) {
-                            Underlyings[position.Contract.Symbol] = new()
-                            {
-                                Contract = new Contract()
-                                {
-                                    Symbol = position.Contract.Symbol,
-                                    AssetClass = position.Contract.AssetClass,
-                                    Id = position.Contract.Id,
-                                    Expiration = position.Contract.Expiration
-                                },
-                                Position = position
-                            };
-                        }
-                        else {
-                            // Replace with front month future
-                            if (position.Contract.Expiration < existingUnderlying.Contract.Expiration) {
-                                Underlyings[position.Contract.Symbol] = new() {
-                                    Contract = new Contract() {
-                                        Symbol = position.Contract.Symbol,
-                                        AssetClass = position.Contract.AssetClass,
-                                        Id = position.Contract.Id,
-                                        Expiration = position.Contract.Expiration
-                                    },
-                                    Position = position
-                                };
-                            }
-                        }
-                        DefaultUnderlying = position;
+                    // Replace with front month future
+                    if (existingUnderlying != null && position.Contract.Expiration <= existingUnderlying.Contract.Expiration) {
+                        Underlyings.Remove(existingUnderlying);
+                        Underlyings.Add(position);
+                        newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
                     }
                     break;
                 case AssetClass.FutureOption:
-                    if (!Underlyings.TryGetValue(position.Contract.Symbol, out var existingPosition2)) {
+                    if (existingUnderlying == null) {
                         // Add placeholder for position
-                        Underlyings.Add(position.Contract.Symbol, new() {
-                            Contract = new Contract() {
-                                Symbol = position.Contract.Symbol,
-                                AssetClass = AssetClass.Future
-                            },
-                            Position = null
-                        });
+                        var contract = new Contract() {
+                            Symbol = position.Contract.Symbol,
+                            AssetClass = AssetClass.Future,
+                            Expiration = _expirationCalendar.GetFrontMonthExpiration(position.Contract.Symbol, _timeProvider.EstNow()),
+                        };
+                        var zeroPosition = new Position(contract) {
+                            Size = 0,
+                            MarketPrice = 0,
+                            MarketValue = 0
+                        };
+                        Underlyings.Add(zeroPosition);
+                        newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
                     }
                     break;
+            }
+        }
+
+        // Remove underlyings that are not in the new list
+        for (int i = Underlyings.Count - 1; i >= 0; i--) {
+            var underlying = Underlyings[i];
+            if (!newUnderlyings.ContainsKey(underlying.Contract.Symbol)) {
+                _logger.LogInformation($"Removing underlying {underlying.Contract.Symbol}");
+                Underlyings.RemoveAt(i);
             }
         }
     }
 
     public Greeks CalculateGreeks() {
         var greeks = new Greeks();
+        if (_selectedPosition == null) {
+            return greeks;
+        }
 
         lock (_lock) {
             foreach (var position in Values) {
-                if (position.Contract.Symbol != DefaultUnderlying?.Contract.Symbol) {
+                if (position.Contract.Symbol != _selectedPosition.Contract.Symbol) {
                     continue;
                 }
                 if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
@@ -198,7 +201,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         if (-0.5f < position.Delta.Value && position.Delta.Value < 0.5f)
                             greeks.Charm -= position.Delta.Value * (absTheta / position.MarketPrice) * position.Size;
                         else {
-                            var intrinsicValue = position.Contract.IsCall ? DefaultUnderlying.MarketPrice - position.Contract.Strike : position.Contract.Strike - DefaultUnderlying.MarketPrice;
+                            var intrinsicValue = position.Contract.IsCall ? _selectedPosition.MarketPrice - position.Contract.Strike : position.Contract.Strike - _selectedPosition.MarketPrice;
                             if (intrinsicValue < 0)
                                 intrinsicValue = 0;
                             var extrinsicValue = position.MarketPrice - intrinsicValue;
@@ -254,7 +257,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             if (position.Contract.Symbol != underlyingSymbol)
                 continue;
             // Skip any positions that are not expired
-            if (currentTime + lookaheadSpan < position.Contract.Expiration!.Value)
+            if (position.Contract.Expiration != null && currentTime + lookaheadSpan < position.Contract.Expiration.Value)
                 continue;
 
             if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
@@ -281,10 +284,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             if (position.Contract.Symbol != underlyingSymbol)
                 continue;
 
-            if (position.Contract.AssetClass == AssetClass.Future) {
+            if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
                 totalPL += position.Size * (currentPrice - position.MarketPrice) * position.Contract.Multiplier;
             } 
-            else if (position.Contract.AssetClass == AssetClass.FutureOption) {
+            else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
                 float optionPrice = CalculateOptionPrice(lookaheadSpan, midPrice, currentTime, currentPrice, bls, position);
 
                 totalPL += position.Size * (optionPrice - position.MarketPrice) * position.Contract.Multiplier;

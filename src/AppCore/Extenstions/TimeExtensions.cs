@@ -45,8 +45,47 @@ public static class TimeExtensions
         return thirdFriday;
     }
 
+    public static DateTimeOffset NextThirdFriday(this DateTimeOffset date, bool ignoreGoodFriday = false) {
+        // Find third Friday this month
+        DateTimeOffset thirdFriday = new DateTimeOffset(date.Year, date.Month, 1, 0, 0, 0, date.Offset);
+        int fridayCounter = 0;
+        while (true) {
+            if (thirdFriday.DayOfWeek == DayOfWeek.Friday) {
+                fridayCounter++;
+                if (fridayCounter == 3) {
+                    if (thirdFriday.IsHoliday())
+                        thirdFriday = thirdFriday.AddDays(-1);
+
+                    // Start over next month if Friday is in past
+                    if (thirdFriday.Date < date.Date) {
+                        thirdFriday = new DateTimeOffset(date.Year, date.Month, 1, 0, 0, 0, date.Offset).AddMonths(1);
+                        fridayCounter = 0;
+                        continue;
+                    }
+                    break;
+                }
+            }
+
+            thirdFriday = thirdFriday.AddDays(1);
+        }
+
+        return thirdFriday;
+    }
+
     [DebuggerStepThrough]
     public static bool IsHoliday(this DateTime date, bool ignoreGoodFriday = false) {
+        var dateTicks = (date.Ticks / TimeSpan.TicksPerDay) * TimeSpan.TicksPerDay;
+        if (!Holidays.TryGetValue(dateTicks, out var holiday))
+            return false;
+
+        if (holiday == Holiday.GoodFriday && ignoreGoodFriday)
+            return false;
+
+        return true;
+    }
+
+    [DebuggerStepThrough]
+    public static bool IsHoliday(this DateTimeOffset date, bool ignoreGoodFriday = false) {
         var dateTicks = (date.Ticks / TimeSpan.TicksPerDay) * TimeSpan.TicksPerDay;
         if (!Holidays.TryGetValue(dateTicks, out var holiday))
             return false;

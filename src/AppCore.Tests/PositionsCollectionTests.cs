@@ -11,7 +11,7 @@ public sealed class PositionsCollectionTests
     [TestMethod]
     public void TotalGreeks_Otm_Call() {
         // Arrange
-        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider());
+        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar());
 
         var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
         var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, null, 5000, isCall: true, 50);
@@ -22,7 +22,7 @@ public sealed class PositionsCollectionTests
         position1.UpdateGreeks(delta: 0.1f, gamma: 0.0f, theta: -position1.MarketPrice, vega: 0.0f);
 
         positions.TryAdd(1, position1);
-        positions.DefaultUnderlying = underlyingPosition;
+        positions.SelectedPosition = underlyingPosition;
 
         // Act
         var greeks = positions.CalculateGreeks();
@@ -36,7 +36,7 @@ public sealed class PositionsCollectionTests
     [TestMethod]
     public void TotalGreeks_Itm_Call() {
         // Arrange
-        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider());
+        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar());
 
         var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
         underlyingPosition.MarketPrice = 5050f;
@@ -49,7 +49,7 @@ public sealed class PositionsCollectionTests
         position1.UpdateGreeks(delta: 0.8f, gamma: 0.0f, theta: -10f, vega: 0.0f);
 
         positions.TryAdd(1, position1);
-        positions.DefaultUnderlying = underlyingPosition;
+        positions.SelectedPosition = underlyingPosition;
 
         // Act
         var greeks = positions.CalculateGreeks();
@@ -62,7 +62,7 @@ public sealed class PositionsCollectionTests
     [TestMethod]
     public void TotalGreeks_Itm_Put() {
         // Arrange
-        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider());
+        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar());
 
         var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
         underlyingPosition.MarketPrice = 4950f;
@@ -75,7 +75,7 @@ public sealed class PositionsCollectionTests
         position1.UpdateGreeks(delta: -0.8f, gamma: 0.0f, theta: -10f, vega: 0.0f);
 
         positions.TryAdd(1, position1);
-        positions.DefaultUnderlying = underlyingPosition;
+        positions.SelectedPosition = underlyingPosition;
 
         // Act
         var greeks = positions.CalculateGreeks();
@@ -88,7 +88,7 @@ public sealed class PositionsCollectionTests
     [TestMethod]
     public void RiskCurve_NoPositions() {
         // Arrange
-        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider());
+        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar());
         
         // Act
         var riskCurve = positions.CalculateRiskCurve("ES", TimeSpan.FromMinutes(5), 4000, 5000, 6000, 10);
@@ -105,7 +105,8 @@ public sealed class PositionsCollectionTests
     public void RiskCurve_OneHedgedPosition() {
         // Arrange
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, 
-            new FakeTimeProvider(new DateTimeOffset(2025, 4, 23, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)));
+            new FakeTimeProvider(new DateTimeOffset(2025, 4, 23, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)),
+            new ExpirationCalendar());
 
         var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future,
             new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),

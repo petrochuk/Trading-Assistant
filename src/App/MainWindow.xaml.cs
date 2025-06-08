@@ -1,3 +1,4 @@
+using AppCore;
 using AppCore.Interfaces;
 using AppCore.Models;
 using InteractiveBrokers.Args;
@@ -190,11 +191,13 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             var accountFactory = AppCore.ServiceProvider.Instance.GetRequiredService<IAccountFactory>();
             var accountLogger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<Account>>();
             var timeProvider = AppCore.ServiceProvider.Instance.GetRequiredService<TimeProvider>();
+            var expirationCalendar = AppCore.ServiceProvider.Instance.GetRequiredService<ExpirationCalendar>();
             var account = accountFactory.CreateAccount(brokerAccount.Id, 
                 string.IsNullOrWhiteSpace(brokerAccount.Alias) ? brokerAccount.DisplayName : brokerAccount.Alias,
-                accountLogger, timeProvider);
+                accountLogger, timeProvider, expirationCalendar);
             account.Positions.OnPositionAdded += OnPositionAdded;
             account.Positions.OnPositionRemoved += OnPositionRemoved;
+            account.Positions.PropertyChanged += Positions_PropertyChanged;
             _accounts.Add(account);
 
             if (brokerAccount.CustomerType == "INDIVIDUAL") {
@@ -234,6 +237,14 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         PositionsRefreshTimer_Elapsed(null, new ElapsedEventArgs(DateTime.Now));
     }
 
+    private void Positions_PropertyChanged(object? sender, PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(PositionsCollection.SelectedPosition)) {
+            DispatcherQueue?.TryEnqueue(() => {
+                RiskGraphControl.Redraw();
+            });
+        }
+    }
+
     private void IBClient_AccountSummary(object? sender, AccountSummaryArgs e) {
         if (_activeAccount == null || _activeAccount.Id != e.accountcode.Value) {
             _logger.LogInformation($"Summary for account {e.accountcode.Value} not found");
@@ -255,14 +266,16 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         DispatcherQueue?.TryEnqueue(() => {
             _activeAccount.Positions.Reconcile(e.Positions);
 
+            /*
             if (_activeAccount.Positions.DefaultUnderlying != null) {
                 // Make sure we have positions for each underlying
-                foreach (var underlying in _activeAccount.Positions.Underlyings.Values) {
-                    if (underlying.Position == null && _activeAccount.Positions.DefaultUnderlying.Contract.Id == underlying.Contract.Id) {
+                foreach (var underlying in _activeAccount.Positions.Underlyings) {
+                    if (_activeAccount.Positions.DefaultUnderlying.Contract.Id == underlying.Contract.Id) {
                         App.Instance.IBClient.FindContract(underlying.Contract);
                     }
                 }
             }
+            */
 
             RiskGraphControl.Redraw();
         });

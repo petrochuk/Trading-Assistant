@@ -9,7 +9,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <ListBox x:Name="UnderlyingList" SelectionChanged="UnderlyingList_SelectionChanged" ItemsSource="{x:Bind Positions.Values, Mode=OneWay}"
+    <ListBox x:Name="UnderlyingList" SelectionChanged="UnderlyingList_SelectionChanged" ItemsSource="{x:Bind Positions.Underlyings, Mode=OneWay}"
              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
              Margin="8" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
              BorderBrush="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
