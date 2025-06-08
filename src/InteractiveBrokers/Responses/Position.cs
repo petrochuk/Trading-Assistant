@@ -220,6 +220,8 @@ public class Position : IPosition, IJsonOnDeserialized
         // Deserialize expiry
         switch (assetClass) {
             case AssetClass.Option:
+                DeserializeOptionExpiry(descriptionParts);
+                break;
             case AssetClass.FutureOption:
             case AssetClass.Future:
                 if (string.IsNullOrWhiteSpace(ExpiryString)) {
@@ -297,6 +299,21 @@ public class Position : IPosition, IJsonOnDeserialized
                 else
                     throw new InvalidOperationException($"Unable to parse expiration date from description: {contractDesc}");
                 break;
+        }
+    }
+
+    private void DeserializeOptionExpiry(string[] descriptionParts) {
+        if (5 < descriptionParts.Length) {
+            var optionDetail = descriptionParts[5].Split(['P', 'C'], StringSplitOptions.RemoveEmptyEntries);
+            if (optionDetail.Length < 2) {
+                throw new InvalidOperationException($"Unable to determine expiration date from description: {contractDesc}");
+            }
+            if (!DateTime.TryParseExact(optionDetail[0], "yyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var expiration)) {
+                throw new InvalidOperationException($"Unable to parse expiration date from description: {contractDesc}");
+            }
+            // Add default expiration time of 16:00:00 EST
+            var expirationDate = new DateTime(expiration.Year, expiration.Month, expiration.Day, 16, 0, 0, DateTimeKind.Unspecified);
+            _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expiration));
         }
     }
 
