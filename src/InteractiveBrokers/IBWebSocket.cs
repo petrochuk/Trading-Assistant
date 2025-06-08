@@ -262,6 +262,10 @@ public class IBWebSocket : IDisposable
             if (account.Positions.TryGetValue(contractId, out var position)) {
                 positions.Add(position);
             }
+            var underlyingPositions = account.Positions.Underlyings.Where(p => p.Contract.Id == contractId).FirstOrDefault();
+            if (underlyingPositions != null) {
+                positions.Add(underlyingPositions);
+            }
         }
         if (positions.Count == 0) {
             _logger.LogWarning($"Position(s) with contract ID {contractId} not found in any account");
