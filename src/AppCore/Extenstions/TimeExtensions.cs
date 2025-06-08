@@ -72,7 +72,6 @@ public static class TimeExtensions
         return thirdFriday;
     }
 
-    [DebuggerStepThrough]
     public static bool IsHoliday(this DateTime date, bool ignoreGoodFriday = false) {
         var dateTicks = (date.Ticks / TimeSpan.TicksPerDay) * TimeSpan.TicksPerDay;
         if (!Holidays.TryGetValue(dateTicks, out var holiday))
@@ -84,7 +83,6 @@ public static class TimeExtensions
         return true;
     }
 
-    [DebuggerStepThrough]
     public static bool IsHoliday(this DateTimeOffset date, bool ignoreGoodFriday = false) {
         var dateTicks = (date.Ticks / TimeSpan.TicksPerDay) * TimeSpan.TicksPerDay;
         if (!Holidays.TryGetValue(dateTicks, out var holiday))

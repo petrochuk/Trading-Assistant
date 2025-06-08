@@ -9,15 +9,15 @@ public class ExpirationCalendar
         switch (symbol)
         {
             case "ES":
-                return GetFrontMonthExpirationES(dateTimeOffset);
+                return GetFrontMonthExpiration_ES(dateTimeOffset);
             case "ZN":
-                return GetFrontMonthExpirationZN(dateTimeOffset);
+                return GetFrontMonthExpiration_ZN(dateTimeOffset);
             default:
                 throw new ArgumentException($"Unsupported symbol: {symbol}");
         }
     }
 
-    public DateTimeOffset GetFrontMonthExpirationES(DateTimeOffset dateTimeOffset) {
+    public DateTimeOffset GetFrontMonthExpiration_ES(DateTimeOffset dateTimeOffset) {
         // For ES, the front month expiration is the third Friday of every quarter month (March, June, September, December)
         var year = dateTimeOffset.Year;
         var month = dateTimeOffset.Month;
@@ -43,8 +43,34 @@ public class ExpirationCalendar
 
         return new DateTimeOffset(frontMonthExpiration.Year, frontMonthExpiration.Month, frontMonthExpiration.Day, 16, 0, 0, dateTimeOffset.Offset);
     }
-    
-    public DateTimeOffset GetFrontMonthExpirationZN(DateTimeOffset dateTimeOffset) {
-        return dateTimeOffset;
+
+    /// <summary>
+    /// Trading terminates at 12:01 p.m. CT, 7 business days prior to the last business day of the contract month.
+    /// </summary>
+    /// <param name="dateTimeOffset"></param>
+    /// <returns></returns>
+    public DateTimeOffset GetFrontMonthExpiration_ZN(DateTimeOffset dateTimeOffset) {
+        // First, find the last business day of the month
+        var lastDayOfMonth = new DateTimeOffset(dateTimeOffset.Year, (dateTimeOffset.Month + 2) / 3 * 3, 1, 0, 0, 0, dateTimeOffset.Offset)
+            .AddMonths(1).AddDays(-1);
+        
+        while (lastDayOfMonth.DayOfWeek == DayOfWeek.Saturday || lastDayOfMonth.DayOfWeek == DayOfWeek.Sunday || lastDayOfMonth.IsHoliday()) {
+            lastDayOfMonth = lastDayOfMonth.AddDays(-1);
+        }
+
+        var businessDaysCount = 7;
+        while (businessDaysCount > 0) {
+            lastDayOfMonth = lastDayOfMonth.AddDays(-1);
+            if (lastDayOfMonth.DayOfWeek != DayOfWeek.Saturday && lastDayOfMonth.DayOfWeek != DayOfWeek.Sunday && !lastDayOfMonth.IsHoliday()) {
+                businessDaysCount--;
+            }
+        }
+
+        var frontMonthExpiration = new DateTimeOffset(lastDayOfMonth.Year, lastDayOfMonth.Month, lastDayOfMonth.Day, 13, 0, 0, dateTimeOffset.Offset);
+        if (dateTimeOffset <= frontMonthExpiration) {
+            return frontMonthExpiration;
+        }
+
+        return GetFrontMonthExpiration_ZN(dateTimeOffset.AddMonths(1));
     }
 }

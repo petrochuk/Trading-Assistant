@@ -131,19 +131,18 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
         foreach (var position in Values) {
             var existingUnderlying = Underlyings.FirstOrDefault(u => u.Contract.Symbol == position.Contract.Symbol);
+            newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
 
             switch (position.Contract.AssetClass) {
                 case AssetClass.Stock:
                     if (existingUnderlying == null)
                         Underlyings.Add(position);
-                    newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
                     break;
                 case AssetClass.Future:
                     // Replace with front month future
                     if (existingUnderlying != null && position.Contract.Expiration <= existingUnderlying.Contract.Expiration) {
                         Underlyings.Remove(existingUnderlying);
                         Underlyings.Add(position);
-                        newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
                     }
                     break;
                 case AssetClass.FutureOption:
@@ -160,7 +159,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                             MarketValue = 0
                         };
                         Underlyings.Add(zeroPosition);
-                        newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
                     }
                     break;
             }

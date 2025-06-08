@@ -266,16 +266,13 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         DispatcherQueue?.TryEnqueue(() => {
             _activeAccount.Positions.Reconcile(e.Positions);
 
-            /*
-            if (_activeAccount.Positions.DefaultUnderlying != null) {
-                // Make sure we have positions for each underlying
-                foreach (var underlying in _activeAccount.Positions.Underlyings) {
-                    if (_activeAccount.Positions.DefaultUnderlying.Contract.Id == underlying.Contract.Id) {
-                        App.Instance.IBClient.FindContract(underlying.Contract);
-                    }
+            // Make sure each underlying has a valid contract
+            foreach (var position in _activeAccount.Positions.Underlyings) {
+                if (0 < position.Contract.Id) {
+                    continue;
                 }
+                App.Instance.IBClient.FindContract(position.Contract);
             }
-            */
 
             RiskGraphControl.Redraw();
         });
@@ -290,10 +287,30 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        // This needs improvement to handle multiple accounts and positions
-        var position = _activeAccount.Positions.AddPosition(e.Contract);
-        if (position != null) {
-            App.Instance.IBWebSocket.RequestPositionMarketData(position);
+        foreach (var position in _activeAccount.Positions.Underlyings) {
+            if (position.Contract.Symbol != e.Contract.Symbol) {
+                continue;
+            }
+            
+            if (position.Contract.AssetClass != e.Contract.AssetClass) {
+                continue;
+            }
+            
+            if (position.Contract.AssetClass == AssetClass.Stock) {
+                position.Contract.Id = e.Contract.Id; // Update the contract ID
+                App.Instance.IBWebSocket.RequestPositionMarketData(position);
+                continue;
+            }
+            
+            if (position.Contract.Expiration == null || e.Contract.Expiration == null) {
+                _logger.LogWarning($"Contract {e.Contract.Symbol} has no expiration date, cannot request market data");
+                continue;
+            }
+
+            if (position.Contract.Expiration.Value.Date == e.Contract.Expiration.Value.Date) {
+                position.Contract.Id = e.Contract.Id; // Update the contract ID
+                App.Instance.IBWebSocket.RequestPositionMarketData(position);
+            }
         }
     }
 
