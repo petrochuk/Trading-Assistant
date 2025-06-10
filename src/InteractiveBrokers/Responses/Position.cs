@@ -282,14 +282,21 @@ public class Position : IPosition, IJsonOnDeserialized
 
                                 break;
                             case "ZN":
-                                dayCode = optionSymbol[0];
-                                weekNumber = optionSymbol[2] - '0';
-                                if (weekNumber < 1 || weekNumber > 5)
-                                    throw new InvalidOperationException($"Invalid week number in option symbol: {optionSymbol}");
-                                expirationDate = TimeExtensions.NthDayOfMonth(expiration.Year, expiration.Month, SecurityDefinition.WeekCodeToDayOfWeek(Symbol, dayCode), weekNumber);
-                                // Add default expiration time of 16:00:00 EST
-                                expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 16, 0, 0, DateTimeKind.Unspecified);
-                                _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                if (optionSymbol == "OZN") {
+                                    var thirdFriday = expiration.NextThirdFriday();
+                                    var morningExpirationDate = new DateTime(thirdFriday.Year, thirdFriday.Month, thirdFriday.Day, 17, 0, 0, DateTimeKind.Unspecified);
+                                    _expiration = new DateTimeOffset(morningExpirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(thirdFriday));
+                                }
+                                else {
+                                    dayCode = optionSymbol[0];
+                                    weekNumber = optionSymbol[2] - '0';
+                                    if (weekNumber < 1 || weekNumber > 5)
+                                        throw new InvalidOperationException($"Invalid week number in option symbol: {optionSymbol}");
+                                    expirationDate = TimeExtensions.NthDayOfMonth(expiration.Year, expiration.Month, SecurityDefinition.WeekCodeToDayOfWeek(Symbol, dayCode), weekNumber);
+                                    // Add default expiration time of 16:00:00 EST
+                                    expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                }
                                 break;
                             default:
                                 throw new InvalidOperationException($"Unsupported future option symbol: {Symbol}");
