@@ -118,6 +118,12 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
     }
 
+    public Position? FindUnderlying(int contractId) {
+        lock (_lock) {
+            return Underlyings.Where(p => p.Contract.Id == contractId).FirstOrDefault();
+        }
+    }
+
     private void RemovePosition(int contractId) {
         if (TryRemove(contractId, out var removedPosition)) {
             _logger.LogInformation($"Removed position {removedPosition!.Contract}");

@@ -257,14 +257,15 @@ public class IBWebSocket : IDisposable
         }
         var contractId = contractIdElement.GetInt32();
 
-        List<Position> positions = new List<Position>();
+        var positions = new List<Position>();
         foreach (var account in _accounts) {
             if (account.Positions.TryGetValue(contractId, out var position)) {
                 positions.Add(position);
             }
-            var underlyingPositions = account.Positions.Underlyings.Where(p => p.Contract.Id == contractId).FirstOrDefault();
-            if (underlyingPositions != null) {
-                positions.Add(underlyingPositions);
+
+            var underlyingPosition = account.Positions.FindUnderlying(contractId);
+            if (underlyingPosition != null) {
+                positions.Add(underlyingPosition);
             }
         }
         if (positions.Count == 0) {
