@@ -54,7 +54,16 @@ public class SecurityDefinition
                 'Z' => DayOfWeek.Friday,
                 _ => throw new ArgumentException($"Invalid week code: {weekCode}")
             };
-
+        }
+        else if (symbol == "CL") {
+            return weekCode switch {
+                'M' => DayOfWeek.Monday,
+                'N' => DayOfWeek.Tuesday,
+                'W' => DayOfWeek.Wednesday,
+                'X' => DayOfWeek.Thursday,
+                'O' => DayOfWeek.Friday,
+                _ => throw new ArgumentException($"Invalid week code: {weekCode}")
+            };
         }
 
         throw new ArgumentException($"Unsupported symbol: {symbol}");

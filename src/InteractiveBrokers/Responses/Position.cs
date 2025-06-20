@@ -304,6 +304,17 @@ public class Position : IPosition, IJsonOnDeserialized
                                     _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
                                 }
                                 break;
+                            case "CL":
+                                if (optionSymbol.Length == 3) {
+                                    dayCode = optionSymbol[0] == 'L' ? optionSymbol[1] : optionSymbol[0];
+                                    weekNumber = optionSymbol[2] - '0';
+                                    if (weekNumber < 1 || weekNumber > 5)
+                                        throw new InvalidOperationException($"Invalid week number in option symbol: {optionSymbol}");
+                                    expirationDate = TimeExtensions.NthDayOfMonth(expiration.Year, expiration.Month, SecurityDefinition.WeekCodeToDayOfWeek(Symbol, dayCode), weekNumber);
+                                    expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 14, 30, 0, DateTimeKind.Unspecified);
+                                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                }
+                                break;
                             default:
                                 throw new InvalidOperationException($"Unsupported future option symbol: {Symbol}");
                         }

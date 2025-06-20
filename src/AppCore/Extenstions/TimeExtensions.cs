@@ -1,6 +1,5 @@
 ﻿using AppCore.Models;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 
 namespace AppCore.Extenstions;
 
@@ -43,6 +42,20 @@ public static class TimeExtensions
         }
 
         return thirdFriday;
+    }
+
+    public static DateTimeOffset AddBusinessDays(this DateTimeOffset date, int days, bool ignoreGoodFriday = false) {
+        if (days == 0)
+            return date;
+        int direction = days > 0 ? 1 : -1;
+        int absDays = System.Math.Abs(days);
+        while (absDays > 0) {
+            date = date.AddDays(direction);
+            if (!date.IsHoliday(ignoreGoodFriday) && date.DayOfWeek != DayOfWeek.Saturday && date.DayOfWeek != DayOfWeek.Sunday) {
+                absDays--;
+            }
+        }
+        return date;
     }
 
     public static DateTimeOffset NextThirdFriday(this DateTimeOffset date, bool ignoreGoodFriday = false) {

@@ -12,6 +12,8 @@ public class ExpirationCalendar
                 return GetFrontMonthExpiration_ES(dateTimeOffset);
             case "ZN":
                 return GetFrontMonthExpiration_ZN(dateTimeOffset);
+            case "CL":
+                return GetFrontMonthExpiration_CL(dateTimeOffset);
             default:
                 throw new ArgumentException($"Unsupported symbol: {symbol}");
         }
@@ -71,6 +73,19 @@ public class ExpirationCalendar
             return frontMonthExpiration;
         }
 
-        return GetFrontMonthExpiration_ZN(dateTimeOffset.AddMonths(1));
+        return GetFrontMonthExpiration_ZN(new DateTimeOffset(dateTimeOffset.Year, dateTimeOffset.Month, 1, 0, 0, 0, dateTimeOffset.Offset).AddMonths(1));
+    }
+
+    public DateTimeOffset GetFrontMonthExpiration_CL(DateTimeOffset dateTimeOffset) {
+        // For CL, the front month expiration is the third business day prior to the 25th of the month
+        var year = dateTimeOffset.Year;
+        var month = dateTimeOffset.Month;
+        var frontMonthExpiration = new DateTimeOffset(year, month, 25, 14, 30, 0, dateTimeOffset.Offset);
+        frontMonthExpiration = frontMonthExpiration.AddBusinessDays(-3);
+        if (dateTimeOffset <= frontMonthExpiration) {
+            return frontMonthExpiration;
+        }
+
+        return GetFrontMonthExpiration_CL(new DateTimeOffset(dateTimeOffset.Year, dateTimeOffset.Month, 1, 0, 0, 0, dateTimeOffset.Offset).AddMonths(1));
     }
 }
