@@ -259,7 +259,7 @@ public class Position : IPosition, IJsonOnDeserialized
                                 throw new InvalidOperationException($"Unable to determine expiration date from description: {contractDesc}");
                         }
                         var optionSymbol = descriptionParts[4].Trim(['(', ')']);
-                        if (optionSymbol.Length != 3)
+                        if (optionSymbol.Length != 3 && optionSymbol.Length != 2)
                             throw new InvalidOperationException($"Invalid option symbol format: {optionSymbol}");
 
                         char dayCode;
@@ -267,18 +267,24 @@ public class Position : IPosition, IJsonOnDeserialized
                         DateTime expirationDate;
                         switch (Symbol) {
                             case "ES":
-                            case "NQ":
-                            case "RTY":
-                            case "YM":
-                                dayCode = optionSymbol[1] == 'W' ? 'W' : optionSymbol[2];
-                                weekNumber = dayCode == 'W' ? optionSymbol[2] - '0' : optionSymbol[1] - '0'; // Convert char to int
-                                if (weekNumber < 1 || weekNumber > 5)
-                                    throw new InvalidOperationException($"Invalid week number in option symbol: {optionSymbol}");
+                                if (optionSymbol == "EW") {
+                                    expirationDate = new DateTime(expiration.Year, expiration.Month, 1, 16, 0, 0, DateTimeKind.Unspecified);
+                                    expirationDate = expirationDate.AddMonths(1).AddDays(-1); // Last day of the month
+                                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                }
+                                else if (optionSymbol.Length == 3) {
+                                    dayCode = optionSymbol[1] == 'W' ? 'W' : optionSymbol[2];
+                                    weekNumber = dayCode == 'W' ? optionSymbol[2] - '0' : optionSymbol[1] - '0'; // Convert char to int
+                                    if (weekNumber < 1 || weekNumber > 5)
+                                        throw new InvalidOperationException($"Invalid week number in option symbol: {optionSymbol}");
 
-                                expirationDate = TimeExtensions.NthDayOfMonth(expiration.Year, expiration.Month, SecurityDefinition.WeekCodeToDayOfWeek(Symbol, dayCode), weekNumber);
-                                // Add default expiration time of 16:00:00 EST
-                                expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 16, 0, 0, DateTimeKind.Unspecified);
-                                _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                    expirationDate = TimeExtensions.NthDayOfMonth(expiration.Year, expiration.Month, SecurityDefinition.WeekCodeToDayOfWeek(Symbol, dayCode), weekNumber);
+                                    // Add default expiration time of 16:00:00 EST
+                                    expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                }
+                                else
+                                    throw new InvalidOperationException($"Invalid option symbol format: {optionSymbol}");
 
                                 break;
                             case "ZN":
