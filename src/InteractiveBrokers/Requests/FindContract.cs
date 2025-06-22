@@ -10,7 +10,6 @@ internal class FindContract : Request
 {
     EventHandler<ContractFoundArgs>? _responseHandler;
 
-    private readonly AssetClass _assetClass;
     private readonly Contract _contract;
 
     [SetsRequiredMembers]
@@ -28,7 +27,6 @@ internal class FindContract : Request
         else
             throw new IBClientException($"Invalid contract asset class {contract.AssetClass} for contract request");
 
-        _assetClass = contract.AssetClass;
         _responseHandler = responseHandler;
     }
 
@@ -58,7 +56,7 @@ internal class FindContract : Request
         var contractDetails = new ContractFoundArgs {
             Contract = new () {
                 Symbol = contract.symbol,
-                AssetClass = _assetClass,
+                AssetClass = _contract.AssetClass,
                 Id = contract.conid,
                 UnderlyingContractId = contract.underlyingConid,
                 Expiration = DateTime.ParseExact(contract.expirationDate.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture),
