@@ -13,14 +13,17 @@ jobs:
     strategy:
       matrix:
         configuration: [Debug, Release]
+        platform: [x64]
 
     runs-on: windows-latest
 
     env:
-      Solution_Name: Trading-Assistant.sln
+      Solution_Name: src\Trading-Assistant.sln
       Test_Project_Path: src\AppCore.Tests\AppCore.Tests.csproj
       Wap_Project_Directory: App-Package
-      Wap_Project_Path: App-Package\App-Package.wapproj
+      Wap_Project_Path: src\App-Package\App-Package.wapproj
+      Platform: ${{ matrix.platform }}
+      Runtime_Identifier: win-${{ matrix.platform }}
 
     steps:
     - name: Checkout
@@ -32,28 +35,30 @@ jobs:
     - name: Install .NET Core
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 9.0.x
 
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
 
     # Execute all unit tests in the solution
     - name: Execute unit tests
-      run: dotnet test
+      run: dotnet test --verbosity normal $env:Test_Project_Path --configuration $env:Configuration
+      env:
+        Configuration: ${{ matrix.configuration }}
 
     # Restore the application to populate the obj folder with RuntimeIdentifiers
     - name: Restore the application
-      run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration
+      run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration /p:RuntimeIdentifier=$env:Runtime_Identifier
       env:
         Configuration: ${{ matrix.configuration }}
 
     # Create the app package by building and packaging the Windows Application Packaging project
     - name: Create the app package
-      run: msbuild $env:Wap_Project_Path /p:Configuration=$env:Configuration /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode /p:AppxBundle=$env:Appx_Bundle /p:PackageCertificateKeyFile=GitHubActionsWorkflow.pfx /p:PackageCertificatePassword=${{ secrets.Pfx_Key }}
+      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode /p:AppxBundle=$env:Appx_Bundle /p:AppxPackageDir="$env:Appx_Package_Dir" /p:GenerateAppxPackageOnBuild=true /p:PublishSelfContained=true /p:SelfContained=True /p:Platform=$env:Platform /p:RuntimeIdentifier=$env:Runtime_Identifier
       env:
-        Appx_Bundle: Always
-        Appx_Bundle_Platforms: x86|x64
-        Appx_Package_Build_Mode: StoreUpload
+        Appx_Bundle: Never
+        Appx_Package_Build_Mode: SideloadOnly
+        Appx_Package_Dir: Packages\
         Configuration: ${{ matrix.configuration }}
 
     # Upload the MSIX package: https://github.com/marketplace/actions/upload-a-build-artifact
