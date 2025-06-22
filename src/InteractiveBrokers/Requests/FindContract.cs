@@ -41,10 +41,9 @@ internal class FindContract : Request
         // Find contract with lowest expiration date
         Models.Contract? contract;
         if (_contract.Expiration != null) {
-            var expirationDate = _contract.Expiration.Value.Year * 10000 + 
-                                  _contract.Expiration.Value.Month * 100 + _contract.Expiration.Value.Day;
+            var expirationDate = _contract.Expiration.Value.ToString("yyyyMMdd");
             contract = contractsResponse.First().Value
-                .Where(c => c.expirationDate == expirationDate)
+                .Where(c => c.expirationDate.ToString() == expirationDate)
                 .FirstOrDefault();
             if (contract == null) {
                 throw new IBClientException($"No {_contract.Symbol} contracts found with the expiration date of {_contract.Expiration.Value:yyyy-MM-dd}");
