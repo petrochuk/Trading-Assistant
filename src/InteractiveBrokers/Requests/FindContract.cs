@@ -3,7 +3,6 @@ using AppCore.Models;
 using InteractiveBrokers.Args;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Text.Json;
 
 namespace InteractiveBrokers.Requests;
 
@@ -12,10 +11,11 @@ internal class FindContract : Request
     EventHandler<ContractFoundArgs>? _responseHandler;
 
     private readonly AssetClass _assetClass;
+    private readonly Contract _contract;
 
     [SetsRequiredMembers]
     public FindContract(Contract contract, EventHandler<ContractFoundArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
-        _ = contract ?? throw new ArgumentNullException(nameof(contract));
+        _contract = contract ?? throw new ArgumentNullException(nameof(contract));
         if (string.IsNullOrWhiteSpace(contract.Symbol))
             throw new ArgumentNullException(nameof(contract.Symbol), "Contract symbol cannot be null or empty");
 
@@ -39,9 +39,23 @@ internal class FindContract : Request
         }
 
         // Find contract with lowest expiration date
-        var contract = contractsResponse.First().Value
-            .OrderBy(c => c.expirationDate)
-            .First();
+        Models.Contract? contract;
+        if (_contract.Expiration != null) {
+            var expirationDate = _contract.Expiration.Value.Year * 10000 + 
+                                  _contract.Expiration.Value.Month * 100 + _contract.Expiration.Value.Day;
+            contract = contractsResponse.First().Value
+                .Where(c => c.expirationDate == expirationDate)
+                .FirstOrDefault();
+            if (contract == null) {
+                throw new IBClientException($"No {_contract.Symbol} contracts found with the expiration date of {_contract.Expiration.Value:yyyy-MM-dd}");
+            }
+        }
+        else {
+            contract = contractsResponse.First().Value
+                .OrderBy(c => c.expirationDate)
+                .First();
+        }
+
         var contractDetails = new ContractFoundArgs {
             Contract = new () {
                 Symbol = contract.symbol,

@@ -1,7 +1,10 @@
-﻿namespace InteractiveBrokers.Models;
+﻿using System.Diagnostics;
+
+namespace InteractiveBrokers.Models;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
+[DebuggerDisplay("{symbol} ({conid}, {expirationDate})")]
 public class Contract
 {
     public string symbol { get; set; }
