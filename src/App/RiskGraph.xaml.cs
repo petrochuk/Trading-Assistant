@@ -90,6 +90,7 @@ public sealed partial class RiskGraph : UserControl
             GammaText.Text = string.Empty;
             CharmText.Text = string.Empty;
             ThetaText.Text = string.Empty;
+            VegaText.Text  = string.Empty;
             return;
         }
 
@@ -107,6 +108,7 @@ public sealed partial class RiskGraph : UserControl
         DeltaText.Text = $"{greeks.Delta:N2}";
         GammaText.Text = $"{greeks.Gamma:N4}";
         CharmText.Text = $"{greeks.Charm:N2}";
+        VegaText.Text = $"{greeks.Vega:N2}";
         if (Account != null && Account.NetLiquidationValue != 0) {
             ThetaText.Text = $"{greeks.Theta / Account.NetLiquidationValue:P2}";
         }

@@ -40,7 +40,7 @@
             <TextBlock Grid.Column="3" Grid.Row="0" Text="Gamma" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
             <TextBlock Grid.Column="3" Grid.Row="1" Text="-" x:Name="GammaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
             <TextBlock Grid.Column="4" Grid.Row="0" Text="Vega" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="4" Grid.Row="1" Text="-" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="4" Grid.Row="1" Text="-" x:Name="VegaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
             <TextBlock Grid.Column="5" Grid.Row="0" Text="Theta" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
             <TextBlock Grid.Column="5" Grid.Row="1" Text="-" x:Name="ThetaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
         </Grid>
