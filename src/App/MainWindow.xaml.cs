@@ -200,7 +200,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             account.Positions.PropertyChanged += Positions_PropertyChanged;
             _accounts.Add(account);
 
-            if (brokerAccount.CustomerType == "INDIVIDUAL") {
+            if (_activeAccount != null) {
                 // If this is an Individual account, we want to select the first one
                 _activeAccount = account;
             }

@@ -5,17 +5,15 @@ namespace InteractiveBrokers.Responses;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
-[DebuggerDisplay("{Alias} ({AccountId})")]
+[DebuggerDisplay("{Alias} ({Id})")]
 public class Account
 {
     public required string Id { get; init; }
 
-    public required string AccountId { get; init; }
-
-    public required string DisplayName { get; init; }
+    public string DisplayName { get; init; } = string.Empty;
 
     [JsonPropertyName("accountAlias")]
-    public required string Alias { get; set; }
+    public string? Alias { get; set; } = string.Empty;
 
     [JsonPropertyName("businessType")]
     public string BusinessType { get; set; }

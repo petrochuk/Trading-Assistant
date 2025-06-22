@@ -20,6 +20,7 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Dictionary<string, List<Models.SecurityDefinition>>))]
 [JsonSerializable(typeof(List<Responses.Account>))]
 [JsonSerializable(typeof(Responses.Account))]
+[JsonSerializable(typeof(Responses.Accounts))]
 [JsonSerializable(typeof(Responses.AccountParent))]
 [JsonSerializable(typeof(Dictionary<string, JsonElement>))]
 [JsonSerializable(typeof(Args.AccountSummaryArgs))]

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using AppCore.Extenstions;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace InteractiveBrokers.Requests;
@@ -9,36 +10,40 @@ internal class Accounts : Request
 
     [SetsRequiredMembers]
     public Accounts(EventHandler<Args.AccountsArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
-        Uri = "v1/api/portfolio/accounts";
+        Uri = "v1/api/iserver/accounts";
         _responseHandler = responseHandler;
     }
 
     public override void Execute(HttpClient httpClient) {
-        var accountsResponse = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.ListAccount);
-        if (accountsResponse.Count != 1) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {accountsResponse.Count} accounts response");
+        var accountsResponse = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.Accounts);
+        if (accountsResponse.AccountIds.Count < 1) {
+            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {accountsResponse.AccountIds.Count} accounts response");
         }
 
-        // If this is Financial Advisor (FA) account, we want to request the sub-accounts
-        if (accountsResponse[0].BusinessType == "FA") {
-            accountsResponse = GetResponse(httpClient, "v1/api/portfolio/subaccounts", SourceGeneratorContext.Default.ListAccount);
-
-            // Get first individual account
-            var individualAccount = accountsResponse.FirstOrDefault(a => a.BusinessType != "FA" && a.CustomerType == "INDIVIDUAL");
-            if (individualAccount == null) {
-                throw new IBClientException($"Individual account not found in subaccounts response");
+        // Find first individual account
+        var accountList = new List<Responses.Account>();
+        foreach (var accountProperties in accountsResponse.AccountProperties.AccountProperties) {
+            var accountId = accountProperties.Key;
+            // Check if accountId is group id
+            if (accountsResponse.Groups.Contains(accountId)) {
+                continue; // Skip group accounts
             }
-            var accountsArgs = new Args.AccountsArgs {
-                Accounts = accountsResponse
-            };
-            _responseHandler?.Invoke(this, accountsArgs);
-        }
-        else {
-            var accountsArgs = new Args.AccountsArgs {
-                Accounts = accountsResponse
-            };
 
-            _responseHandler?.Invoke(this, accountsArgs);
+            var properties = accountProperties.Value;
+            if (properties.ValueKind != JsonValueKind.Object) {
+                throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided invalid account properties for account {accountId.Mask()}");
+            }
+
+            var account = new Responses.Account() {
+                Id = accountId,
+                Alias = accountsResponse.Aliases.Aliases.ContainsKey(accountId) ? accountsResponse.Aliases.Aliases[accountId].GetString() : null,
+            };
+            accountList.Add(account);
         }
+
+        var accountsArgs = new Args.AccountsArgs {
+            Accounts = accountList
+        };
+        _responseHandler?.Invoke(this, accountsArgs);
     }
 }
