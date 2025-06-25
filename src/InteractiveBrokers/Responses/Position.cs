@@ -314,6 +314,15 @@ public class Position : IPosition, IJsonOnDeserialized
                                     expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 14, 30, 0, DateTimeKind.Unspecified);
                                     _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
                                 }
+                                else if (optionSymbol == "LO") {
+                                    expirationDate = new DateTime(expiration.Year, expiration.Month, 25, 14, 30, 0, DateTimeKind.Unspecified);
+                                    expirationDate = expirationDate.AddMonths(-1);
+                                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                    _expiration = _expiration.Value.AddBusinessDays(-6);
+                                }
+                                else {
+                                    throw new InvalidOperationException($"Invalid option symbol format: {optionSymbol}");
+                                }
                                 break;
                             default:
                                 throw new InvalidOperationException($"Unsupported future option symbol: {Symbol}");
