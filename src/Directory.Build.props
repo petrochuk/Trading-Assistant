@@ -6,6 +6,6 @@
   <!-- Package Versions -->
   <PropertyGroup Label="Package Versions">
     <MicrosoftNETTestSdkVersion>17.14.1</MicrosoftNETTestSdkVersion>
-    <MSTestVersion>3.9.3</MSTestVersion>
+    <MSTestVersion>3.10.0</MSTestVersion>
   </PropertyGroup>
 </Project>
