@@ -25,6 +25,20 @@ public class BlackNScholesTests
     }
 
     [TestMethod]
+    [DataRow(6263.5f, 6175f, 7f, 0.188f, -0.15f)]
+    public void TestBlackNScholes_PutDelta(float stockPrice, float strikePrice, float optionPrice, float expectedIV, float expectedDelta) {
+        var bls = new BlackNScholesCaculator {
+            StockPrice = stockPrice,
+            Strike = strikePrice
+        };
+        bls.DaysLeft = 2f;
+        bls.ImpliedVolatility = bls.GetPutIVBisections(optionPrice);
+        Assert.AreEqual(expectedIV, bls.ImpliedVolatility, 0.005f);
+        bls.CalculateAll();
+        Assert.AreEqual(expectedDelta, bls.DeltaPut, 0.005f);
+    }
+
+    [TestMethod]
     [DataRow(5401.25f, 5400f, 87.5f, 0.297f)]
     [DataRow(5401.25f, 5350f, 67.25f, 0.305f)]
     public void TestBlackNScholes_PutRoundtrip(float stockPrice, float strikePrice, float optionPrice, float expectedIV) {
@@ -40,4 +54,6 @@ public class BlackNScholesTests
         var putPrice = bls.CalculatePut();
         Assert.AreEqual(optionPrice, putPrice, 0.005f);
     }
+
+
 }

@@ -198,6 +198,17 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     if (position.Delta.HasValue) {
                         greeks.Delta += position.Delta.Value * position.Size;
                     }
+                    else {
+                        _logger.LogWarning($"Position {position.Contract} does not have a delta value. Cannot calculate greeks.");
+                        var bls = new BlackNScholesCaculator();
+                        bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
+                        bls.StockPrice = _selectedPosition.MarketPrice;
+                        bls.Strike = position.Contract.Strike;
+                        bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice) : bls.GetPutIVBisections(position.MarketPrice);
+                        bls.CalculateAll();
+                        position.Delta = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
+                    }
+
                     if (position.Delta.HasValue && position.Theta.HasValue && position.MarketPrice != 0) {
                         var absTheta = MathF.Abs(position.Theta.Value);
                         if (position.MarketPrice < absTheta)
