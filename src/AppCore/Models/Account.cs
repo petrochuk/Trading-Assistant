@@ -12,10 +12,14 @@ namespace AppCore.Models;
 /// </summary>
 public class Account
 {
+    #region Fields
+    
     private readonly ILogger<Account> _logger;
     private readonly IDeltaHedgerFactory _deltaHedgerFactory;
     private readonly ConcurrentDictionary<int, IDeltaHedger> _deltaHedgers = new();
     private readonly DeltaHedgerConfiguration _deltaHedgerConfiguration;
+
+    #endregion
 
     [SetsRequiredMembers]
     public Account(

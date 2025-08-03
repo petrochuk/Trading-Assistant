@@ -16,6 +16,6 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
             throw new ArgumentException("Underlying symbol cannot be null or empty.", nameof(contract.Symbol));
         }
 
-        return new DeltaHedger(configuration);
+        return new DeltaHedger(contract, configuration);
     }
 }
