@@ -196,7 +196,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 }
                 else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
                     //greeks.Delta += position.Delta.Value * position.Size;
-                    _logger.LogWarning($"Position {position.Contract} does not have a delta value. Cannot calculate greeks.");
                     var bls = new BlackNScholesCaculator();
                     bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
                     bls.StockPrice = _selectedPosition.MarketPrice;

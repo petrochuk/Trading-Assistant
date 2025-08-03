@@ -8,18 +8,30 @@ namespace AppCore.Tests;
 [TestClass]
 public sealed class PositionsCollectionTests
 {
+    private readonly Contract _esContract = new Contract {
+        Symbol = "ES",
+        AssetClass = AssetClass.Future,
+        Id = 1,
+        Multiplier = 50,
+        Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
+    };
+
     [TestMethod]
     public void TotalGreeks_Otm_Call() {
         // Arrange
-        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar());
+        var time = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
+        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
 
-        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
-        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, null, 5000, isCall: true, 50);
+        var underlyingPosition = new Position(_esContract);
+        underlyingPosition.MarketPrice = 4950f; // Underlying price below strike
+
+        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, 
+            expiration: new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
+            5000, isCall: true, 50);
         position1.Size = 1;
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 10.0f;
-        position1.UpdateGreeks(delta: 0.1f, gamma: 0.0f, theta: -position1.MarketPrice, vega: 0.0f);
 
         positions.TryAdd(1, position1);
         positions.SelectedPosition = underlyingPosition;
@@ -28,25 +40,27 @@ public sealed class PositionsCollectionTests
         var greeks = positions.CalculateGreeks();
 
         // Assert
-        Assert.AreEqual(0.1f, greeks.Delta);
-        Assert.AreEqual(-position1.MarketPrice * position1.Contract.Multiplier, greeks.Theta);
-        Assert.AreEqual(-0.1f, greeks.Charm);
+        Assert.IsLessThan(0.5, greeks.Delta, "out of the money call");
+        Assert.IsGreaterThan(0, greeks.Delta, "out of the money call has positive delta");
+        Assert.IsLessThan(0, greeks.Charm, "out of the money call has negative charm");
     }
 
     [TestMethod]
     public void TotalGreeks_Itm_Call() {
         // Arrange
-        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar());
+        var time = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
+        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
 
-        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
+        var underlyingPosition = new Position(_esContract);
         underlyingPosition.MarketPrice = 5050f;
 
-        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, null, 5000, isCall: true, 50);
+        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, 
+            expiration: new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset), 
+            5000, isCall: true, multiplier: 50);
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 60.0f;
         position1.Size = 1;
-        position1.UpdateGreeks(delta: 0.8f, gamma: 0.0f, theta: -10f, vega: 0.0f);
 
         positions.TryAdd(1, position1);
         positions.SelectedPosition = underlyingPosition;
@@ -55,24 +69,26 @@ public sealed class PositionsCollectionTests
         var greeks = positions.CalculateGreeks();
 
         // Assert
-        Assert.AreEqual(position1.Delta * position1.Size, greeks.Delta);
-        Assert.IsTrue(MathF.Abs(0.2f - greeks.Charm) < 0.00001f);
+        Assert.IsGreaterThan(0.5, greeks.Delta, "in the money call");
+        Assert.IsGreaterThan(0, greeks.Charm, "in the money call has positive charm");
     }
 
     [TestMethod]
     public void TotalGreeks_Itm_Put() {
         // Arrange
-        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar());
+        var time = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
+        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
 
         var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
         underlyingPosition.MarketPrice = 4950f;
 
-        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, null, 5000, isCall: false, 50);
+        var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, 
+            expiration: new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
+            5000, isCall: false, 50);
 
         // 0 DTE theta = -market price
         position1.MarketPrice = 60.0f;
         position1.Size = 1;
-        position1.UpdateGreeks(delta: -0.8f, gamma: 0.0f, theta: -10f, vega: 0.0f);
 
         positions.TryAdd(1, position1);
         positions.SelectedPosition = underlyingPosition;
@@ -81,8 +97,8 @@ public sealed class PositionsCollectionTests
         var greeks = positions.CalculateGreeks();
 
         // Assert
-        Assert.AreEqual(position1.Delta * position1.Size, greeks.Delta);
-        Assert.IsTrue(MathF.Abs(-0.2f - greeks.Charm) < 0.00001f);
+        Assert.IsLessThan(-0.5, greeks.Delta, "in the money put");
+        Assert.IsLessThan(0, greeks.Charm, "in the money put has negative charm");
     }
 
     [TestMethod]

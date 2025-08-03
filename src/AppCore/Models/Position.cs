@@ -107,6 +107,11 @@ public class Position
         if (multiplier <= 0) {
             throw new ArgumentOutOfRangeException(nameof(multiplier), $"Multiplier {multiplier} is not a valid option multiplier.");
         }
+        if (assetClass == AssetClass.FutureOption || assetClass == AssetClass.Option) {
+            if (expiration == null) {
+                throw new ArgumentNullException(nameof(expiration), "Expiration date is required for options.");
+            }
+        }
 
         Contract = new Contract {
             Id = contractId,
