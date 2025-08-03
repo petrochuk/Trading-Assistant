@@ -5,7 +5,8 @@ namespace AppCore.Configuration;
 public class DeltaHedgerConfiguration
 {
     public TimeSpan HedgeInterval { get; set; } = TimeSpan.FromSeconds(15);
-    public Dictionary<string, DeltaHedgerSymbolConfiguration> Configs { get; set; } = new Dictionary<string, DeltaHedgerSymbolConfiguration>();
+    public List<string> SupportedAccounts { get; set; } = [];
+    public Dictionary<string, DeltaHedgerSymbolConfiguration> Configs { get; set; } = [];
 }
 
 [DebuggerDisplay("d:{Delta}")]

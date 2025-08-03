@@ -21,7 +21,7 @@ public class Position
 
     public float Size { get; set; }
 
-    public float MarketPrice { get; set; }
+    public float? MarketPrice { get; set; }
 
     /// <summary>
     /// Used for StdDev to calculate log return
@@ -195,7 +195,8 @@ public class Position
 
     public void UpdateStdDev()
     {
-        RealizedVol?.AddValue(MarketPrice);
+        if (MarketPrice.HasValue)
+            RealizedVol?.AddValue(MarketPrice.Value);
     }
 
     #endregion

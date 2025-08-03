@@ -180,17 +180,30 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
     }
 
-    public Greeks CalculateGreeks() {
-        var greeks = new Greeks();
-        if (_selectedPosition == null) {
-            return greeks;
+    public Greeks? CalculateGreeks(Position? underlyingPosition = null) {
+        if (underlyingPosition == null) {
+            if (_selectedPosition == null) {
+                return null;
+            }
+            underlyingPosition = _selectedPosition;
         }
 
+        if (!underlyingPosition.MarketPrice.HasValue)
+            return null;
+
+        var greeks = new Greeks();
         lock (_lock) {
             foreach (var position in Values) {
-                if (position.Contract.Symbol != _selectedPosition.Contract.Symbol) {
+                // Skip any positions that are not in the same underlying
+                if (position.Contract.Symbol != underlyingPosition.Contract.Symbol) {
                     continue;
                 }
+
+                if (!position.MarketPrice.HasValue) {
+                    _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate Greeks.");
+                    return null;
+                }
+
                 if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
                     greeks.Delta += position.Size;
                 }
@@ -198,9 +211,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     //greeks.Delta += position.Delta.Value * position.Size;
                     var bls = new BlackNScholesCaculator();
                     bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
-                    bls.StockPrice = _selectedPosition.MarketPrice;
+                    bls.StockPrice = underlyingPosition.MarketPrice.Value;
                     bls.Strike = position.Contract.Strike;
-                    bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice) : bls.GetPutIVBisections(position.MarketPrice);
+                    bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice.Value) : bls.GetPutIVBisections(position.MarketPrice.Value);
                     bls.CalculateAll();
 
                     greeks.Delta += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
@@ -209,13 +222,17 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     greeks.Theta += (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut) * position.Size * position.Contract.Multiplier;
                     greeks.Charm += (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut) * position.Size;
                 }
+                else {
+                    _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
+                    continue;
+                }
             }
         }
 
         return greeks;
     }
 
-    public RiskCurve CalculateRiskCurve(string underlyingSymbol, TimeSpan lookaheadSpan, float minPrice, float midPrice, float maxPrice, float priceIncrement)
+    public RiskCurve? CalculateRiskCurve(string underlyingSymbol, TimeSpan lookaheadSpan, float minPrice, float midPrice, float maxPrice, float priceIncrement)
     {
         var riskCurve = new RiskCurve();
         var currentTime = _timeProvider.EstNow();
@@ -226,7 +243,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         for (var currentPrice = minPrice; currentPrice < maxPrice; currentPrice += priceIncrement) {
             var totalPL = CalculatePL(underlyingSymbol, currentTime, lookaheadSpan, staticDelta, midPrice, currentPrice);
 
-            riskCurve.Add(currentPrice, totalPL);
+            if (!totalPL.HasValue) {
+                _logger.LogWarning($"Unable to calculate RiskCurve for price {currentPrice} for underlying {underlyingSymbol}");
+                return null;
+            }
+            riskCurve.Add(currentPrice, totalPL.Value);
         }
 
         return riskCurve;
@@ -260,7 +281,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         return staticDelta;
     }
 
-    private float CalculatePL(string underlyingSymbol, DateTimeOffset currentTime, TimeSpan lookaheadSpan, float staticDelta, float midPrice, float currentPrice) {
+    private float? CalculatePL(string underlyingSymbol, DateTimeOffset currentTime, TimeSpan lookaheadSpan, float staticDelta, float midPrice, float currentPrice) {
 
         var bls = new BlackNScholesCaculator();
         float totalPL = staticDelta * (currentPrice - midPrice);
@@ -269,20 +290,34 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             if (position.Contract.Symbol != underlyingSymbol)
                 continue;
 
+            if (!position.MarketPrice.HasValue) {
+                _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate P&L.");
+                continue;
+            }
+
             if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
-                totalPL += position.Size * (currentPrice - position.MarketPrice) * position.Contract.Multiplier;
+                totalPL += position.Size * (currentPrice - position.MarketPrice.Value) * position.Contract.Multiplier;
             } 
             else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
-                float optionPrice = CalculateOptionPrice(lookaheadSpan, midPrice, currentTime, currentPrice, bls, position);
+                var optionPrice = CalculateOptionPrice(lookaheadSpan, midPrice, currentTime, currentPrice, bls, position);
+                if (!optionPrice.HasValue) {
+                    _logger.LogWarning($"Unable to calculate option price for position {position.Contract}");
+                    return null;
+                }
 
-                totalPL += position.Size * (optionPrice - position.MarketPrice) * position.Contract.Multiplier;
+                totalPL += position.Size * (optionPrice.Value - position.MarketPrice.Value) * position.Contract.Multiplier;
             }
         }
 
         return totalPL;
     }
 
-    private float CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCaculator bls, Position position) {
+    private float? CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCaculator bls, Position position) {
+        if (!position.MarketPrice.HasValue) {
+            _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate option price.");
+            return null;
+        }
+        
         // Past expiration calculate realized value at mid price (market price)
         if (position.Contract.Expiration!.Value  < currentTime + lookaheadSpan) {
             if (position.Contract.IsCall) {
@@ -305,14 +340,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         bls.Strike = position.Contract.Strike;
         if (position.Contract.IsCall) {
             // Estimate IV
-            var currentIV = bls.GetCallIVBisections(position.MarketPrice);
+            var currentIV = bls.GetCallIVBisections(position.MarketPrice.Value);
             bls.ImpliedVolatility = currentIV;
             bls.StockPrice = currentPrice;
             bls.DaysLeft -= (float)lookaheadSpan.TotalDays;
             optionPrice = bls.CalculateCall();
         } else {
             // Estimate IV
-            var currentIV = bls.GetPutIVBisections(position.MarketPrice);
+            var currentIV = bls.GetPutIVBisections(position.MarketPrice.Value);
             // Keep existing IV and move market price to calculate new option price
             bls.ImpliedVolatility = currentIV;
             bls.StockPrice = currentPrice;
@@ -336,6 +371,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
             position.UpdateStdDev();
         }
+    }
+
+    public IEnumerable<Position> GetPositionsForContract(int id) {
+        return Values.Where(p => p.Contract.Id == id);
     }
 
     #endregion

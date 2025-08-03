@@ -1,6 +1,10 @@
-﻿namespace AppCore.Interfaces;
+﻿using AppCore.Models;
+
+namespace AppCore.Interfaces;
 
 public interface IDeltaHedger
 {
+    Contract Contract { get; }
+
     void Hedge();
 }

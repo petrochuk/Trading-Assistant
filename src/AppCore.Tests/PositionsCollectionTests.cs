@@ -38,11 +38,12 @@ public sealed class PositionsCollectionTests
 
         // Act
         var greeks = positions.CalculateGreeks();
+        Assert.IsNotNull(greeks, "Greeks should not be null");
 
         // Assert
-        Assert.IsLessThan(0.5, greeks.Delta, "out of the money call");
-        Assert.IsGreaterThan(0, greeks.Delta, "out of the money call has positive delta");
-        Assert.IsLessThan(0, greeks.Charm, "out of the money call has negative charm");
+        Assert.IsLessThan(0.5, greeks.Value.Delta, "out of the money call");
+        Assert.IsGreaterThan(0, greeks.Value.Delta, "out of the money call has positive delta");
+        Assert.IsLessThan(0, greeks.Value.Charm, "out of the money call has negative charm");
     }
 
     [TestMethod]
@@ -67,10 +68,11 @@ public sealed class PositionsCollectionTests
 
         // Act
         var greeks = positions.CalculateGreeks();
+        Assert.IsNotNull(greeks, "Greeks should not be null");
 
         // Assert
-        Assert.IsGreaterThan(0.5, greeks.Delta, "in the money call");
-        Assert.IsGreaterThan(0, greeks.Charm, "in the money call has positive charm");
+        Assert.IsGreaterThan(0.5, greeks.Value.Delta, "in the money call");
+        Assert.IsGreaterThan(0, greeks.Value.Charm, "in the money call has positive charm");
     }
 
     [TestMethod]
@@ -95,10 +97,11 @@ public sealed class PositionsCollectionTests
 
         // Act
         var greeks = positions.CalculateGreeks();
+        Assert.IsNotNull(greeks, "Greeks should not be null");
 
         // Assert
-        Assert.IsLessThan(-0.5, greeks.Delta, "in the money put");
-        Assert.IsLessThan(0, greeks.Charm, "in the money put has negative charm");
+        Assert.IsLessThan(-0.5, greeks.Value.Delta, "in the money put");
+        Assert.IsLessThan(0, greeks.Value.Charm, "in the money put has negative charm");
     }
 
     [TestMethod]

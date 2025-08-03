@@ -86,15 +86,15 @@ public sealed partial class RiskGraph : UserControl
 
     private void UpdateGreeks() {
         if (Account == null) {
-            DeltaText.Text = string.Empty;
-            GammaText.Text = string.Empty;
-            CharmText.Text = string.Empty;
-            ThetaText.Text = string.Empty;
-            VegaText.Text  = string.Empty;
+            ClearGreeks();
             return;
         }
 
         var greeks = Account.Positions!.CalculateGreeks();
+        if (greeks == null) {
+            ClearGreeks();
+            return;
+        }
 
         if (Account.Positions.SelectedPosition != null && Account.Positions.SelectedPosition.RealizedVol != null) {
 
@@ -105,13 +105,21 @@ public sealed partial class RiskGraph : UserControl
             }
         }
 
-        DeltaText.Text = $"{greeks.Delta:N2}";
-        GammaText.Text = $"{greeks.Gamma:N4}";
-        CharmText.Text = $"{greeks.Charm:N2}";
-        VegaText.Text = $"{greeks.Vega:N2}";
+        DeltaText.Text = $"{greeks.Value.Delta:N2}";
+        GammaText.Text = $"{greeks.Value.Gamma:N4}";
+        CharmText.Text = $"{greeks.Value.Charm:N2}";
+        VegaText.Text = $"{greeks.Value.Vega:N2}";
         if (Account != null && Account.NetLiquidationValue != 0) {
-            ThetaText.Text = $"{greeks.Theta / Account.NetLiquidationValue:P2}";
+            ThetaText.Text = $"{greeks.Value.Theta / Account.NetLiquidationValue:P2}";
         }
+    }
+
+    private void ClearGreeks() {
+        DeltaText.Text = string.Empty;
+        GammaText.Text = string.Empty;
+        CharmText.Text = string.Empty;
+        ThetaText.Text = string.Empty;
+        VegaText.Text = string.Empty;
     }
 
     private void DrawRiskIntervals() {
@@ -121,20 +129,24 @@ public sealed partial class RiskGraph : UserControl
 
         // First calculate the risk curves for each interval
         var midPrice = Account.Positions.SelectedPosition.MarketPrice;
-        if (midPrice == 0) {
+        if (!midPrice.HasValue) {
             _logger.LogTrace("No market price available for underlying");
             return;
         }
 
         var underlyingSymbol = Account.Positions.SelectedPosition.Contract.Symbol;
-        var minPrice = midPrice * 0.95f;
-        var maxPrice = midPrice * 1.05f;
+        var minPrice = midPrice.Value * 0.95f;
+        var maxPrice = midPrice.Value * 1.05f;
         var priceIncrement = (maxPrice - minPrice) / 100f;
         var riskCurves = new Dictionary<TimeSpan, RiskCurve>();
         var maxPL = float.MinValue;
         var minPL = float.MaxValue;
         foreach (var interval in _riskIntervals) {
-            var riskCurve = Account.Positions.CalculateRiskCurve(underlyingSymbol, interval.Key, minPrice, midPrice, maxPrice, priceIncrement);
+            var riskCurve = Account.Positions.CalculateRiskCurve(underlyingSymbol, interval.Key, minPrice, midPrice.Value, maxPrice, priceIncrement);
+            if (riskCurve == null) {
+                _logger.LogWarning($"Risk curve for interval {interval.Key} is null");
+                continue;
+            }
             if (riskCurve.MaxPL > maxPL) {
                 maxPL = riskCurve.MaxPL;
             }
@@ -181,7 +193,7 @@ public sealed partial class RiskGraph : UserControl
             Canvas.Children.Add(path);
         }
 
-        DrawLabels(midPrice, minPrice, maxPrice, maxPL, minPL);
+        DrawLabels(midPrice.Value, minPrice, maxPrice, maxPL, minPL);
     }
 
     private void DrawLabels(float midPrice, float minPrice, float maxPrice, float maxPL, float minPL) {

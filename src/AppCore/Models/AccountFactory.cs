@@ -27,9 +27,6 @@ public class AccountFactory : IAccountFactory
     public Account CreateAccount(string id, string name) {
 
         var positionsCollection = new PositionsCollection(_logger, _timeProvider, _expirationCalendar);
-        return new Account(_logger, positionsCollection, _deltaHedgerFactory, _deltaHedgerConfiguration) {
-            Id = id,
-            Name = name
-        };
+        return new Account(id, name, _logger, positionsCollection, _deltaHedgerFactory, _deltaHedgerConfiguration);
     }
 }

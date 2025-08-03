@@ -10,7 +10,7 @@ namespace AppCore.Models;
 /// <summary>
 /// Brokerage account.
 /// </summary>
-public class Account
+public class Account : IDisposable
 {
     #region Fields
     
@@ -18,27 +18,42 @@ public class Account
     private readonly IDeltaHedgerFactory _deltaHedgerFactory;
     private readonly ConcurrentDictionary<int, IDeltaHedger> _deltaHedgers = new();
     private readonly DeltaHedgerConfiguration _deltaHedgerConfiguration;
+    private readonly Timer? _hedgeTimer;
+    private bool _disposed = false;
 
     #endregion
 
-    [SetsRequiredMembers]
     public Account(
+        string id, string name,
         ILogger<Account> logger,
         PositionsCollection positionsCollection, 
         IDeltaHedgerFactory deltaHedgerFactory,
         DeltaHedgerConfiguration deltaHedgerConfiguration) 
     {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentException("Account ID cannot be null or empty.", nameof(id));
+        Id = id;
+        Name = name;
+
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         Positions = positionsCollection;
         _deltaHedgerFactory = deltaHedgerFactory ?? throw new ArgumentNullException(nameof(deltaHedgerFactory));
         _deltaHedgerConfiguration = deltaHedgerConfiguration ?? throw new ArgumentNullException(nameof(deltaHedgerConfiguration));
 
-        Positions.Underlyings.CollectionChanged += OnUnderlyingsChanged;
+        // Initialize the hedge timer
+        if (_deltaHedgerConfiguration.SupportedAccounts.Contains(Id)) {
+            Positions.Underlyings.CollectionChanged += OnUnderlyingsChanged;
+            _hedgeTimer = new Timer(ExecuteHedgers, null, _deltaHedgerConfiguration.HedgeInterval, _deltaHedgerConfiguration.HedgeInterval);
+            _logger.LogInformation($"Delta hedge timer started with interval: {_deltaHedgerConfiguration.HedgeInterval}");
+        }
+        else {
+            _logger.LogInformation($"Account {Id} is not supported for delta hedging. Skipping timer initialization.");
+        }
     }
 
-    public required string Name { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
 
-    public required string Id { get; init; } = string.Empty;
+    public string Id { get; init; } = string.Empty;
 
     public float NetLiquidationValue { get; set; }
 
@@ -63,12 +78,58 @@ public class Account
                         continue;
                     }
 
-                    var deltaHedger = _deltaHedgerFactory.Create(position.Contract, _deltaHedgerConfiguration);
+                    var deltaHedger = _deltaHedgerFactory.Create(position, Positions, _deltaHedgerConfiguration);
                     if (_deltaHedgers.TryAdd(position.Contract.Id, deltaHedger)) {
                         _logger.LogInformation($"Delta hedger added for contract {position.Contract}");
                     }
                 }
             }
         }
+    }
+
+    private void ExecuteHedgers(object? state)
+    {
+        if (_disposed)
+            return;
+
+        try
+        {
+            if (_deltaHedgers.IsEmpty)
+            {
+                _logger.LogDebug("No delta hedgers to execute");
+                return;
+            }
+
+            _logger.LogDebug($"Executing {_deltaHedgers.Count} delta hedger(s)");
+
+            foreach (var hedger in _deltaHedgers.Values)
+            {
+                try
+                {
+                    hedger.Hedge();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error executing delta hedger for contract {hedger.Contract}");
+                }
+            }
+
+            _logger.LogDebug("Completed executing all delta hedgers");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in hedge timer execution");
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        _hedgeTimer?.Dispose();
+        Positions.Underlyings.CollectionChanged -= OnUnderlyingsChanged;
+        _logger.LogInformation("Account disposed and hedge timer stopped");
     }
 }
