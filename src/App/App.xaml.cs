@@ -66,7 +66,8 @@ public partial class App : Application
         serviceCollection
             .AddSingleton(configuration)
             .Configure<BrokerConfiguration>(configuration.GetSection("Broker"))
-            .Configure<AuthenticationConfiguration>(configuration.GetSection("Authentication"));
+            .Configure<AuthenticationConfiguration>(configuration.GetSection("Authentication"))
+            .Configure<DeltaHedgerConfiguration>(configuration.GetSection("DeltaHedger"));
 
         // Logging
         var Logger = new LoggerConfiguration()

@@ -1,4 +1,5 @@
-﻿using AppCore.Interfaces;
+﻿using AppCore.Hedging;
+using AppCore.Interfaces;
 using AppCore.Models;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,7 +11,8 @@ public static class IServiceCollectionExtension
 
         services
             .AddTransient<IAccountFactory, AccountFactory>()
-            .AddSingleton<ExpirationCalendar>();
+            .AddSingleton<ExpirationCalendar>()
+            .AddTransient<IDeltaHedgerFactory, DeltaHedgerFactory>();
 
         return services;
     }

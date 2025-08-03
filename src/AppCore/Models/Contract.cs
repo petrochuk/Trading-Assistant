@@ -19,6 +19,12 @@ public class Contract
     public bool IsCall { get; init; }
 
     public override string ToString() {
-        return $"{Symbol} {Expiration:d}";
+        var sb = new System.Text.StringBuilder();
+
+        sb.Append(Symbol);
+        if (Expiration.HasValue) {
+            sb.Append($" {Expiration.Value:d}");
+        }
+        return sb.ToString();
     }
 }

@@ -189,12 +189,8 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             var accountFactory = AppCore.ServiceProvider.Instance.GetRequiredService<IAccountFactory>();
-            var accountLogger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<Account>>();
-            var timeProvider = AppCore.ServiceProvider.Instance.GetRequiredService<TimeProvider>();
-            var expirationCalendar = AppCore.ServiceProvider.Instance.GetRequiredService<ExpirationCalendar>();
             var account = accountFactory.CreateAccount(brokerAccount.Id, 
-                string.IsNullOrWhiteSpace(brokerAccount.Alias) ? brokerAccount.DisplayName : brokerAccount.Alias,
-                accountLogger, timeProvider, expirationCalendar);
+                string.IsNullOrWhiteSpace(brokerAccount.Alias) ? brokerAccount.DisplayName : brokerAccount.Alias);
             account.Positions.OnPositionAdded += OnPositionAdded;
             account.Positions.OnPositionRemoved += OnPositionRemoved;
             account.Positions.PropertyChanged += Positions_PropertyChanged;
