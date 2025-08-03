@@ -1,4 +1,5 @@
-﻿using AppCore.Options;
+﻿using AppCore.Extenstions;
+using AppCore.Options;
 
 namespace AppCore.Tests.Options;
 
@@ -36,6 +37,20 @@ public class BlackNScholesTests
         Assert.AreEqual(expectedIV, bls.ImpliedVolatility, 0.005f);
         bls.CalculateAll();
         Assert.AreEqual(expectedDelta, bls.DeltaPut, 0.005f);
+    }
+
+    [TestMethod]
+    [DataRow(5000f, 5100f, 30f, 0.25f, -2.315f)]
+    [DataRow(5000f, 5100f, 10f, 0.25f, -3.716f)]
+    public void TestBlackNScholes_CallTheta(float stockPrice, float strikePrice, float daysLeft, float iv, float expectedTheta) {
+        var bls = new BlackNScholesCaculator {
+            StockPrice = stockPrice,
+            Strike = strikePrice
+        };
+        bls.DaysLeft = daysLeft;
+        bls.ImpliedVolatility = iv;
+        bls.CalculateAll();
+        Assert.AreEqual(expectedTheta, bls.ThetaCall, 0.005f);
     }
 
     [TestMethod]

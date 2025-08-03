@@ -9,6 +9,17 @@ public static class TimeExtensions
     public static TimeZoneInfo CentralStandardTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time");
     public static TimeZoneInfo PacificStandardTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
 
+    /// <summary>
+    /// Approximate number of business days in a year.
+    /// </summary>
+    public static float BusinessDaysPerYear = 252f;
+
+    /// <summary>
+    /// Represents the average number of days in a year.
+    /// </summary>
+    /// <remarks>This value is based on a standard year and does not account for leap years.</remarks>
+    public static float DaysPerYear = 365f;
+
     public static ConcurrentDictionary<long, Holiday> Holidays = new();
 
     public static DateTimeOffset EstNow(this TimeProvider timeProvider) {

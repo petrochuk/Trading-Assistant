@@ -1,4 +1,6 @@
-﻿namespace AppCore.Options;
+﻿using AppCore.Extenstions;
+
+namespace AppCore.Options;
 
 /// <summary>
 /// Black-Scholes model for option pricing.
@@ -88,18 +90,37 @@ public class BlackNScholesCaculator
         get; set;
     }
 
+    /// <summary>
+    /// Theta per day for Call options.
+    /// </summary>
     public float ThetaCall {
         get; set;
     }
 
+    /// <summary>
+    /// Theta per day for Put options.
+    /// </summary>
     public float ThetaPut {
+        get; set;
+    }
+
+    /// <summary>
+    /// Charm (delta decay) for Call options - rate of change of delta with respect to time.
+    /// </summary>
+    public float CharmCall {
+        get; set;
+    }
+
+    /// <summary>
+    /// Charm (delta decay) for Put options - rate of change of delta with respect to time.
+    /// </summary>
+    public float CharmPut {
         get; set;
     }
 
     public int IterationCounter {
         get; private set;
     }
-
 
     /// <summary>
     /// The number of days left until the option expired!
@@ -164,32 +185,35 @@ public class BlackNScholesCaculator
     }
 
     private void CalculateTheta(float d1, float d2) {
-        ThetaCall = -(
-            (
-                (
-                    StockPrice * ((Math.ExpOpt(-(d1 * d1 / 2))) /
-                    MathF.Sqrt(2.0f * MathF.PI)) * ImpliedVolatility
-                ) /
-                (2 * MathF.Sqrt(ExpiryTime))
-            ) -
-            (
-                RiskFreeInterestRate * Strike *
-                Math.ExpOpt(-RiskFreeInterestRate * ExpiryTime) * CalculateNOfX(d2)
-            )) / 2.5f;
+        float N_prime_d1 = MathF.Exp(-d1 * d1 / 2.0f) / MathF.Sqrt(2.0f * MathF.PI);
 
-        ThetaPut = (
-            (
-                -(
-                    StockPrice * (Math.ExpOpt(-(d1 * d1 / 2)) /
-                    MathF.Sqrt(2.0f * MathF.PI)) * ImpliedVolatility
-                ) /
-                (2 * MathF.Sqrt(ExpiryTime))
-            ) +
-            (
-                RiskFreeInterestRate * Strike *
-                Math.ExpOpt(-RiskFreeInterestRate * ExpiryTime) * CalculateNOfX(-d2)
-            )) / 2.5f;
+        float commonTerm = -(StockPrice * N_prime_d1 * ImpliedVolatility) / (2.0f * MathF.Sqrt(ExpiryTime));
+        float interestTerm = RiskFreeInterestRate * Strike * MathF.Exp(-RiskFreeInterestRate * ExpiryTime);
 
+        ThetaCall = (commonTerm - interestTerm * CumulativeNormDist(d2)) / TimeExtensions.DaysPerYear;
+        ThetaPut = (commonTerm + interestTerm * CumulativeNormDist(-d2)) / TimeExtensions.DaysPerYear;
+    }
+
+    private void CalculateCharm(float d1, float d2) {
+        // Avoid division by zero when time to expiration is very small
+        if (ExpiryTime <= 0.0f) {
+            CharmCall = CharmPut = 0.0f;
+            return;
+        }
+
+        float N_prime_d1 = MathF.Exp(-d1 * d1 / 2.0f) / MathF.Sqrt(2.0f * MathF.PI);
+        float sqrtT = MathF.Sqrt(ExpiryTime);
+
+        // Common term for both call and put charm
+        float commonTerm = -N_prime_d1 * (2.0f * RiskFreeInterestRate * ExpiryTime - d2 * ImpliedVolatility * sqrtT) /
+                          (2.0f * ExpiryTime * ImpliedVolatility * sqrtT);
+
+        // For calls: charm = commonTerm
+        CharmCall = commonTerm / TimeExtensions.DaysPerYear;
+
+        // For puts: charm = commonTerm + (N'(d1) * 2 * r) / (σ * √T)
+        float putAdjustment = N_prime_d1 * 2.0f * RiskFreeInterestRate / (ImpliedVolatility * sqrtT);
+        CharmPut = (commonTerm + putAdjustment) / TimeExtensions.DaysPerYear;
     }
 
     private void CalculateGama(float d1) {
@@ -224,6 +248,8 @@ public class BlackNScholesCaculator
         CalculateGama(d1);
 
         CalculateTheta(d1, d2);
+
+        CalculateCharm(d1, d2);
     }
 
     public void CalculateCallPut() {

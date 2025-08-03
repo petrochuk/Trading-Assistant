@@ -195,49 +195,20 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     greeks.Delta += position.Size;
                 }
                 else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
-                    if (position.Delta.HasValue) {
-                        greeks.Delta += position.Delta.Value * position.Size;
-                    }
-                    else {
-                        _logger.LogWarning($"Position {position.Contract} does not have a delta value. Cannot calculate greeks.");
-                        var bls = new BlackNScholesCaculator();
-                        bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
-                        bls.StockPrice = _selectedPosition.MarketPrice;
-                        bls.Strike = position.Contract.Strike;
-                        bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice) : bls.GetPutIVBisections(position.MarketPrice);
-                        bls.CalculateAll();
-                        position.Delta = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
-                    }
+                    //greeks.Delta += position.Delta.Value * position.Size;
+                    _logger.LogWarning($"Position {position.Contract} does not have a delta value. Cannot calculate greeks.");
+                    var bls = new BlackNScholesCaculator();
+                    bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
+                    bls.StockPrice = _selectedPosition.MarketPrice;
+                    bls.Strike = position.Contract.Strike;
+                    bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice) : bls.GetPutIVBisections(position.MarketPrice);
+                    bls.CalculateAll();
 
-                    if (position.Delta.HasValue && position.Theta.HasValue && position.MarketPrice != 0) {
-                        var absTheta = MathF.Abs(position.Theta.Value);
-                        if (position.MarketPrice < absTheta)
-                            absTheta = position.MarketPrice;
-                        if (-0.5f < position.Delta.Value && position.Delta.Value < 0.5f)
-                            greeks.Charm -= position.Delta.Value * (absTheta / position.MarketPrice) * position.Size;
-                        else {
-                            var intrinsicValue = position.Contract.IsCall ? _selectedPosition.MarketPrice - position.Contract.Strike : position.Contract.Strike - _selectedPosition.MarketPrice;
-                            if (intrinsicValue < 0)
-                                intrinsicValue = 0;
-                            var extrinsicValue = position.MarketPrice - intrinsicValue;
-                            if (extrinsicValue < 0)
-                                extrinsicValue = 0;
-                            if (extrinsicValue < absTheta)
-                                absTheta = extrinsicValue;
-
-                            if (0 < absTheta)
-                                greeks.Charm += ((position.Contract.IsCall ? 1f : -1f) - position.Delta.Value) * (absTheta / extrinsicValue) * position.Size;
-                        }
-                    }
-                    if (position.Gamma.HasValue) {
-                        greeks.Gamma += position.Gamma.Value * position.Size;
-                    }
-                    if (position.Theta.HasValue) {
-                        greeks.Theta += position.Theta.Value * position.Size * position.Contract.Multiplier;
-                    }
-                    if (position.Vega.HasValue) {
-                        greeks.Vega += position.Vega.Value * position.Size;
-                    }
+                    greeks.Delta += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
+                    greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
+                    greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size;
+                    greeks.Theta += (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut) * position.Size * position.Contract.Multiplier;
+                    greeks.Charm += (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut) * position.Size;
                 }
             }
         }
