@@ -14,6 +14,7 @@ namespace AppCore.Hedging;
 public class DeltaHedger : IDeltaHedger, IDisposable
 {
     private readonly ILogger<DeltaHedger> _logger;
+    private readonly IBroker _broker;
     private readonly DeltaHedgerSymbolConfiguration _configuration;
     private readonly Position _underlyingPosition;
     private readonly PositionsCollection _positions;
@@ -24,9 +25,10 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     /// Initializes a new instance of the <see cref="DeltaHedger"/> class.
     /// </summary>
     /// <param name="configuration">The delta hedger configuration.</param>
-    public DeltaHedger(ILogger<DeltaHedger> logger, Position underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
+    public DeltaHedger(ILogger<DeltaHedger> logger, IBroker broker, Position underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _broker = broker ?? throw new ArgumentNullException(nameof(broker));
         _underlyingPosition = underlyingPosition ?? throw new ArgumentNullException(nameof(underlyingPosition));
         _positions = positions ?? throw new ArgumentNullException(nameof(positions));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -58,12 +60,18 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             }
 
             var deltaWithCharm = greeks.Value.Delta + greeks.Value.Charm;
-            if (MathF.Abs(deltaWithCharm) < _configuration.Delta) {
-                _logger.LogDebug($"Delta with Charm is within threshold: {deltaWithCharm} < {_configuration.Delta}. Delta: {greeks.Value.Delta}, Charm: {greeks.Value.Charm}. No hedging required.");
+            if (MathF.Abs(deltaWithCharm) < _configuration.Delta + _configuration.MinDeltaAdjustment) {
+                _logger.LogDebug($"Delta with Charm is within threshold: {deltaWithCharm} < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta}, Charm: {greeks.Value.Charm}. No hedging required.");
                 return;
             }
 
-            _logger.LogInformation($"Delta with Charm: {deltaWithCharm} exceeds threshold: {_configuration.Delta}. Delta: {greeks.Value.Delta}, Charm: {greeks.Value.Charm}. Executing hedge.");
+            _logger.LogInformation($"Delta with Charm: {deltaWithCharm} exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta}, Charm: {greeks.Value.Charm}. Executing hedge.");
+
+            // Round delta down to 0 in whole numbers
+            var deltaHedgeSize = 0 < deltaWithCharm ? MathF.Ceiling(_configuration.Delta - deltaWithCharm) : MathF.Floor(-_configuration.Delta - deltaWithCharm);
+
+            _logger.LogDebug($"Placing delta hedge size: {deltaHedgeSize} for contract {_underlyingPosition.Contract}");
+            _broker.PlaceOrder(Contract, deltaHedgeSize);
         }
         finally
         {

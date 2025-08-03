@@ -1,8 +1,8 @@
 ﻿using AppCore.Configuration;
 using AppCore.Extenstions;
+using AppCore.Interfaces;
 using AppCore.Models;
 using InteractiveBrokers.Args;
-using InteractiveBrokers.Requests;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,7 +13,7 @@ namespace InteractiveBrokers;
 /// <summary>
 /// Interactive Brokers Client. It handles the connection to the IB client portal API.
 /// </summary>
-public class IBClient : IDisposable
+public class IBClient : IBroker, IDisposable
 {
     #region Fields
 
@@ -272,6 +272,14 @@ public class IBClient : IDisposable
     public void Dispose() {
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
+    }
+
+    #endregion
+
+    #region IBroker
+
+    public void PlaceOrder(Contract contract, float size) {
+        _logger.LogInformation($"Placing order for {size} {contract}");
     }
 
     #endregion

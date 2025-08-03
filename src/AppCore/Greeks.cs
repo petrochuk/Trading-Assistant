@@ -1,5 +1,8 @@
-﻿namespace AppCore;
+﻿using System.Diagnostics;
 
+namespace AppCore;
+
+[DebuggerDisplay("d:{Delta}, g:{Gamma}, t:{Theta}, v:{Vega}, c:{Charm}")]
 public struct Greeks
 {
     public float Delta;

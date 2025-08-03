@@ -111,6 +111,7 @@ public sealed class PositionsCollectionTests
         
         // Act
         var riskCurve = positions.CalculateRiskCurve("ES", TimeSpan.FromMinutes(5), 4000, 5000, 6000, 10);
+        Assert.IsNotNull(riskCurve, "Risk curve should not be null");
 
         // Assert
         Assert.AreEqual(200, riskCurve.Points.Count);
@@ -145,6 +146,7 @@ public sealed class PositionsCollectionTests
 
         // Act
         var riskCurve = positions.CalculateRiskCurve("ES", TimeSpan.FromMinutes(5), 5300, 5401.25f, 5500, 10);
+        Assert.IsNotNull(riskCurve, "Risk curve should not be null");
 
         // Assert
         Assert.AreEqual(20, riskCurve.Points.Count);

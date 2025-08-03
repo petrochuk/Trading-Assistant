@@ -15,6 +15,7 @@ public class Account : IDisposable
     #region Fields
     
     private readonly ILogger<Account> _logger;
+    private readonly IBroker _broker;
     private readonly IDeltaHedgerFactory _deltaHedgerFactory;
     private readonly ConcurrentDictionary<int, IDeltaHedger> _deltaHedgers = new();
     private readonly DeltaHedgerConfiguration _deltaHedgerConfiguration;
@@ -26,6 +27,7 @@ public class Account : IDisposable
     public Account(
         string id, string name,
         ILogger<Account> logger,
+        IBroker broker,
         PositionsCollection positionsCollection, 
         IDeltaHedgerFactory deltaHedgerFactory,
         DeltaHedgerConfiguration deltaHedgerConfiguration) 
@@ -36,6 +38,7 @@ public class Account : IDisposable
         Name = name;
 
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _broker = broker ?? throw new ArgumentNullException(nameof(broker));
         Positions = positionsCollection;
         _deltaHedgerFactory = deltaHedgerFactory ?? throw new ArgumentNullException(nameof(deltaHedgerFactory));
         _deltaHedgerConfiguration = deltaHedgerConfiguration ?? throw new ArgumentNullException(nameof(deltaHedgerConfiguration));
@@ -78,7 +81,7 @@ public class Account : IDisposable
                         continue;
                     }
 
-                    var deltaHedger = _deltaHedgerFactory.Create(position, Positions, _deltaHedgerConfiguration);
+                    var deltaHedger = _deltaHedgerFactory.Create(_broker, position, Positions, _deltaHedgerConfiguration);
                     if (_deltaHedgers.TryAdd(position.Contract.Id, deltaHedger)) {
                         _logger.LogInformation($"Delta hedger added for contract {position.Contract}");
                     }
