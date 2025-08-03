@@ -2,7 +2,7 @@
 
 namespace AppCore.Interfaces;
 
-public interface IDeltaHedger
+public interface IDeltaHedger : IDisposable
 {
     Contract Contract { get; }
 

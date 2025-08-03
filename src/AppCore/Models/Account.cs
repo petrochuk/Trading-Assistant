@@ -85,6 +85,16 @@ public class Account : IDisposable
                 }
             }
         }
+        else if (e.Action == NotifyCollectionChangedAction.Remove) {
+            foreach (var item in e.OldItems ?? Array.Empty<object>()) {
+                if (item is Position position) {
+                    if (_deltaHedgers.TryRemove(position.Contract.Id, out var deltaHedger)) {
+                        deltaHedger.Dispose();
+                        _logger.LogInformation($"Delta hedger removed and disposed for contract {position.Contract}");
+                    }
+                }
+            }
+        }
     }
 
     private void ExecuteHedgers(object? state)
@@ -129,6 +139,21 @@ public class Account : IDisposable
 
         _disposed = true;
         _hedgeTimer?.Dispose();
+        
+        // Dispose all delta hedgers
+        foreach (var hedger in _deltaHedgers.Values)
+        {
+            try
+            {
+                hedger.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error disposing delta hedger for contract {hedger.Contract}");
+            }
+        }
+        _deltaHedgers.Clear();
+        
         Positions.Underlyings.CollectionChanged -= OnUnderlyingsChanged;
         _logger.LogInformation("Account disposed and hedge timer stopped");
     }
