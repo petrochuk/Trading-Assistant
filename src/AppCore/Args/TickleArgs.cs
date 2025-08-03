@@ -1,4 +1,4 @@
-﻿namespace InteractiveBrokers.Args;
+﻿namespace AppCore.Args;
 
 public class TickleArgs : EventArgs
 {

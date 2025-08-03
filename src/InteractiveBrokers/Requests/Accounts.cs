@@ -1,4 +1,5 @@
-﻿using AppCore.Extenstions;
+﻿using AppCore.Args;
+using AppCore.Extenstions;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
@@ -6,10 +7,10 @@ namespace InteractiveBrokers.Requests;
 
 internal class Accounts : Request
 {
-    EventHandler<Args.AccountsArgs>? _responseHandler;
+    EventHandler<AccountsArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public Accounts(EventHandler<Args.AccountsArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
+    public Accounts(EventHandler<AccountsArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
         Uri = "v1/api/iserver/accounts";
         _responseHandler = responseHandler;
     }
@@ -41,9 +42,19 @@ internal class Accounts : Request
             accountList.Add(account);
         }
 
-        var accountsArgs = new Args.AccountsArgs {
-            Accounts = accountList
-        };
+        var accountsArgs = new AccountsArgs();
+        foreach (var account in accountList) {
+            // Skip FA (Financial Advisor) accounts
+            if (account.BusinessType == "FA") {
+                continue;
+            }
+
+            accountsArgs.Accounts.Add(new AccountsArgs.Account() {
+                Id = account.Id,
+                Name = string.IsNullOrWhiteSpace(account.Alias) ? account.DisplayName : account.Alias
+            });
+        }
+
         _responseHandler?.Invoke(this, accountsArgs);
     }
 }

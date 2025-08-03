@@ -15,6 +15,8 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Dictionary<string, List<Models.Contract>>))]
 [JsonSerializable(typeof(List<Models.Contract>))]
 [JsonSerializable(typeof(Models.Contract))]
+[JsonSerializable(typeof(Models.Order))]
+[JsonSerializable(typeof(Models.OrdersObject))]
 [JsonSerializable(typeof(Models.SecurityDefinition))]
 [JsonSerializable(typeof(List<Models.SecurityDefinition>))]
 [JsonSerializable(typeof(Dictionary<string, List<Models.SecurityDefinition>>))]
@@ -22,9 +24,10 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Responses.Account))]
 [JsonSerializable(typeof(Responses.Accounts))]
 [JsonSerializable(typeof(Responses.AccountParent))]
+[JsonSerializable(typeof(Responses.PlaceOrder))]
 [JsonSerializable(typeof(Dictionary<string, JsonElement>))]
-[JsonSerializable(typeof(Args.AccountSummaryArgs))]
-[JsonSerializable(typeof(Args.SummaryLine))]
+[JsonSerializable(typeof(AppCore.Args.AccountSummaryArgs))]
+[JsonSerializable(typeof(AppCore.Args.SummaryLine))]
 internal partial class SourceGeneratorContext : JsonSerializerContext
 {
 }

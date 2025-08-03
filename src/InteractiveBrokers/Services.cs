@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using AppCore.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InteractiveBrokers;
 
@@ -8,6 +9,7 @@ public static class IServiceCollectionExtension
 
         services
             .AddSingleton<IBClient>()
+            .AddSingleton<IBroker, IBClient>()
             .AddSingleton<IBWebSocket>();
 
         return services;

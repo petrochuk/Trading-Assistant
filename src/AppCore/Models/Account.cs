@@ -81,7 +81,7 @@ public class Account : IDisposable
                         continue;
                     }
 
-                    var deltaHedger = _deltaHedgerFactory.Create(_broker, position, Positions, _deltaHedgerConfiguration);
+                    var deltaHedger = _deltaHedgerFactory.Create(_broker, Id, position, Positions, _deltaHedgerConfiguration);
                     if (_deltaHedgers.TryAdd(position.Contract.Id, deltaHedger)) {
                         _logger.LogInformation($"Delta hedger added for contract {position.Contract}");
                     }

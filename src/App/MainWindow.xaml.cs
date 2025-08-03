@@ -1,7 +1,7 @@
 using AppCore;
+using AppCore.Args;
 using AppCore.Interfaces;
 using AppCore.Models;
-using InteractiveBrokers.Args;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
@@ -183,14 +183,9 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
         _accounts.Clear();
         foreach (var brokerAccount in e.Accounts) {
-            // Skip FA (Financial Advisor) accounts
-            if (brokerAccount.BusinessType == "FA") {
-                continue;
-            }
 
             var accountFactory = AppCore.ServiceProvider.Instance.GetRequiredService<IAccountFactory>();
-            var account = accountFactory.CreateAccount(brokerAccount.Id, 
-                string.IsNullOrWhiteSpace(brokerAccount.Alias) ? brokerAccount.DisplayName : brokerAccount.Alias);
+            var account = accountFactory.CreateAccount(brokerAccount.Id, brokerAccount.Name);
             account.Positions.OnPositionAdded += OnPositionAdded;
             account.Positions.OnPositionRemoved += OnPositionRemoved;
             account.Positions.PropertyChanged += Positions_PropertyChanged;

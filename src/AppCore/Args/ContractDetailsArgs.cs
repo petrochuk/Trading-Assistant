@@ -1,8 +1,8 @@
 ﻿using AppCore.Models;
 
-namespace InteractiveBrokers.Args;
+namespace AppCore.Args;
 
-public class ContractFoundArgs : EventArgs
+public class ContractDetailsArgs : EventArgs
 {
     public required Contract Contract { get; init; }
 }

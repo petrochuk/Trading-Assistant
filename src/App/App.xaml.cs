@@ -1,6 +1,7 @@
 ﻿using AppCore;
 using AppCore.Configuration;
 using AppCore.Extenstions;
+using AppCore.Interfaces;
 using InteractiveBrokers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +18,7 @@ public partial class App : Application
 {
     private Window? _window;
 
-    private readonly IBClient _ibClient;
+    private readonly IBroker _broker;
     private readonly IBWebSocket _ibWebSocket;
     private readonly ILogger<App> _logger;
 
@@ -36,7 +37,7 @@ public partial class App : Application
 
         InitializeHolidays();
 
-        _ibClient = AppCore.ServiceProvider.Instance.GetRequiredService<IBClient>();
+        _broker = AppCore.ServiceProvider.Instance.GetRequiredService<IBroker>();
         _ibWebSocket = AppCore.ServiceProvider.Instance.GetRequiredService<IBWebSocket>();
     }
 
@@ -99,13 +100,13 @@ public partial class App : Application
         _window.Closed += (s, e) => {
             _logger.LogInformation("Main window closed");
             _ibWebSocket.Dispose();
-            _ibClient.Dispose();
+            _broker.Dispose();
         };
     }
 
     #region Properties
 
-    public IBClient IBClient => _ibClient;
+    public IBroker IBClient => _broker;
 
     public IBWebSocket IBWebSocket => _ibWebSocket;
 

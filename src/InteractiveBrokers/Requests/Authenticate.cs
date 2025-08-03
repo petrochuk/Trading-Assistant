@@ -7,18 +7,19 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
+using AppCore.Args;
 
 namespace InteractiveBrokers.Requests;
 
 internal class Authenticate : Request
 {
-    EventHandler<Args.AuthenticatedArgs>? _responseHandler;
+    EventHandler<AuthenticatedArgs>? _responseHandler;
     private AuthenticationConfiguration _authConfiguration;
     private string _accessToken = string.Empty;
     private string _publicIP = string.Empty;
 
     [SetsRequiredMembers]
-    public Authenticate(EventHandler<Args.AuthenticatedArgs>? responseHandler, AuthenticationConfiguration authConfiguration) {
+    public Authenticate(EventHandler<AuthenticatedArgs>? responseHandler, AuthenticationConfiguration authConfiguration) {
         _responseHandler = responseHandler;
         _authConfiguration = authConfiguration ?? throw new ArgumentNullException(nameof(authConfiguration), "Authentication configuration cannot be null.");
         Uri = string.Empty;
@@ -118,7 +119,7 @@ internal class Authenticate : Request
         var response = GetResponse(httpClient, sessionInitUrl, SourceGeneratorContext.Default.SessionInit, HttpMethod.Post, content);
         Logger?.LogInformation($"Initialized brokerage session");
 
-        _responseHandler?.Invoke(this, new Args.AuthenticatedArgs {
+        _responseHandler?.Invoke(this, new AuthenticatedArgs {
             BearerToken = BearerToken!,
         });
     }

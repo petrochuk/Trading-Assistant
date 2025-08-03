@@ -1,8 +1,8 @@
-﻿using AppCore.Configuration;
+﻿using AppCore.Args;
+using AppCore.Configuration;
 using AppCore.Extenstions;
 using AppCore.Interfaces;
 using AppCore.Models;
-using InteractiveBrokers.Args;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,7 +13,7 @@ namespace InteractiveBrokers;
 /// <summary>
 /// Interactive Brokers Client. It handles the connection to the IB client portal API.
 /// </summary>
-public class IBClient : IBroker, IDisposable
+public class IBClient : IBroker
 {
     #region Fields
 
@@ -278,8 +278,17 @@ public class IBClient : IBroker, IDisposable
 
     #region IBroker
 
-    public void PlaceOrder(Contract contract, float size) {
+    public void PlaceOrder(string accountId, Contract contract, float size) {
         _logger.LogInformation($"Placing order for {size} {contract}");
+
+        var request = new Requests.PlaceOrder(accountId, contract, size, _brokerConfiguration.APIOperator, BearerToken) {
+            Logger = AppCore.ServiceProvider.Instance.GetService<ILogger<Requests.Request>>()
+        };
+
+        _logger.LogInformation($"Placing order for {size} {contract} on account {accountId.Mask()}");
+        if (!_channel.Writer.TryWrite(request)) {
+            throw new IBClientException($"Failed to place order for {size} {contract} on account {accountId.Mask()}");
+        }
     }
 
     #endregion

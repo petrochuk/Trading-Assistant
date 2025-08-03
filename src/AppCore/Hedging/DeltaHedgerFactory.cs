@@ -17,12 +17,12 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public IDeltaHedger Create(IBroker broker, Position underlyingPosition, PositionsCollection positions, DeltaHedgerConfiguration configuration)
+    public IDeltaHedger Create(IBroker broker, string accountId, Position underlyingPosition, PositionsCollection positions, DeltaHedgerConfiguration configuration)
     {
         var symbolConfiguration = configuration.Configs[underlyingPosition.Contract.Symbol];
         if (symbolConfiguration == null)
             throw new ArgumentException($"No configuration found for symbol {underlyingPosition.Contract.Symbol}", nameof(configuration));
 
-        return new DeltaHedger(_logger, broker, underlyingPosition, positions, symbolConfiguration);
+        return new DeltaHedger(_logger, broker, accountId, underlyingPosition, positions, symbolConfiguration);
     }
 }

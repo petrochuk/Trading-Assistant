@@ -58,7 +58,7 @@ public sealed class DeltaHedgerTests
             }
         };
         var testBroker = new TestBroker();
-        var deltaHedger = deltaHedgerFactory.Create(testBroker, underlyingPosition, positions, deltaHedgerConfiguration);
+        var deltaHedger = deltaHedgerFactory.Create(testBroker, "FakeAccountId", underlyingPosition, positions, deltaHedgerConfiguration);
 
         // Act
         deltaHedger.Hedge();
@@ -118,8 +118,8 @@ public sealed class DeltaHedgerTests
             }
         };
         var testBroker = new TestBroker();
-        var deltaHedger = deltaHedgerFactory.Create(testBroker, underlyingPosition, positions, deltaHedgerConfiguration);
-     
+        var deltaHedger = deltaHedgerFactory.Create(testBroker, "FakeAccountId", underlyingPosition, positions, deltaHedgerConfiguration);
+
         // Act
         deltaHedger.Hedge();
 

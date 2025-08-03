@@ -15,6 +15,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 {
     private readonly ILogger<DeltaHedger> _logger;
     private readonly IBroker _broker;
+    private readonly string _accountId;
     private readonly DeltaHedgerSymbolConfiguration _configuration;
     private readonly Position _underlyingPosition;
     private readonly PositionsCollection _positions;
@@ -25,10 +26,13 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     /// Initializes a new instance of the <see cref="DeltaHedger"/> class.
     /// </summary>
     /// <param name="configuration">The delta hedger configuration.</param>
-    public DeltaHedger(ILogger<DeltaHedger> logger, IBroker broker, Position underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
+    public DeltaHedger(ILogger<DeltaHedger> logger, IBroker broker, string accountId, Position underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _broker = broker ?? throw new ArgumentNullException(nameof(broker));
+        if (string.IsNullOrWhiteSpace(accountId))
+            throw new ArgumentException("Account ID cannot be null or empty.", nameof(accountId));
+        _accountId = accountId;
         _underlyingPosition = underlyingPosition ?? throw new ArgumentNullException(nameof(underlyingPosition));
         _positions = positions ?? throw new ArgumentNullException(nameof(positions));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -71,7 +75,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             var deltaHedgeSize = 0 < deltaWithCharm ? MathF.Ceiling(_configuration.Delta - deltaWithCharm) : MathF.Floor(-_configuration.Delta - deltaWithCharm);
 
             _logger.LogDebug($"Placing delta hedge size: {deltaHedgeSize} for contract {_underlyingPosition.Contract}");
-            _broker.PlaceOrder(Contract, deltaHedgeSize);
+            _broker.PlaceOrder(_accountId, Contract, deltaHedgeSize);
         }
         finally
         {

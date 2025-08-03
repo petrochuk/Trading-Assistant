@@ -1,14 +1,14 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
+﻿using AppCore.Args;
+using System.Diagnostics.CodeAnalysis;
 
 namespace InteractiveBrokers.Requests;
 
 internal class Tickle : Request
 {
-    private EventHandler<Args.TickleArgs>? _responseHandler;
+    private EventHandler<TickleArgs>? _responseHandler;
 
     [SetsRequiredMembers]
-    public Tickle(EventHandler<Args.TickleArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
+    public Tickle(EventHandler<TickleArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
         Uri = "v1/api/tickle";
         _responseHandler = responseHandler;
     }
@@ -28,7 +28,7 @@ internal class Tickle : Request
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) not authenticated");
         }
 
-        _responseHandler?.Invoke(this, new Args.TickleArgs {
+        _responseHandler?.Invoke(this, new TickleArgs {
             Session = response.Session
         });
     }
