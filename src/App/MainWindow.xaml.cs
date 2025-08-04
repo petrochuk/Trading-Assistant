@@ -159,6 +159,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         App.Instance.IBWebSocket.BearerToken = e.BearerToken;
 
         IBClient_Connected(null, EventArgs.Empty);
+        App.Instance.IBClient.SuppressWarnings();
         App.Instance.IBClient.StartTickle();
     }
 

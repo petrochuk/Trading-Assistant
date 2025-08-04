@@ -38,8 +38,8 @@ internal class PlaceOrder : Request
             ContractIdEx = $"{Contract.Id}@SMART",
             ExternalOperator = _externalOperator,
             SecurityType = $"{Contract.Id}@{Contract.AssetClass.ToSecurityType()}",
-            Price = Size > 0 ? 6000.0f : 6500.0f, // Example price, adjust as needed
-            OrderType = "LMT", // Limit order for now
+            //Price = Size > 0 ? 6000.0f : 6500.0f, // Example price, adjust as needed
+            OrderType = "MKT", // Market order
             Side = Size > 0 ? "BUY" : "SELL",
             Ticker = Contract.Symbol,
             Quantity = (int)Math.Abs(Size),

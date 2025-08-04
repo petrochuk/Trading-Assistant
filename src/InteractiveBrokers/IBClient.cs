@@ -157,6 +157,17 @@ public class IBClient : IBroker
     }
 
     public void SuppressWarnings() {
+        if (_brokerConfiguration.Suppressions == null || _brokerConfiguration.Suppressions.Count == 0) {
+            _logger.LogInformation("No suppressions configured, skipping suppression request");
+            return;
+        }
+
+        var request = new Requests.SuppressWarnings(_brokerConfiguration.Suppressions.Keys, BearerToken);
+
+        _logger.LogInformation($"Suppressing warnings: {string.Join(", ", _brokerConfiguration.Suppressions.Keys)}");
+        if (!_channel.Writer.TryWrite(request)) {
+            throw new IBClientException("Failed to suppress warnings");
+        }
     }
 
     public void StartTickle() {
