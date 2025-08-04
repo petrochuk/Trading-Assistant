@@ -1,6 +1,7 @@
 ﻿
 using AppCore.Models;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 
 namespace InteractiveBrokers.Requests;
 
@@ -37,7 +38,7 @@ internal class PlaceOrder : Request
             ContractIdEx = $"{Contract.Id}@SMART",
             ExternalOperator = _externalOperator,
             SecurityType = $"{Contract.Id}@{Contract.AssetClass.ToSecurityType()}",
-            Price = Size > 0 ? 6500.0f : 6000.0f, // Example price, adjust as needed
+            Price = Size > 0 ? 6000.0f : 6500.0f, // Example price, adjust as needed
             OrderType = "LMT", // Limit order for now
             Side = Size > 0 ? "BUY" : "SELL",
             Ticker = Contract.Symbol,
@@ -52,6 +53,15 @@ internal class PlaceOrder : Request
             content,
             System.Text.Encoding.UTF8,
             "application/json");
-        var response = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.PlaceOrder, HttpMethod.Post, requestContent);
+        var response = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.ListPlaceOrder, HttpMethod.Post, requestContent);
+        if (response.Count != 1) {
+            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {response.Count} orders response, expected 1.");
+        }
+        var placedOrderResponse = response[0];
+        if (placedOrderResponse.Messages.Any()) {
+            foreach (var message in placedOrderResponse.Messages) {
+                Logger?.LogWarning($"IBKR: {message}");
+            }
+        }
     }
 }

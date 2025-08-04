@@ -11,12 +11,17 @@ namespace InteractiveBrokers.Responses;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
-[DebuggerDisplay("{contractDesc}")]
+[DebuggerDisplay("{ContractDesciption}")]
 public class Position : IPosition, IJsonOnDeserialized
 {
     public string acctId { get; set; }
-    public int conid { get; set; }
+
+    [JsonPropertyName("conid")]
+    public string ContractIdString { get; set; }
+
     public string contractDesc { get; set; }
+    public string description { get; set; }
+
     public float position { get; set; }
     public float mktPrice { get; set; }
     public float mktValue { get; set; }
@@ -73,9 +78,9 @@ public class Position : IPosition, IJsonOnDeserialized
 
     #region IPosition
 
-    int IPosition.ContractId => conid;
+    public int ContractId => int.TryParse(ContractIdString, out var contractId) ? contractId : throw new InvalidOperationException($"Invalid contract ID: {ContractId}");
 
-    string IPosition.ContractDesciption => contractDesc;
+    public string ContractDesciption => string.IsNullOrWhiteSpace(contractDesc) ? description : contractDesc;
 
     public string Symbol {
         get {
@@ -149,7 +154,7 @@ public class Position : IPosition, IJsonOnDeserialized
 
     void IJsonOnDeserialized.OnDeserialized() {
 
-        var descriptionParts = contractDesc.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var descriptionParts = ContractDesciption.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         // Fix symbol
         if (string.IsNullOrWhiteSpace(undSym)) {
@@ -352,3 +357,32 @@ public class Position : IPosition, IJsonOnDeserialized
 
     #endregion
 }
+
+/*
+public class Rootobject
+{
+    public Class1[] Property1 { get; set; }
+}
+
+public class Class1
+{
+    public float position { get; set; }
+    public string conid { get; set; }
+    public float avgCost { get; set; }
+    public float avgPrice { get; set; }
+    public string currency { get; set; }
+    public string description { get; set; }
+    public bool isLastToLoq { get; set; }
+    public float marketPrice { get; set; }
+    public float marketValue { get; set; }
+    public float realizedPnl { get; set; }
+    public string secType { get; set; }
+    public int timestamp { get; set; }
+    public float unrealizedPnl { get; set; }
+    public string assetClass { get; set; }
+    public string sector { get; set; }
+    public string group { get; set; }
+    public string model { get; set; }
+}
+
+*/

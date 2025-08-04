@@ -69,7 +69,7 @@ public class Order
     public bool IsSingleGroup { get; set; } = false;
 
     [JsonPropertyName("outsideRTH")]
-    public bool OutsideRTH { get; set; } = true;
+    public bool? OutsideRTH { get; set; }
 
     /// <summary>
     /// Required for LMT or STOP_LIMIT
@@ -136,7 +136,7 @@ public class Order
     public string? Strategy { get; set; }
 
     [JsonPropertyName("strategyParameters")]
-    public StrategyParameters[] StrategyParameters { get; set; } = [];
+    public List<StrategyParameters>? StrategyParameters { get; set; }
 }
 
 public class StrategyParameters

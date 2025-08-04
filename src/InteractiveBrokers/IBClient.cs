@@ -156,6 +156,9 @@ public class IBClient : IBroker
         }
     }
 
+    public void SuppressWarnings() {
+    }
+
     public void StartTickle() {
         // Initialize the tickle request
         _tickleRequest = new Requests.Tickle(OnTickle, BearerToken);

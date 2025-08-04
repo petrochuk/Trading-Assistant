@@ -146,7 +146,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
         App.Instance.IBClient.RequestAccountPositions(_activeAccount.Id);
-        App.Instance.IBClient.RequestAccountSummary(_activeAccount.Id);
+        //App.Instance.IBClient.RequestAccountSummary(_activeAccount.Id);
         return;
     }
 

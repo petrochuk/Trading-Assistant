@@ -52,6 +52,8 @@ internal class TestBroker : IBroker
     }
 
     public void FindContract(Contract contract) {
-        throw new NotImplementedException();
+    }
+
+    public void SuppressWarnings() {
     }
 }

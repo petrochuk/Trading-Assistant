@@ -3,7 +3,11 @@ using System.Text.Json.Serialization;
 
 namespace InteractiveBrokers;
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true, AllowTrailingCommas = true)]
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, 
+    PropertyNameCaseInsensitive = true, 
+    AllowTrailingCommas = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(Responses.Tickle))]
 [JsonSerializable(typeof(Responses.IBServer))]
 [JsonSerializable(typeof(Responses.HMDS))]
@@ -25,6 +29,7 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Responses.Accounts))]
 [JsonSerializable(typeof(Responses.AccountParent))]
 [JsonSerializable(typeof(Responses.PlaceOrder))]
+[JsonSerializable(typeof(List<Responses.PlaceOrder>))]
 [JsonSerializable(typeof(Dictionary<string, JsonElement>))]
 [JsonSerializable(typeof(AppCore.Args.AccountSummaryArgs))]
 [JsonSerializable(typeof(AppCore.Args.SummaryLine))]

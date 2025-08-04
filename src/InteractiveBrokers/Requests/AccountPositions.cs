@@ -16,7 +16,7 @@ internal class AccountPositions : Request
             throw new IBClientException("Account ID cannot be null or empty");
         }
         AccountId = account;
-        Uri = $"v1/api/portfolio/{account}/positions/0";
+        Uri = $"v1/api/portfolio2/{account}/positions";
         _responseHandler = responseHandler;
     }
 
@@ -46,7 +46,7 @@ internal class AccountPositions : Request
                 continue;
             }
 
-            args.Positions.Add(position.conid, position);
+            args.Positions.Add(position.ContractId, position);
         }
 
         Logger?.LogInformation($"IBKR returned {args.Positions.Count} position(s) for account {AccountId.Mask()}");
