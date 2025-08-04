@@ -58,18 +58,19 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogDebug($"Executing delta hedger for contract {_underlyingPosition.Contract}");
 
             var greeks = _positions.CalculateGreeks(_underlyingPosition);
-            if (greeks == null) {
-                _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Contract}. Cannot hedge.");
+            if (greeks == null || float.IsNaN(greeks.Value.Delta) || float.IsNaN(greeks.Value.Gamma)) {
+                _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Contract} or NaN. Cannot hedge.");
                 return;
             }
 
             var deltaWithCharm = greeks.Value.Delta + greeks.Value.Charm;
             if (MathF.Abs(deltaWithCharm) < _configuration.Delta + _configuration.MinDeltaAdjustment) {
-                _logger.LogDebug($"Delta with Charm is within threshold: {deltaWithCharm} < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta}, Charm: {greeks.Value.Charm}. No hedging required.");
+                _logger.LogDebug($"Delta with Charm is within threshold: {MathF.Abs(deltaWithCharm):f3} < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta:f3}, Charm: {greeks.Value.Charm:f3}. No hedging required.");
+                _hedgeSemaphore.Release();
                 return;
             }
 
-            _logger.LogInformation($"Delta with Charm: {deltaWithCharm} exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta}, Charm: {greeks.Value.Charm}. Executing hedge.");
+            _logger.LogInformation($"Delta with Charm: {MathF.Abs(deltaWithCharm):f3} exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta:f3}, Charm: {greeks.Value.Charm:f3}. Executing hedge.");
 
             // Round delta down to 0 in whole numbers
             var deltaHedgeSize = 0 < deltaWithCharm ? MathF.Ceiling(_configuration.Delta - deltaWithCharm) : MathF.Floor(-_configuration.Delta - deltaWithCharm);
@@ -79,7 +80,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         }
         finally
         {
-            _hedgeSemaphore.Release();
+            // _hedgeSemaphore.Release();
         }
     }
 

@@ -166,6 +166,10 @@ public sealed partial class RiskGraph : UserControl
         foreach (var riskCurve in riskCurves) {
             var curve = riskCurve.Value;
             var points = curve.Points;
+            if (points.Count == 0) {
+                _logger.LogDebug($"No points available for risk curve {riskCurve.Key}");
+                continue;
+            }
             var path = new Path() {
                 Stroke = _riskIntervals[riskCurve.Key],
                 StrokeThickness = 1,
