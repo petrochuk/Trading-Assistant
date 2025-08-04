@@ -21,14 +21,29 @@ public class Position
 
     public float Size { get; set; }
 
-    public float? MarketPrice { get; set; }
+    float? _marketPrice;
+    public float? MarketPrice {
+        get => _marketPrice;
+        set {
+            if (value.HasValue && value <= 0 && Contract.AssetClass != AssetClass.FutureOption && Contract.AssetClass != AssetClass.Option) {
+                throw new ArgumentOutOfRangeException(nameof(value), "Market price must be greater than 0 for futures.");
+            }
+            _marketPrice = value;
+        }
+    }
 
     /// <summary>
     /// Used for StdDev to calculate log return
     /// </summary>
     public float? MarketPriceLast { get; set; }
 
-    public float MarketValue { get; set; }
+    float? _marketValue;
+    public float? MarketValue { 
+        get => _marketValue;
+        set {
+            _marketValue = value;
+        }
+    }
 
     public bool IsDataStreaming { get; set; } = false;
 

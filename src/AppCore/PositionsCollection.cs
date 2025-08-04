@@ -160,9 +160,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                             Expiration = _expirationCalendar.GetFrontMonthExpiration(position.Contract.Symbol, _timeProvider.EstNow()),
                         };
                         var zeroPosition = new Position(contract) {
-                            Size = 0,
-                            MarketPrice = 0,
-                            MarketValue = 0
+                            Size = 0
                         };
                         Underlyings.Add(zeroPosition);
                     }
@@ -188,7 +186,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             underlyingPosition = _selectedPosition;
         }
 
-        if (!underlyingPosition.MarketPrice.HasValue)
+        if (!underlyingPosition.MarketPrice.HasValue || underlyingPosition.MarketPrice == 0)
             return null;
 
         var greeks = new Greeks();

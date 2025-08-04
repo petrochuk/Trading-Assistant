@@ -21,10 +21,20 @@ public class Position : IPosition, IJsonOnDeserialized
 
     public string contractDesc { get; set; }
     public string description { get; set; }
+    public string secType { get; set; }
 
     public float position { get; set; }
-    public float mktPrice { get; set; }
-    public float mktValue { get; set; }
+
+    [JsonPropertyName("mktPrice")]
+    public float ibMktPrice { get; set; }
+    [JsonPropertyName("marketPrice")]
+    public float ibMarketPrice { get; set; }
+
+    [JsonPropertyName("mktValue")]
+    public float ibMktValue { get; set; }
+    [JsonPropertyName("marketValue")]
+    public float ibMarketValue { get; set; }
+
     public string currency { get; set; }
     public float avgCost { get; set; }
     public float avgPrice { get; set; }
@@ -135,9 +145,11 @@ public class Position : IPosition, IJsonOnDeserialized
 
     float IPosition.Size => position;
 
-    float IPosition.MarketPrice => mktPrice;
+    [JsonIgnore]
+    public float MarketPrice => ibMktPrice == 0 ? ibMarketPrice : ibMktPrice;
 
-    float IPosition.MarketValue => mktValue;
+    [JsonIgnore]
+    public float MarketValue => ibMktValue == 0 ? ibMarketValue : ibMktValue;
 
     public bool IsValid {
         get {
@@ -357,32 +369,3 @@ public class Position : IPosition, IJsonOnDeserialized
 
     #endregion
 }
-
-/*
-public class Rootobject
-{
-    public Class1[] Property1 { get; set; }
-}
-
-public class Class1
-{
-    public float position { get; set; }
-    public string conid { get; set; }
-    public float avgCost { get; set; }
-    public float avgPrice { get; set; }
-    public string currency { get; set; }
-    public string description { get; set; }
-    public bool isLastToLoq { get; set; }
-    public float marketPrice { get; set; }
-    public float marketValue { get; set; }
-    public float realizedPnl { get; set; }
-    public string secType { get; set; }
-    public int timestamp { get; set; }
-    public float unrealizedPnl { get; set; }
-    public string assetClass { get; set; }
-    public string sector { get; set; }
-    public string group { get; set; }
-    public string model { get; set; }
-}
-
-*/

@@ -58,7 +58,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogDebug($"Executing delta hedger for contract {_underlyingPosition.Contract}");
 
             var greeks = _positions.CalculateGreeks(_underlyingPosition);
-            if (greeks == null || float.IsNaN(greeks.Value.Delta) || float.IsNaN(greeks.Value.Gamma)) {
+            if (greeks == null || float.IsNaN(greeks.Value.Delta) || float.IsNaN(greeks.Value.Charm)) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Contract} or NaN. Cannot hedge.");
                 return;
             }
