@@ -23,6 +23,8 @@ internal class TestBroker : IBroker
 
     public event EventHandler<ContractDetailsArgs>? OnContractDetails;
 
+    public event EventHandler<OrderPlacedArgs>? OnOrderPlaced;
+
     public void Connect() {
     }
 
@@ -32,7 +34,7 @@ internal class TestBroker : IBroker
     public void Dispose() {
     }
 
-    public void PlaceOrder(string accountId, Contract contract, float size) {
+    public void PlaceOrder(string accountId, Guid orderId, Contract contract, float size) {
         PlacedOrders.Add(new TestOrder { 
             Contract = contract, Size = size 
         });

@@ -7,7 +7,7 @@ public interface IBroker : IDisposable
 {
     void Connect();
     void StartTickle();
-    void PlaceOrder(string accountId, Contract contract, float size);
+    void PlaceOrder(string accountId, Guid orderId, Contract contract, float size);
     void FindContract(Contract contract);
     void SuppressWarnings();
 
@@ -26,4 +26,5 @@ public interface IBroker : IDisposable
     event EventHandler<AccountSummaryArgs>? OnAccountSummary;
     event EventHandler<ContractFoundArgs>? OnContractFound;
     event EventHandler<ContractDetailsArgs>? OnContractDetails;
+    event EventHandler<OrderPlacedArgs>? OnOrderPlaced;
 }

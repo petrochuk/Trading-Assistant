@@ -214,11 +214,22 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice.Value) : bls.GetPutIVBisections(position.MarketPrice.Value);
                     bls.CalculateAll();
 
+                    var charm = (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut);
+                    // If the position is close to expiration, charm can go to infinity. Estimate it as diff from delta.
+                    if (bls.DaysLeft <= 1) {
+                        if (position.Contract.IsCall) {
+                            charm = bls.DeltaCall > 0.5 ? 1 - bls.DeltaCall : -bls.DeltaCall;
+                        }
+                        else {
+                            charm = bls.DeltaPut < -0.5 ? 1 + bls.DeltaPut : -bls.DeltaPut;
+                        }
+                    }
+
                     greeks.Delta += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size;
                     greeks.Theta += (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut) * position.Size * position.Contract.Multiplier;
-                    greeks.Charm += (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut) * position.Size;
+                    greeks.Charm += charm * position.Size;
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");

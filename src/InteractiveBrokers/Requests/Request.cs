@@ -18,7 +18,8 @@ internal abstract class Request
 
     public abstract void Execute(HttpClient httpClient);
 
-    protected T GetResponse<T>(HttpClient httpClient, string uri, JsonTypeInfo<T> jsonTypeInfo, HttpMethod? httpMethod = null, HttpContent? httpContent = null) {
+    protected T GetResponse<T>(HttpClient httpClient, string uri, JsonTypeInfo<T> jsonTypeInfo,
+        HttpMethod? httpMethod = null, HttpContent? httpContent = null) {
         _ = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         if (string.IsNullOrWhiteSpace(uri)) {
             throw new ArgumentNullException(nameof(uri), "URI cannot be null or empty.");

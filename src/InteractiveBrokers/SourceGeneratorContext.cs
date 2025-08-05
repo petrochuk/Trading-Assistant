@@ -29,6 +29,7 @@ namespace InteractiveBrokers;
 [JsonSerializable(typeof(Responses.Accounts))]
 [JsonSerializable(typeof(Responses.AccountParent))]
 [JsonSerializable(typeof(Responses.PlaceOrder))]
+[JsonSerializable(typeof(Responses.PlaceOrderError))]
 [JsonSerializable(typeof(Responses.SuppressWarnings))]
 [JsonSerializable(typeof(List<Responses.PlaceOrder>))]
 [JsonSerializable(typeof(Dictionary<string, JsonElement>))]

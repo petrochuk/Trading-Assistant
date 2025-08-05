@@ -1,9 +1,9 @@
-﻿using AppCore.Configuration;
+﻿using AppCore.Args;
+using AppCore.Configuration;
 using AppCore.Interfaces;
 using AppCore.Models;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Threading;
 
 namespace AppCore.Hedging;
 
@@ -14,21 +14,26 @@ namespace AppCore.Hedging;
 public class DeltaHedger : IDeltaHedger, IDisposable
 {
     private readonly ILogger<DeltaHedger> _logger;
+    private readonly TimeProvider _timeProvider;
     private readonly IBroker _broker;
     private readonly string _accountId;
     private readonly DeltaHedgerSymbolConfiguration _configuration;
     private readonly Position _underlyingPosition;
     private readonly PositionsCollection _positions;
     private readonly SemaphoreSlim _hedgeSemaphore = new(1, 1);
+    private Guid? _activeOrderId;
+    private DateTimeOffset? _hedgeDelay;
     private bool _disposed = false;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeltaHedger"/> class.
     /// </summary>
     /// <param name="configuration">The delta hedger configuration.</param>
-    public DeltaHedger(ILogger<DeltaHedger> logger, IBroker broker, string accountId, Position underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
+    public DeltaHedger(ILogger<DeltaHedger> logger, TimeProvider timeProvider, IBroker broker, string accountId, 
+        Position underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _broker = broker ?? throw new ArgumentNullException(nameof(broker));
         if (string.IsNullOrWhiteSpace(accountId))
             throw new ArgumentException("Account ID cannot be null or empty.", nameof(accountId));
@@ -36,6 +41,8 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         _underlyingPosition = underlyingPosition ?? throw new ArgumentNullException(nameof(underlyingPosition));
         _positions = positions ?? throw new ArgumentNullException(nameof(positions));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+
+        _broker.OnOrderPlaced += Broker_OnOrderPlaced;
     }
 
     public Position UnderlyingPosition => _underlyingPosition;
@@ -45,6 +52,17 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     public void Hedge() {
         if (_disposed)
             throw new ObjectDisposedException(nameof(DeltaHedger), "Cannot hedge after the hedger has been disposed.");
+
+        if (_activeOrderId.HasValue) {
+            _logger.LogDebug($"Hedge order already in progress for contract {_underlyingPosition.Contract}. Skipping.");
+            return;
+        }
+
+        if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value)
+        {
+            _logger.LogDebug($"Hedge execution delayed for contract {_underlyingPosition.Contract}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.GetUtcNow():hh\\:mm\\:ss}.");
+            return;
+        }
 
         // Try to acquire the semaphore without blocking
         if (!_hedgeSemaphore.Wait(0))
@@ -76,12 +94,36 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             var deltaHedgeSize = 0 < deltaWithCharm ? MathF.Ceiling(_configuration.Delta - deltaWithCharm) : MathF.Floor(-_configuration.Delta - deltaWithCharm);
 
             _logger.LogDebug($"Placing delta hedge size: {deltaHedgeSize} for contract {_underlyingPosition.Contract}");
-            _broker.PlaceOrder(_accountId, Contract, deltaHedgeSize);
+            _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
+            _broker.PlaceOrder(_accountId, _activeOrderId.Value, Contract, deltaHedgeSize);
         }
         finally
         {
-            // _hedgeSemaphore.Release();
+            _hedgeSemaphore.Release();
         }
+    }
+
+    private void Broker_OnOrderPlaced(object? sender, OrderPlacedArgs e)
+    {
+        if (e.AccountId != _accountId || e.Contract.Id != _underlyingPosition.Contract.Id)
+        {
+            _logger.LogDebug($"Order placed for different account or contract. Ignoring: AccountId={e.AccountId}, ContractId={e.Contract.Id}");
+            return;
+        }
+
+        if (e.OrderId != _activeOrderId)
+        {
+            _logger.LogDebug($"Order placed with different ID. Ignoring: Expected={_activeOrderId}, Actual={e.OrderId}");
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(e.ErrorMessage)) {
+            _logger.LogInformation($"Delta hedge order failed to be placed. Delay hedging");
+            _hedgeDelay = _timeProvider.GetUtcNow().AddHours(1);
+            _activeOrderId = null; // Reset active order ID
+            return;
+        }
+
     }
 
     public void Dispose()

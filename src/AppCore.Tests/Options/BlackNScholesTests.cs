@@ -70,5 +70,19 @@ public class BlackNScholesTests
         Assert.AreEqual(optionPrice, putPrice, 0.005f);
     }
 
-
+    [TestMethod]
+    [DataRow(6100f, 6000f, 4, 0.25f, 0.2681f, -0.0266f)]
+    [DataRow(6100f, 6000f, 3, 0.25f, 0.2364f, -0.0381f)]
+    [DataRow(6100f, 6000f, 2, 0.25f, 0.1884f, -0.0609f)]
+    public void TestBlackNScholes_CallCharm(float strike, float stockPrice, float daysLeft, float iv, float expectedDelta, float expectedCharm) {
+        var bls = new BlackNScholesCaculator {
+            StockPrice = stockPrice,
+            Strike = strike,
+            DaysLeft = daysLeft,
+            ImpliedVolatility = iv
+        };
+        bls.CalculateAll();
+        Assert.AreEqual(expectedDelta, bls.DeltaCall, 0.005f);
+        Assert.AreEqual(expectedCharm, bls.CharmCall, 0.005f);
+    }
 }

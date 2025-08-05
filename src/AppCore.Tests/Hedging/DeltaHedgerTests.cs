@@ -50,7 +50,7 @@ public sealed class DeltaHedgerTests
         callOptionPosition.Size = callSize;
         positions.TryAdd(callOptionPosition.Contract.Id, callOptionPosition);
 
-        var deltaHedgerFactory = new DeltaHedgerFactory(NullLogger<DeltaHedger>.Instance);
+        var deltaHedgerFactory = new DeltaHedgerFactory(NullLogger<DeltaHedger>.Instance, time);
         var deltaHedgerConfiguration = new DeltaHedgerConfiguration {
             Configs = new ()
             {
@@ -110,7 +110,7 @@ public sealed class DeltaHedgerTests
         putOptionPosition.MarketPrice = putOptionMarketPrice;
         putOptionPosition.Size = putSize;
         positions.TryAdd(putOptionPosition.Contract.Id, putOptionPosition);
-        var deltaHedgerFactory = new DeltaHedgerFactory(NullLogger<DeltaHedger>.Instance);
+        var deltaHedgerFactory = new DeltaHedgerFactory(NullLogger<DeltaHedger>.Instance, time);
         var deltaHedgerConfiguration = new DeltaHedgerConfiguration {
             Configs = new ()
             {

@@ -130,6 +130,11 @@ public class IBClient : IBroker
     /// </summary>
     public event EventHandler<ContractDetailsArgs>? OnContractDetails;
 
+    /// <summary>
+    /// On order placed event.
+    /// </summary>
+    public event EventHandler<OrderPlacedArgs>? OnOrderPlaced;
+
     #endregion
 
     #region Public Methods
@@ -292,10 +297,10 @@ public class IBClient : IBroker
 
     #region IBroker
 
-    public void PlaceOrder(string accountId, Contract contract, float size) {
+    public void PlaceOrder(string accountId, Guid orderId, Contract contract, float size) {
         _logger.LogInformation($"Placing order for {size} {contract}");
 
-        var request = new Requests.PlaceOrder(accountId, contract, size, _brokerConfiguration.APIOperator, BearerToken) {
+        var request = new Requests.PlaceOrder(accountId, orderId, contract, size, _brokerConfiguration.APIOperator, OnOrderPlaced, BearerToken) {
             Logger = AppCore.ServiceProvider.Instance.GetService<ILogger<Requests.Request>>()
         };
 
