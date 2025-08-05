@@ -7,7 +7,7 @@
   <!-- Package Versions -->
   <PropertyGroup Label="Package Versions">
     <MicrosoftNETTestSdkVersion>17.14.1</MicrosoftNETTestSdkVersion>
-    <MSTestVersion>3.10.1</MSTestVersion>
+    <MSTestVersion>3.10.0</MSTestVersion>
     <MicrosoftExtensionsVersion>9.0.8</MicrosoftExtensionsVersion>
     <MicrosoftWindowsSDKVersion>10.0.26100.4654</MicrosoftWindowsSDKVersion>
   </PropertyGroup>
