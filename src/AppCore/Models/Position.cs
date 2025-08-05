@@ -28,6 +28,10 @@ public class Position
             if (value.HasValue && value <= 0 && Contract.AssetClass != AssetClass.FutureOption && Contract.AssetClass != AssetClass.Option) {
                 throw new ArgumentOutOfRangeException(nameof(value), "Market price must be greater than 0 for futures.");
             }
+            // DEBUG
+            if (Contract.Symbol == "ES" && Contract.AssetClass == AssetClass.Future && value.HasValue && value < 1000) {
+                throw new ArgumentOutOfRangeException(nameof(value), "Market price for ES should not be less than 1000.");
+            }
             _marketPrice = value;
         }
     }

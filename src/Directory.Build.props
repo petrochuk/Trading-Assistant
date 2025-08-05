@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <LangVersion>13.0</LangVersion>
   </PropertyGroup>
   
   <!-- Package Versions -->

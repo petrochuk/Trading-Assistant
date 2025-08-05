@@ -1,5 +1,6 @@
 ﻿using AppCore;
 using AppCore.Configuration;
+using AppCore.Extenstions;
 using AppCore.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,6 +8,7 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace InteractiveBrokers;
 
@@ -46,6 +48,8 @@ public class IBWebSocket : IDisposable
     private IReadOnlyList<Account>? _accounts;
     private readonly BrokerConfiguration _brokerConfiguration;
     private readonly AuthenticationConfiguration _authConfiguration;
+    private static readonly string[] AccountKeys = ["NetLiquidation"];
+    private const string AccountDataHeader = "ssd+";
 
     #endregion
 
@@ -86,7 +90,11 @@ public class IBWebSocket : IDisposable
 
     public event EventHandler? Connected;
 
+    public event EventHandler? Connected2;
+
     #endregion
+
+    #region Public Request Methods
 
     public void RequestMarketData(IReadOnlyList<Account> accounts) {
         if (accounts == null || accounts.Count == 0) {
@@ -110,6 +118,10 @@ public class IBWebSocket : IDisposable
 
         StopMarketData(position);
     }
+
+    #endregion
+
+    #region Private Methods
 
     private void EnsureSocketConnected() {
         if (_mainThread.ThreadState.HasFlag(ThreadState.Unstarted)) {
@@ -169,6 +181,10 @@ public class IBWebSocket : IDisposable
                             else if (topicString == "smd") {
                                 HandleDataNotification(message);
                             }
+                            else if (topicString.StartsWith(AccountDataHeader)){
+                                _logger.LogTrace($"Account data: {messageString}");
+                                HandleAccountData(topicString.Substring(AccountDataHeader.Length), messageString);
+                            }
                             else {
                                 _logger.LogWarning($"Unknown topic: {topicString}");
                             }
@@ -192,6 +208,10 @@ public class IBWebSocket : IDisposable
         _logger.LogInformation($"WebSocket thread finished");
     }
 
+    private void HandleAccountData(string accountId, string messageString) {
+        var accountData = JsonSerializer.Deserialize(messageString, SourceGeneratorContext.Default.AccountData);
+    }
+
     private void HandleDataNotification(Dictionary<string, JsonElement> message) {
         if (message.TryGetValue("error", out var errorElement)) {
             _logger.LogError($"Data error: {errorElement.GetString()}");
@@ -204,6 +224,10 @@ public class IBWebSocket : IDisposable
     private void HandleSystemMessage(Dictionary<string, JsonElement> message) {
         if (message.TryGetValue("success", out var successElement)) {
             _logger.LogInformation($"success message: {successElement.GetString()}");
+
+            foreach (var account in _accounts ?? Enumerable.Empty<Account>()) {
+                RequestAccountUpdates(account.Id);
+            }
             _connectedEvent.Set();
             Connected?.Invoke(this, EventArgs.Empty);
         }
@@ -228,6 +252,18 @@ public class IBWebSocket : IDisposable
             _logger.LogTrace($"Requesting market data for stock {position.Contract}");
             _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
+    }
+
+    private void RequestAccountUpdates(string accountId) {
+        if (_clientWebSocket == null || _clientWebSocket.State != WebSocketState.Open) {
+            _logger.LogError($"WebSocket is not connected. Cannot request account updates for {accountId.Mask()}");
+            return;
+        }
+        var request = $@"ssd+{accountId}+{{""keys"":[""{string.Join(',', AccountKeys)}""],""fields"":[""currency"",""monetaryValue""]}}";
+        // All keys
+        // var request = $@"ssd+{accountId}+{{""keys"":[],""fields"":[""currency"",""monetaryValue""]}}";
+        _logger.LogTrace($"Requesting account updates for {accountId.Mask()}");
+        _clientWebSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
     }
 
     private void StopMarketData(Position position) {
@@ -332,6 +368,8 @@ public class IBWebSocket : IDisposable
             }
         }
     }
+
+    #endregion
 
     #region IDisposable
 

@@ -83,7 +83,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
             var deltaWithCharm = greeks.Value.Delta + greeks.Value.Charm;
             if (MathF.Abs(deltaWithCharm) < _configuration.Delta + _configuration.MinDeltaAdjustment) {
-                _logger.LogDebug($"Delta with Charm is within threshold: {MathF.Abs(deltaWithCharm):f3} < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta:f3}, Charm: {greeks.Value.Charm:f3}. No hedging required.");
+                _logger.LogDebug($"Delta with Charm is within threshold: Abs({deltaWithCharm:f3}) < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta:f3}, Charm: {greeks.Value.Charm:f3}. No hedging required.");
                 return;
             }
 
