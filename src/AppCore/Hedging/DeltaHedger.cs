@@ -87,7 +87,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                 return;
             }
 
-            _logger.LogInformation($"Delta with Charm: {MathF.Abs(deltaWithCharm):f3} exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta:f3}, Charm: {greeks.Value.Charm:f3}. Executing hedge.");
+            _logger.LogInformation($"Delta with Charm: Abs({deltaWithCharm:f3}) exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta:f3}, Charm: {greeks.Value.Charm:f3}. Executing hedge.");
 
             // Round delta down to 0 in whole numbers
             var deltaHedgeSize = 0 < deltaWithCharm ? MathF.Ceiling(_configuration.Delta - deltaWithCharm) : MathF.Floor(-_configuration.Delta - deltaWithCharm);
