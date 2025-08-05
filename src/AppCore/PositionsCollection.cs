@@ -192,8 +192,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         var greeks = new Greeks();
         lock (_lock) {
             foreach (var position in Values) {
-                // Skip any positions that are not in the same underlying
-                if (position.Contract.Symbol != underlyingPosition.Contract.Symbol) {
+                // Skip any positions that are not in the same underlying, 0 size
+                if (position.Contract.Symbol != underlyingPosition.Contract.Symbol || 
+                    position.Size == 0) {
                     continue;
                 }
 
@@ -206,6 +207,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     greeks.Delta += position.Size;
                 }
                 else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
+                    // Skip expired options
+                    if (position.Contract.Expiration!.Value <= _timeProvider.EstNow()) {
+                        continue;
+                    }
+
                     //greeks.Delta += position.Delta.Value * position.Size;
                     var bls = new BlackNScholesCaculator();
                     bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
