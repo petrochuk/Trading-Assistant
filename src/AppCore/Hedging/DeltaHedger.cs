@@ -124,6 +124,8 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         }
 
         _logger.LogInformation($"Delta hedge order {_activeOrderId} placed successfully for contract {_underlyingPosition.Contract}.");
+        // Set a delay to prevent immediate re-hedging
+        _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(15);
         _activeOrderId = null; // Reset active order ID after successful placement
     }
 
