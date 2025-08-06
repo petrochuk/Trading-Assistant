@@ -34,6 +34,7 @@ public class SecurityDefinition
     public bool hasOptions { get; set; }
     public string fullName { get; set; }
     public bool isEventContract { get; set; }
+    public bool isUS { get; set; }
     public int pageSize { get; set; }
 
     public static DayOfWeek WeekCodeToDayOfWeek(string symbol, char weekCode) {
@@ -69,4 +70,3 @@ public class SecurityDefinition
         throw new ArgumentException($"Unsupported symbol: {symbol}");
     }
 }
-
