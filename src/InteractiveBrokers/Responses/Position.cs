@@ -53,7 +53,10 @@ public class Position : IPosition, IJsonOnDeserialized
 
     public object exerciseStyle { get; set; }
     public object[] conExchMap { get; set; }
-    public AssetClass assetClass { get; set; }
+
+    [JsonPropertyName("assetClass")]
+    public AssetClass? AssetClassModel { get; set; }
+
     public int undConid { get; set; }
     public string model { get; set; }
     public float baseMktValue { get; set; }
@@ -102,12 +105,13 @@ public class Position : IPosition, IJsonOnDeserialized
         }
     }
 
-    AssetClass IPosition.AssetClass => assetClass;
+    [JsonIgnore]
+    public AssetClass AssetClass => AssetClassModel != null ? AssetClassModel.Value : secType.ToAssetClass();
 
     float IPosition.Multiplier {
         get {
             if (!multiplier.HasValue || multiplier.Value == 0) {
-                if (assetClass == AssetClass.Stock)
+                if (AssetClass == AssetClass.Stock)
                     return 1;
 
                 throw new InvalidOperationException("No multiplier value available.");
@@ -176,7 +180,7 @@ public class Position : IPosition, IJsonOnDeserialized
 
         // Fix multiplier
         if (!multiplier.HasValue) {
-            switch (assetClass) {
+            switch (AssetClass) {
                 case AssetClass.Future:
                 case AssetClass.FutureOption:
                     // For futures and future options, we can use the known multiplier
@@ -204,7 +208,7 @@ public class Position : IPosition, IJsonOnDeserialized
             float.TryParse(JsonStrike.GetString(), out result);
         }
 
-        switch (assetClass) {
+        switch (AssetClass) {
             case AssetClass.Option:
             case AssetClass.FutureOption:
                 if (result != 0) {
@@ -223,7 +227,7 @@ public class Position : IPosition, IJsonOnDeserialized
 
         // Fix put/call
         if (string.IsNullOrWhiteSpace(putOrCall)) {
-            switch (assetClass) {
+            switch (AssetClass) {
                 case AssetClass.Option:
                 case AssetClass.FutureOption:
                     if (descriptionParts.Length >= 4 && (descriptionParts[3] == "C" || descriptionParts[3] == "P"))
@@ -235,7 +239,7 @@ public class Position : IPosition, IJsonOnDeserialized
 
     private void DeserializeExpiry(string[] descriptionParts) {
         // Deserialize expiry
-        switch (assetClass) {
+        switch (AssetClass) {
             case AssetClass.Option:
                 DeserializeOptionExpiry(descriptionParts);
                 break;
@@ -257,13 +261,13 @@ public class Position : IPosition, IJsonOnDeserialized
                 }
                 else if (DateTime.TryParseExact(ExpiryString, "MMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out expiration)) {
 
-                    if (assetClass == AssetClass.Future) {
+                    if (AssetClass == AssetClass.Future) {
                         var thirdFriday = expiration.NextThirdFriday();
                         // Add default expiration time of 16:00:00 EST
                         var expirationDate = new DateTime(thirdFriday.Year, thirdFriday.Month, thirdFriday.Day, 16, 0, 0, DateTimeKind.Unspecified);
                         _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(thirdFriday));
                     }
-                    else if (assetClass == AssetClass.FutureOption) {
+                    else if (AssetClass == AssetClass.FutureOption) {
                         if (descriptionParts.Length < 5) {
                             if (Symbol == "ES") {
                                 var thirdFriday = expiration.NextThirdFriday();

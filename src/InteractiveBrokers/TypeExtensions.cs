@@ -21,4 +21,22 @@ internal static class TypeExtensions
             _ => throw new ArgumentOutOfRangeException(nameof(assetClass), assetClass, null)
         };
     }
+
+    public static AssetClass ToAssetClass(this string securityType)
+    {
+        return securityType switch
+        {
+            "STK" => AssetClass.Stock,
+            "BND" => AssetClass.Bond,
+            "OPT" => AssetClass.Option,
+            "FUT" => AssetClass.Future,
+            "FOP" => AssetClass.FutureOption,
+            "CASH" => AssetClass.Cash,
+            "FND" => AssetClass.MutualFund,
+            "WAR" => AssetClass.Warrant,
+            "CFD" => AssetClass.ContractForDifference,
+            "EFP" => AssetClass.ExchangeForPhysical,
+            _ => throw new ArgumentOutOfRangeException(nameof(securityType), securityType, null)
+        };
+    }
 }

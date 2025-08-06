@@ -1,4 +1,5 @@
-﻿using AppCore.Models;
+﻿using AppCore;
+using AppCore.Models;
 using System.Text.Json;
 
 namespace InteractiveBrokers.Tests
@@ -8,20 +9,25 @@ namespace InteractiveBrokers.Tests
     {
         [TestMethod]
         [DataRow("""{"acctId":"U*******","conid":"784136636","contractDesc":"ES     JUN2025 6040 C (E2D)","position":-1.0,"mktPrice":17.543211,"mktValue":-877.16,"currency":"USD","avgCost":1761.08,"avgPrice":35.2216,"realizedPnl":0.0,"unrealizedPnl":883.92,"exchs":null,"expiry":null,"putOrCall":null,"multiplier":null,"strike":0.0,"exerciseStyle":null,"conExchMap":[],"assetClass":"FOP","undConid":0,"model":""}""",
-            2025, 6, 12, 16, 0)]
+            AssetClass.FutureOption, 2025, 6, 12, 16, 0)]
         [DataRow("""{"acctId":"U*******","conid":"784391272","contractDesc":"ES     JUN2025 6010 C (EW2)","position":-1.0,"mktPrice":28.3278103,"mktValue":-1416.39,"currency":"USD","avgCost":1448.58,"avgPrice":28.9716,"realizedPnl":0.0,"unrealizedPnl":32.19,"exchs":null,"expiry":null,"putOrCall":null,"multiplier":null,"strike":0.0,"exerciseStyle":null,"conExchMap":[],"assetClass":"FOP","undConid":0,"model":""}""",
-            2025, 6, 13, 16, 0)]
+            AssetClass.FutureOption, 2025, 6, 13, 16, 0)]
         [DataRow("""{"acctId":"U*******","conid":"785625295","contractDesc":"ZN     JUN2025 112.75 C (ZN2)","position":-1.0,"mktPrice":0.0578679,"mktValue":-57.87,"currency":"USD","avgCost":45.155,"avgPrice":0.045155,"realizedPnl":0.0,"unrealizedPnl":-12.71,"exchs":null,"expiry":null,"putOrCall":null,"multiplier":null,"strike":0.0,"exerciseStyle":null,"conExchMap":[],"assetClass":"FOP","undConid":0,"model":""}""",
-            2025, 6, 13, 16, 0)]
+            AssetClass.FutureOption, 2025, 6, 13, 16, 0)]
         [DataRow("""{"acctId":"U*******","conid":"767939135","contractDesc":"SPXU   JUN2025 40 C [SPXU  250620C00040000 100]","position":-5.0,"mktPrice":8.5215E-4,"mktValue":-0.43,"currency":"USD","avgCost":0.0,"avgPrice":0.0,"realizedPnl":0.0,"unrealizedPnl":-0.43,"exchs":null,"expiry":null,"putOrCall":null,"multiplier":null,"strike":0.0,"exerciseStyle":null,"conExchMap":[],"assetClass":"OPT","undConid":0,"model":""}""",
-            2025, 6, 20, 16, 0)]
-        public void ParsePosition(string positionJson, int expectedYear, int expectedMonth, int expectedDay, int expectedHour, int expectedMinute) {
+            AssetClass.Option, 2025, 6, 20, 16, 0)]
+        [DataRow("""{"position":1.0,"conid":"796297203","avgCost":13.92,"avgPrice":0.2784,"currency":"USD","description":"ES     AUG2025 6000 P (E1C)","isLastToLoq":false,"marketPrice":0.025304630398750305,"marketValue":1.2652315199375153,"realizedPnl":0.0,"secType":"FOP","timestamp":1754498735,"unrealizedPnl":-12.654768480062485,"model":""}""",
+            AssetClass.FutureOption, 2025, 8, 6, 16, 0)]
+        [DataRow("""{"position":1.0,"conid":"796297203","avgCost":13.92,"avgPrice":0.2784,"currency":"USD","description":"ES     AUG2025 6000 P (E1C)","isLastToLoq":false,"marketPrice":0.025304630398750305,"marketValue":1.2652315199375153,"realizedPnl":0.0,"secType":"FOP","timestamp":1754499149,"unrealizedPnl":-12.654768480062485,"assetClass":"FOP","sector":null,"group":null,"model":""}""",
+            AssetClass.FutureOption, 2025, 8, 6, 16, 0)]
+        public void ParsePosition(string positionJson, AssetClass expectedAssetClass, int expectedYear, int expectedMonth, int expectedDay, int expectedHour, int expectedMinute) {
 
             // Act
             var position = JsonSerializer.Deserialize(positionJson, SourceGeneratorContext.Default.Position) as IPosition;
 
             // Asset
             Assert.IsNotNull(position, "Position should not be null after deserialization.");
+            Assert.AreEqual(expectedAssetClass, position.AssetClass, "Asset class does not match expected value.");
             Assert.IsNotNull(position.Expiration, "Expiration should not be null.");
             Assert.AreEqual(expectedYear, position.Expiration.Value.Year, "Expiration year does not match expected value.");
             Assert.AreEqual(expectedMonth, position.Expiration.Value.Month, "Expiration month does not match expected value.");

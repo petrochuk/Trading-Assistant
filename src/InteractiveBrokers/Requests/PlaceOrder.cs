@@ -85,6 +85,7 @@ internal class PlaceOrder : Request
             Logger?.LogWarning($"Failed to parse success response will try to parse error: {ex.Message}");
             var errorResponse = JsonSerializer.Deserialize(responseContent, SourceGeneratorContext.Default.PlaceOrderError);
 
+            Logger?.LogError($"{errorResponse?.Error}");
             _responseHandler?.Invoke(this, new OrderPlacedArgs {
                 AccountId = _accountId,
                 OrderId = _orderId,
