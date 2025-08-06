@@ -92,6 +92,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         continue;
                     }
                     var position = new Position(positionKV.Value);
+                    if (position.Contract.Symbol == "ES" && position.Contract.AssetClass == AssetClass.Future && position.Contract.Id != 637533641)
+                        Debugger.Break();
                     if (TryAdd(positionKV.Key, position)) {
                         _logger.LogInformation($"Added {position.Size} position {position.Contract}");
                         OnPositionAdded?.Invoke(this, position);
@@ -112,6 +114,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 return null;
             }
             var position = new Position(contract);
+            if (position.Contract.Symbol == "ES" && position.Contract.AssetClass == AssetClass.Future && position.Contract.Id != 637533641)
+                Debugger.Break();
             TryAdd(contract.Id, position);
 
             return position;
@@ -144,6 +148,18 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     if (existingUnderlying == null)
                         Underlyings.Add(position);
                     break;
+                case AssetClass.Option:
+                    if (existingUnderlying == null) {
+                        // Add placeholder for position
+                        var contract = new Contract() {
+                            Symbol = position.Contract.Symbol,
+                            AssetClass = AssetClass.Stock,
+                        };
+                        Underlyings.Add(new Position(contract) {
+                            Size = 0
+                        });
+                    }
+                    break;
                 case AssetClass.Future:
                     // Replace with front month future
                     if (existingUnderlying != null && position.Contract.Expiration <= existingUnderlying.Contract.Expiration) {
@@ -159,10 +175,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                             AssetClass = AssetClass.Future,
                             Expiration = _expirationCalendar.GetFrontMonthExpiration(position.Contract.Symbol, _timeProvider.EstNow()),
                         };
-                        var zeroPosition = new Position(contract) {
+                        Underlyings.Add(new Position(contract) {
                             Size = 0
-                        };
-                        Underlyings.Add(zeroPosition);
+                        });
                     }
                     break;
             }

@@ -61,6 +61,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         App.Instance.IBClient.OnContractDetails += IBClient_OnContractDetails;
 
         App.Instance.IBWebSocket.Connected += IBWebSocket_Connected;
+        App.Instance.IBWebSocket.OnAccountData += IBWebSocket_AccountData;
     }
 
     #endregion
@@ -319,6 +320,28 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         RequestMarketDataForAccount(_activeAccount);
+    }
+
+    private void IBWebSocket_AccountData(object? sender, AccountDataArgs e) {
+
+        var account = _accounts.FirstOrDefault(a => a.Id == e.AccountId);
+        if (account == null) {
+            _logger.LogInformation($"Account {e.AccountId} not found in list of accounts");
+            return;
+        }
+
+        switch (e.DataKey) {
+            case "NetLiquidation":
+                if (e.MonetaryValue.HasValue) {
+                    account.NetLiquidationValue = e.MonetaryValue.Value;
+                    if (_activeAccount != null && _activeAccount.Id == e.AccountId) {
+                        DispatcherQueue?.TryEnqueue(() => {
+                            RiskGraphControl.Redraw();
+                        });
+                    }
+                }
+                break;
+        }
     }
 
     #endregion

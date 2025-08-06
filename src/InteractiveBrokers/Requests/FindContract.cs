@@ -37,7 +37,8 @@ internal class FindContract : Request
         }
 
         // Find contract with lowest expiration date
-        Models.Contract? contract;
+        Models.Contract? contract = null;
+        int contractId = 0;
         if (_contract.Expiration != null) {
             var expirationDate = _contract.Expiration.Value.ToString("yyyyMMdd");
             contract = contractsResponse.First().Value
@@ -46,20 +47,43 @@ internal class FindContract : Request
             if (contract == null) {
                 throw new IBClientException($"No {_contract.Symbol} contracts found with the expiration date of {_contract.Expiration.Value:yyyy-MM-dd}");
             }
+            contractId = contract.conid;
         }
         else {
-            contract = contractsResponse.First().Value
-                .OrderBy(c => c.expirationDate)
-                .First();
+            if (_contract.AssetClass == AssetClass.Stock) {
+                foreach (var response in contractsResponse.First().Value) {
+                    if (response.assetClass != _contract.AssetClass)
+                        continue;
+
+                    foreach (var innerContract in response.contracts) {
+                        if (innerContract.isUS) {
+                            contractId = innerContract.conid;
+                            break;
+                        }
+                    }
+
+                    if (contractId != 0)
+                        break;
+                }
+                if (contractId == 0) {
+                    throw new IBClientException($"No {_contract.Symbol} contracts found for US exchange");
+                }
+            }
+            else {
+                contract = contractsResponse.First().Value
+                    .OrderBy(c => c.expirationDate)
+                    .First();
+                contractId = contract.conid;
+            }
         }
 
         var contractDetails = new ContractFoundArgs {
             Contract = new () {
-                Symbol = contract.symbol,
+                Symbol = _contract.Symbol,
                 AssetClass = _contract.AssetClass,
-                Id = contract.conid,
-                UnderlyingContractId = contract.underlyingConid,
-                Expiration = DateTime.ParseExact(contract.expirationDate.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture),
+                Id = contractId,
+                UnderlyingContractId = contract != null ? contract.underlyingConid : null,
+                Expiration = contract != null ? DateTime.ParseExact(contract.expirationDate.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture) : null,
             }
         };
 

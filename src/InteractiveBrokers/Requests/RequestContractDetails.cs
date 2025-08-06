@@ -34,11 +34,12 @@ internal class RequestContractDetails : Request
                     "STK" => AssetClass.Stock,
                     "OPT" => AssetClass.Option,
                     "FUT" => AssetClass.Future,
+                    "FOP" => AssetClass.FutureOption,
                     _ => throw new IBClientException($"Invalid contract asset class {contract.assetClass} for contract request"),
                 },
                 Id = contract.conid,
                 UnderlyingContractId = contract.undConid,
-                Expiration = DateTime.ParseExact(contract.expiry, "yyyyMMdd", CultureInfo.InvariantCulture),
+                Expiration = contract.expiry != null ? DateTime.ParseExact(contract.expiry, "yyyyMMdd", CultureInfo.InvariantCulture) : null,
                 Multiplier = contract.multiplier,
             }
         };

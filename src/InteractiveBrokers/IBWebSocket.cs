@@ -1,4 +1,5 @@
 ﻿using AppCore;
+using AppCore.Args;
 using AppCore.Configuration;
 using AppCore.Extenstions;
 using AppCore.Models;
@@ -90,7 +91,7 @@ public class IBWebSocket : IDisposable
 
     public event EventHandler? Connected;
 
-    public event EventHandler? Connected2;
+    public event EventHandler<AccountDataArgs>? OnAccountData;
 
     #endregion
 
@@ -210,6 +211,18 @@ public class IBWebSocket : IDisposable
 
     private void HandleAccountData(string accountId, string messageString) {
         var accountData = JsonSerializer.Deserialize(messageString, SourceGeneratorContext.Default.AccountData);
+        if (accountData == null) {
+            _logger.LogError($"Failed to deserialize account data for {accountId}");
+            return;
+        }
+
+        foreach (var result in accountData.Result) {
+            OnAccountData?.Invoke(this, new AccountDataArgs {
+                AccountId = accountId,
+                DataKey = result.Key,
+                MonetaryValue = result.MonetaryValue.ValueKind == JsonValueKind.Number ? result.MonetaryValue.GetSingle() : null
+            });
+        }
     }
 
     private void HandleDataNotification(Dictionary<string, JsonElement> message) {
@@ -259,9 +272,9 @@ public class IBWebSocket : IDisposable
             _logger.LogError($"WebSocket is not connected. Cannot request account updates for {accountId.Mask()}");
             return;
         }
-        var request = $@"ssd+{accountId}+{{""keys"":[""{string.Join(',', AccountKeys)}""],""fields"":[""currency"",""monetaryValue""]}}";
-        // All keys
-        // var request = $@"ssd+{accountId}+{{""keys"":[],""fields"":[""currency"",""monetaryValue""]}}";
+        var request = $@"{AccountDataHeader}{accountId}+{{""keys"":[""{string.Join(',', AccountKeys)}""],""fields"":[""currency"",""monetaryValue""]}}";
+        // All keys for debugging purposes
+        // var request = $@"{AccountDataHeader}{accountId}+{{""keys"":[],""fields"":[""currency"",""monetaryValue""]}}";
         _logger.LogTrace($"Requesting account updates for {accountId.Mask()}");
         _clientWebSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
     }
