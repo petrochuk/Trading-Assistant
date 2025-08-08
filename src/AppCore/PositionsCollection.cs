@@ -236,20 +236,23 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     bls.CalculateAll();
 
                     var charm = (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut);
+                    var theta = (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut);
                     // If the position is close to expiration, charm can go to infinity. Estimate it as diff from delta.
                     if (bls.DaysLeft <= 1) {
                         if (position.Contract.IsCall) {
                             charm = bls.DeltaCall > 0.5 ? 1 - bls.DeltaCall : -bls.DeltaCall;
+                            theta = bls.DeltaCall > 0.5 ? -bls.PutValue : -bls.CallValue;
                         }
                         else {
                             charm = bls.DeltaPut < -0.5 ? 1 + bls.DeltaPut : -bls.DeltaPut;
+                            theta = bls.DeltaPut < -0.5 ? -bls.CallValue : -bls.PutValue;
                         }
                     }
 
                     greeks.Delta += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size;
-                    greeks.Theta += (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut) * position.Size * position.Contract.Multiplier;
+                    greeks.Theta += theta * position.Size * position.Contract.Multiplier;
                     greeks.Charm += charm * position.Size;
                 }
                 else {
