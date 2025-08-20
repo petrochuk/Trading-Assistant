@@ -93,6 +93,8 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             var deltaHedgeSize = 0 < deltaWithCharm ? MathF.Ceiling(_configuration.Delta - deltaWithCharm) : MathF.Floor(-_configuration.Delta - deltaWithCharm);
 
             _logger.LogDebug($"Placing delta hedge size: {deltaHedgeSize} for contract {_underlyingPosition.Contract}");
+            // Set a delay to prevent immediate re-hedging
+            _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(15);
             _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
             _broker.PlaceOrder(_accountId, _activeOrderId.Value, Contract, deltaHedgeSize);
         }
@@ -124,8 +126,6 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         }
 
         _logger.LogInformation($"Delta hedge order {_activeOrderId} placed successfully for contract {_underlyingPosition.Contract}.");
-        // Set a delay to prevent immediate re-hedging
-        _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(15);
         _activeOrderId = null; // Reset active order ID after successful placement
     }
 

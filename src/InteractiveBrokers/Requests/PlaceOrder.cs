@@ -80,6 +80,12 @@ internal class PlaceOrder : Request
                     Logger?.LogWarning($"IBKR: {message}");
                 }
             }
+
+            _responseHandler?.Invoke(this, new OrderPlacedArgs {
+                AccountId = _accountId,
+                OrderId = _orderId,
+                Contract = Contract,
+            });
         }
         catch (JsonException ex) {
             Logger?.LogWarning($"Failed to parse success response will try to parse error: {ex.Message}");

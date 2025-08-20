@@ -14,5 +14,5 @@ public class OrderPlacedArgs : EventArgs
 
     public required Contract Contract { get; init; }
 
-    public required string ErrorMessage { get; init; } = string.Empty;
+    public string ErrorMessage { get; init; } = string.Empty;
 }

@@ -162,7 +162,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     break;
                 case AssetClass.Future:
                     // Replace with front month future
-                    if (existingUnderlying != null && position.Contract.Expiration <= existingUnderlying.Contract.Expiration) {
+                    if (existingUnderlying != null && position.Contract.Expiration < existingUnderlying.Contract.Expiration) {
                         Underlyings.Remove(existingUnderlying);
                         Underlyings.Add(position);
                     }
