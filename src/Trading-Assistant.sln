@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppCore.Tests", "AppCore.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteractiveBrokers.Tests", "InteractiveBrokers.Tests\InteractiveBrokers.Tests.csproj", "{B0333324-D0DE-4C86-B794-245EB339CE3E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Simulation", "Simulation\Simulation.csproj", "{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -103,6 +105,18 @@ Global
 		{B0333324-D0DE-4C86-B794-245EB339CE3E}.Release|x64.Build.0 = Release|Any CPU
 		{B0333324-D0DE-4C86-B794-245EB339CE3E}.Release|x86.ActiveCfg = Release|Any CPU
 		{B0333324-D0DE-4C86-B794-245EB339CE3E}.Release|x86.Build.0 = Release|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Debug|x64.Build.0 = Debug|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Debug|x86.Build.0 = Debug|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Release|ARM64.Build.0 = Release|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Release|x64.ActiveCfg = Release|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Release|x64.Build.0 = Release|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Release|x86.ActiveCfg = Release|Any CPU
+		{169CDC46-6D6E-43CD-B6A0-23731ED0B3EC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
