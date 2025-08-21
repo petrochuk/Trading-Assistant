@@ -397,7 +397,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
     private void RealizedVolTimer(object? sender, System.Timers.ElapsedEventArgs e)
     {
-        foreach (var position in Values)
+        foreach (var position in Underlyings)
         {
             if (position.Contract.AssetClass != AssetClass.Stock && position.Contract.AssetClass != AssetClass.Future)
                 continue;
