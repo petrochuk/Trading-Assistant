@@ -79,6 +79,9 @@ internal class PlaceOrder : Request
                 foreach (var message in placedOrderResponse.Messages) {
                     Logger?.LogWarning($"IBKR: {message}");
                 }
+                foreach (var messageId in placedOrderResponse.MessageIds) {
+                    Logger?.LogWarning($"IBKR message id: {messageId}");
+                }
             }
 
             _responseHandler?.Invoke(this, new OrderPlacedArgs {
