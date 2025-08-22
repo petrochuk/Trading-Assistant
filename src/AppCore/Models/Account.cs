@@ -113,7 +113,7 @@ public class Account : IDisposable
                 return;
             }
 
-            _logger.LogDebug($"Executing {_deltaHedgers.Count} delta hedger(s)");
+            _logger.LogDebug($"Executing {_deltaHedgers.Count} delta hedger(s) on '{Name}'");
 
             foreach (var hedger in _deltaHedgers.Values)
             {
