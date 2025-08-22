@@ -251,8 +251,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
                     greeks.Delta += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
-                    greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size;
+                    greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
                     greeks.Theta += theta * position.Size * position.Contract.Multiplier;
+                    greeks.Vanna += (position.Contract.IsCall ? bls.VannaCall * 0.01f : bls.VannaPut * 0.01f) * position.Size;
                     greeks.Charm += charm * position.Size;
                 }
                 else {

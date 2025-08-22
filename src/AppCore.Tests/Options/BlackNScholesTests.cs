@@ -86,4 +86,16 @@ public class BlackNScholesTests
         Assert.AreEqual(expectedDelta, bls.DeltaCall, 0.005f);
         Assert.AreEqual(expectedCharm, bls.CharmCall, 0.005f);
     }
+
+    [TestMethod]
+    public void TestBlackNScholes_Vega() {
+        var bls = new BlackNScholesCaculator {
+            StockPrice = 5000f,
+            Strike = 5100f,
+            DaysLeft = 30f,
+            ImpliedVolatility = 0.25f
+        };
+        bls.CalculateAll();
+        Assert.AreEqual(5.5557f, bls.VegaCall, 0.0001f);
+    }
 }

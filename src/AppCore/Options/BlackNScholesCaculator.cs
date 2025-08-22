@@ -208,6 +208,19 @@ public class BlackNScholesCaculator
         ThetaPut = (commonTerm + interestTerm * CumulativeNormDist(-d2)) / TimeExtensions.DaysPerYear;
     }
 
+    private void CalculateVega(float d1) {
+        // Vega = S * φ(d1) * sqrt(T). Same for calls and puts.
+        if (ExpiryTime <= 0.0f) {
+            VegaCall = VegaPut = 0.0f;
+            return;
+        }
+        float nPrimeD1 = MathF.Exp(-d1 * d1 / 2.0f) / MathF.Sqrt(2.0f * MathF.PI);
+        float sqrtT = MathF.Sqrt(ExpiryTime);
+        float vega = StockPrice * nPrimeD1 * sqrtT / 100; // per 1.00 change in volatility (i.e., 100 percentage points)
+        VegaCall = vega;
+        VegaPut = vega;
+    }
+
     private void CalculateVanna(float d1, float d2) {
         if (ImpliedVolatility == 0.0f) {
             VannaCall = VannaPut = 0.0f;
@@ -271,6 +284,8 @@ public class BlackNScholesCaculator
         CalculateDelta(d1, d2);
 
         CalculateGama(d1);
+
+        CalculateVega(d1);
 
         CalculateTheta(d1, d2);
 
