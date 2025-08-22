@@ -118,6 +118,20 @@ public class BlackNScholesCaculator
         get; set;
     }
 
+    /// <summary>
+    /// Vanna for Put options - rate of change of delta with respect to volatility and underlying price.
+    /// </summary>
+    public float VannaCall {
+        get; set;
+    }
+
+    /// <summary>
+    /// Vanna for Put options - rate of change of delta with respect to volatility and underlying price.
+    /// </summary>
+    public float VannaPut {
+        get; set;
+    }
+
     public int IterationCounter {
         get; private set;
     }
@@ -194,6 +208,17 @@ public class BlackNScholesCaculator
         ThetaPut = (commonTerm + interestTerm * CumulativeNormDist(-d2)) / TimeExtensions.DaysPerYear;
     }
 
+    private void CalculateVanna(float d1, float d2) {
+        if (ImpliedVolatility == 0.0f) {
+            VannaCall = VannaPut = 0.0f;
+            return;
+        }
+        float N_prime_d1 = MathF.Exp(-d1 * d1 / 2.0f) / MathF.Sqrt(2.0f * MathF.PI);
+        float vanna = -N_prime_d1 * d2 / ImpliedVolatility;
+        VannaCall = vanna;
+        VannaPut = vanna;
+    }
+
     private void CalculateCharm(float d1, float d2) {
         // Avoid division by zero when time to expiration is very small
         if (ExpiryTime <= 0.0f) {
@@ -248,6 +273,8 @@ public class BlackNScholesCaculator
         CalculateGama(d1);
 
         CalculateTheta(d1, d2);
+
+        CalculateVanna(d1, d2);
 
         CalculateCharm(d1, d2);
     }
