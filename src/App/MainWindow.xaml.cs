@@ -22,7 +22,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
     private readonly ILogger<MainWindow> _logger;
     private Account? _activeAccount = null;
-    private List<Account> _accounts = new();
+    private Dictionary<string, Account> _accounts = new();
     private string _ibClientSession = string.Empty;
 
     private Timer _positionsRefreshTimer = new(TimeSpan.FromMinutes(1)) {
@@ -143,11 +143,15 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     private void PositionsRefreshTimer_Elapsed(object? sender, ElapsedEventArgs e) {
-        if (_activeAccount == null || App.Instance == null) {
+        if (App.Instance == null) {
             return;
         }
-        App.Instance.IBClient.RequestAccountPositions(_activeAccount.Id);
-        //App.Instance.IBClient.RequestAccountSummary(_activeAccount.Id);
+
+        // Refresh account positions for each account
+        foreach (var account in _accounts.Values) {
+            App.Instance.IBClient.RequestAccountPositions(account.Id);
+        }
+
         return;
     }
 
@@ -191,7 +195,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             account.Positions.OnPositionAdded += OnPositionAdded;
             account.Positions.OnPositionRemoved += OnPositionRemoved;
             account.Positions.PropertyChanged += Positions_PropertyChanged;
-            _accounts.Add(account);
+            _accounts.Add(brokerAccount.Id, account);
 
             if (_activeAccount != null) {
                 // If this is an Individual account, we want to select the first one
@@ -201,7 +205,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
         if (_activeAccount == null) {
             // If no individual account found, select the first one
-            _activeAccount = _accounts.FirstOrDefault();
+            _activeAccount = _accounts.Values.FirstOrDefault();
         }
 
         RiskGraphControl.Account = _activeAccount;
@@ -214,7 +218,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             }
             ActiveAccountLabel = _activeAccount.Name;
             var menuFlyout = new MenuFlyout();
-            foreach (var account in _accounts) {
+            foreach (var account in _accounts.Values) {
                 var menuItem = new MenuFlyoutItem() {
                     Text = account.Name,
                     Command = new RelayCommand<Account>(ActiveAccount_Click),
@@ -226,7 +230,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             ActiveAccountButton.IsEnabled = true;
         });
 
-        App.Instance.IBWebSocket.RequestMarketData(_accounts);
+        App.Instance.IBWebSocket.RequestMarketData(_accounts.Values.ToList());
         PositionsRefreshTimer_Elapsed(null, new ElapsedEventArgs(DateTime.Now));
     }
 
@@ -239,28 +243,30 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     private void IBClient_AccountSummary(object? sender, AccountSummaryArgs e) {
-        if (_activeAccount == null || _activeAccount.Id != e.accountcode.Value) {
-            _logger.LogInformation($"Summary for account {e.accountcode.Value} not found");
+
+        if (!_accounts.TryGetValue(e.accountcode.Value!, out var account)) {
+            _logger.LogWarning($"Summary for account {e.accountcode.Value} not found");
             return;
         }
 
-        _activeAccount.NetLiquidationValue = e.NetLiquidation.Amount;
+        account.NetLiquidationValue = e.NetLiquidation.Amount;
         DispatcherQueue?.TryEnqueue(() => {
             RiskGraphControl.Redraw();
         });
     }
 
     private void IBClient_AccountPositions(object? sender, AccountPositionsArgs e) {
-        if (_activeAccount == null || _activeAccount.Id != e.AccountId) {
-            _logger.LogInformation($"Positions for account {e.AccountId} not found");
+        // Find account by ID and update positions
+        if (!_accounts.TryGetValue(e.AccountId, out var account)) {
+            _logger.LogWarning($"Account {e.AccountId} not found in list of accounts");
             return;
         }
 
         DispatcherQueue?.TryEnqueue(() => {
-            _activeAccount.Positions.Reconcile(e.Positions);
+            account.Positions.Reconcile(e.Positions);
 
             // Make sure each underlying has a valid contract
-            foreach (var position in _activeAccount.Positions.Underlyings) {
+            foreach (var position in account.Positions.Underlyings) {
                 if (0 < position.Contract.Id) {
                     continue;
                 }
@@ -276,33 +282,32 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     private void IBClient_OnContractDetails(object? sender, ContractDetailsArgs e) {
-        if (_activeAccount == null) {
-            return;
-        }
 
-        foreach (var position in _activeAccount.Positions.Underlyings) {
-            if (position.Contract.Symbol != e.Contract.Symbol) {
-                continue;
-            }
-            
-            if (position.Contract.AssetClass != e.Contract.AssetClass) {
-                continue;
-            }
-            
-            if (position.Contract.AssetClass == AssetClass.Stock) {
-                position.Contract.Id = e.Contract.Id; // Update the contract ID
-                App.Instance.IBWebSocket.RequestPositionMarketData(position);
-                continue;
-            }
-            
-            if (position.Contract.Expiration == null || e.Contract.Expiration == null) {
-                _logger.LogWarning($"Contract {e.Contract.Symbol} has no expiration date, cannot request market data");
-                continue;
-            }
+        foreach (var account in _accounts.Values) {
+            foreach (var position in account.Positions.Underlyings) {
+                if (position.Contract.Symbol != e.Contract.Symbol) {
+                    continue;
+                }
 
-            if (position.Contract.Expiration.Value.Date == e.Contract.Expiration.Value.Date) {
-                position.Contract.Id = e.Contract.Id; // Update the contract ID
-                App.Instance.IBWebSocket.RequestPositionMarketData(position);
+                if (position.Contract.AssetClass != e.Contract.AssetClass) {
+                    continue;
+                }
+
+                if (position.Contract.AssetClass == AssetClass.Stock) {
+                    position.Contract.Id = e.Contract.Id; // Update the contract ID
+                    App.Instance.IBWebSocket.RequestPositionMarketData(position);
+                    continue;
+                }
+
+                if (position.Contract.Expiration == null || e.Contract.Expiration == null) {
+                    _logger.LogWarning($"Contract {e.Contract.Symbol} has no expiration date, cannot request market data");
+                    continue;
+                }
+
+                if (position.Contract.Expiration.Value.Date == e.Contract.Expiration.Value.Date) {
+                    position.Contract.Id = e.Contract.Id; // Update the contract ID
+                    App.Instance.IBWebSocket.RequestPositionMarketData(position);
+                }
             }
         }
     }
@@ -324,9 +329,8 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
     private void IBWebSocket_AccountData(object? sender, AccountDataArgs e) {
 
-        var account = _accounts.FirstOrDefault(a => a.Id == e.AccountId);
-        if (account == null) {
-            _logger.LogInformation($"Account {e.AccountId} not found in list of accounts");
+        if (!_accounts.TryGetValue(e.AccountId, out var account)) {
+            _logger.LogWarning($"Account {e.AccountId} not found in list of accounts");
             return;
         }
 
