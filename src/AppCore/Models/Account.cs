@@ -72,12 +72,12 @@ public class Account : IDisposable
                 if (item is Position position) {
 
                     if (_deltaHedgers.ContainsKey(position.Contract.Id)) {
-                        _logger.LogInformation($"Delta hedger already exists for contract {position.Contract}");
+                        _logger.LogInformation($"Delta hedger already exists for contract {position.Contract} with id: {position.Contract.Id}");
                         continue;
                     }
 
                     if (!_deltaHedgerConfiguration.Configs.ContainsKey(position.Contract.Symbol)) {
-                        _logger.LogInformation($"Delta hedger configuration not found for contract {position.Contract}. Skipping.");
+                        _logger.LogInformation($"Delta hedger configuration not found for contract {position.Contract} with id: {position.Contract.Id}. Skipping.");
                         continue;
                     }
 
