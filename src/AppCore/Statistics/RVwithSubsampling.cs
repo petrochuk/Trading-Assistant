@@ -1,4 +1,6 @@
-﻿namespace AppCore.Statistics;
+﻿using AppCore.Extenstions;
+
+namespace AppCore.Statistics;
 
 /// <summary>
 /// Calculates realized volatility using subsampling method.
@@ -46,8 +48,11 @@ public class RVwithSubsampling
             validSubsampleCount++;
         }
         
-        value = validSubsampleCount > 0 ? total / validSubsampleCount : 0;
+        if (validSubsampleCount <=0)
+            return false;
 
-        return validSubsampleCount > 0;
+        value = total / validSubsampleCount * System.Math.Sqrt(TimeExtensions.DaysPerYear * 24.0 * (60.0 / _period.TotalMinutes));
+
+        return true;
     }
 }

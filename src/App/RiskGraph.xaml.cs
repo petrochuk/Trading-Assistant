@@ -100,7 +100,6 @@ public sealed partial class RiskGraph : UserControl
 
             if (Account.Positions.SelectedPosition.RealizedVol.TryGetValue(out var rv)) {
                 // Annualize RV
-                var annualizalizedRV = rv * System.Math.Sqrt(365.0 * 24.0 * (60.0 / PositionsCollection.RealizedVolPeriod.TotalMinutes));
                 RVText.Text = annualizalizedRV.ToString("P2");
             }
         }

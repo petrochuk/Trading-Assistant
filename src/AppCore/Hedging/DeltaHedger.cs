@@ -81,7 +81,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                 return;
             }
 
-            var deltaPlus1 = greeks.Value.Delta + greeks.Value.Charm + greeks.Value.Vanna;
+            var deltaPlus1 = greeks.Value.Delta + greeks.Value.Charm;
             if (MathF.Abs(deltaPlus1) < _configuration.Delta + _configuration.MinDeltaAdjustment) {
                 _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta:f3}, Charm: {greeks.Value.Charm:f3}. No hedging required.");
                 return;

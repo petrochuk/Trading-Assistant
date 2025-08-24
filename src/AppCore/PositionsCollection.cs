@@ -204,6 +204,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         if (!underlyingPosition.MarketPrice.HasValue || underlyingPosition.MarketPrice == 0)
             return null;
 
+        if (underlyingPosition.RealizedVol == null || !underlyingPosition.RealizedVol.TryGetValue(out var realizedVol))
+            return null;
+
         var greeks = new Greeks();
         lock (_lock) {
             foreach (var position in Values) {
@@ -232,7 +235,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
                     bls.StockPrice = underlyingPosition.MarketPrice.Value;
                     bls.Strike = position.Contract.Strike;
-                    bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice.Value) : bls.GetPutIVBisections(position.MarketPrice.Value);
+                    // Market implied vol
+                    // bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice.Value) : bls.GetPutIVBisections(position.MarketPrice.Value);
+                    // Actual realized vol
+                    bls.ImpliedVolatility = (float)realizedVol;
                     bls.CalculateAll();
 
                     var charm = (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut);
