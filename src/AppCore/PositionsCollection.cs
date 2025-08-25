@@ -193,7 +193,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
     }
 
-    public Greeks? CalculateGreeks(Position? underlyingPosition = null) {
+    public Greeks? CalculateGreeks(float minIV = 0, Position? underlyingPosition = null) {
         if (underlyingPosition == null) {
             if (_selectedPosition == null) {
                 return null;
@@ -206,6 +206,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
         if (underlyingPosition.RealizedVol == null || !underlyingPosition.RealizedVol.TryGetValue(out var realizedVol))
             return null;
+
+        if (realizedVol < minIV) {
+            realizedVol = minIV;
+        }
 
         var greeks = new Greeks();
         lock (_lock) {

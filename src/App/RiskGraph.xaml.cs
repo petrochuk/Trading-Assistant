@@ -100,11 +100,11 @@ public sealed partial class RiskGraph : UserControl
 
             if (Account.Positions.SelectedPosition.RealizedVol.TryGetValue(out var rv)) {
                 // Annualize RV
-                RVText.Text = annualizalizedRV.ToString("P2");
+                RVText.Text = rv.ToString("P2");
             }
         }
 
-        DeltaPlus1Text.Text = $"{greeks.Value.Delta + greeks.Value.Charm + greeks.Value.Vanna:N2}";
+        DeltaPlus1Text.Text = $"{greeks.Value.Delta:N2}";
 
         DeltaText.Text = $"{greeks.Value.Delta:N2}";
         GammaText.Text = $"{greeks.Value.Gamma:N4}";

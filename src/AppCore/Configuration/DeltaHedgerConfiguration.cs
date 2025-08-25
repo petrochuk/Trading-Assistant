@@ -18,6 +18,11 @@ public class DeltaHedgerSymbolConfiguration
     public float Delta { get; set; } = 0f;
 
     /// <summary>
+    /// Minumial IV value
+    /// </summary>
+    public float MinIV { get; set; } = 0f;
+
+    /// <summary>
     /// Minimum delta adjustment to trigger a hedge. It can be 1 contract for futures or 100 shares for stocks.
     /// </summary>
     public float MinDeltaAdjustment { get; set; } = 1f;

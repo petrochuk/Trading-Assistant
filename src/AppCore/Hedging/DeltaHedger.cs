@@ -75,13 +75,13 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         {
             _logger.LogDebug($"Executing delta hedger for contract {_underlyingPosition.Contract}");
 
-            var greeks = _positions.CalculateGreeks(_underlyingPosition);
+            var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition);
             if (greeks == null || float.IsNaN(greeks.Value.Delta) || float.IsNaN(greeks.Value.Charm)) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Contract} or NaN. Cannot hedge.");
                 return;
             }
 
-            var deltaPlus1 = greeks.Value.Delta + greeks.Value.Charm;
+            var deltaPlus1 = greeks.Value.Delta;
             if (MathF.Abs(deltaPlus1) < _configuration.Delta + _configuration.MinDeltaAdjustment) {
                 _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.Delta:f3}, Charm: {greeks.Value.Charm:f3}. No hedging required.");
                 return;
