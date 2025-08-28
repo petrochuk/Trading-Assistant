@@ -8,7 +8,7 @@ namespace AppCore.Statistics;
 public class RVwithSubsampling
 {
     private readonly TimeSpan _period;
-    private List<RollingStandardDeviation> _subsamples = new();
+    private List<EwmaVolatility> _subsamples = new();
     private int _currentSubsampleIndex = 0;
 
     public RVwithSubsampling(TimeSpan period, int subsamplesCount)
@@ -20,7 +20,8 @@ public class RVwithSubsampling
         _period = period;
         for (int i = 0; i < subsamplesCount; i++)
         {
-            _subsamples.Add(new RollingStandardDeviation());
+            //_subsamples.Add(new RollingStandardDeviation());
+            _subsamples.Add(EwmaVolatility.FromPeriod(36));
         }
     }
 
@@ -47,8 +48,8 @@ public class RVwithSubsampling
             total += subsampleValue;
             validSubsampleCount++;
         }
-        
-        if (validSubsampleCount <=0)
+
+        if (validSubsampleCount <= 0)
             return false;
 
         value = total / validSubsampleCount * System.Math.Sqrt(TimeExtensions.DaysPerYear * 24.0 * (60.0 / _period.TotalMinutes));
