@@ -21,7 +21,8 @@ internal class GammaScalping : ISimulation
         var totalPayouts = 0.0f;
         var totalHedgedPayouts = 0.0f;
         var impliedVolatility = 0.2f;
-        var realizedVolatility = 0.20f;
+        var realizedVolatility = 0.2f;
+        var hedgeVolatility = 0.50f;
 
         for (int i = 0; i < numberOfPaths; i++)
         {
@@ -40,6 +41,7 @@ internal class GammaScalping : ISimulation
             var totalQunatity = 0.0f;
             var totalPL = 0.0f;
             var currentDelta = 0.0f;
+            bnsCalc.ImpliedVolatility = hedgeVolatility;
             while (now < expiration - timeStep) {
                 now += timeStep;
                 currentPrice *= 1 + (float)normalDist.Sample();
