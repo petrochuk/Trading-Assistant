@@ -55,6 +55,30 @@ public static class TimeExtensions
         return thirdFriday;
     }
 
+    public static DateTime LastBusinessDayOfMonth(this DateTime date, bool ignoreGoodFriday = false) {
+        // Get the last day of the month
+        var lastDay = new DateTime(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
+
+        // Work backwards to find the last business day
+        while (lastDay.IsHoliday(ignoreGoodFriday) || lastDay.DayOfWeek == DayOfWeek.Saturday || lastDay.DayOfWeek == DayOfWeek.Sunday) {
+            lastDay = lastDay.AddDays(-1);
+        }
+
+        return lastDay;
+    }
+
+    public static DateTimeOffset LastBusinessDayOfMonth(this DateTimeOffset date, bool ignoreGoodFriday = false) {
+        // Get the last day of the month
+        var lastDay = new DateTimeOffset(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month), 0, 0, 0, date.Offset);
+
+        // Work backwards to find the last business day
+        while (lastDay.IsHoliday(ignoreGoodFriday) || lastDay.DayOfWeek == DayOfWeek.Saturday || lastDay.DayOfWeek == DayOfWeek.Sunday) {
+            lastDay = lastDay.AddDays(-1);
+        }
+
+        return lastDay;
+    }
+
     public static DateTimeOffset AddBusinessDays(this DateTimeOffset date, int days, bool ignoreGoodFriday = false) {
         if (days == 0)
             return date;

@@ -49,7 +49,7 @@ public class RVwithSubsampling
             validSubsampleCount++;
         }
 
-        if (validSubsampleCount <= 0)
+        if (validSubsampleCount < _subsamples.Count)
             return false;
 
         value = total / validSubsampleCount * System.Math.Sqrt(TimeExtensions.DaysPerYear * 24.0 * (60.0 / _period.TotalMinutes));

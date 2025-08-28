@@ -289,8 +289,7 @@ public class Position : IPosition, IJsonOnDeserialized
                         switch (Symbol) {
                             case "ES":
                                 if (optionSymbol == "EW") {
-                                    expirationDate = new DateTime(expiration.Year, expiration.Month, 1, 16, 0, 0, DateTimeKind.Unspecified);
-                                    expirationDate = expirationDate.AddMonths(1).AddDays(-1); // Last day of the month
+                                    expirationDate = expiration.LastBusinessDayOfMonth();
                                     _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
                                 }
                                 else if (optionSymbol.Length == 3) {

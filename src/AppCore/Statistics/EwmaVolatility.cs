@@ -12,6 +12,7 @@ public sealed class EwmaVolatility
     private readonly double _lambda; // decay factor in (0,1)
     private double? _variance;       // EWMA variance
     private int _count;              // number of returns processed
+    private double? _lastValue;
 
     /// <summary>
     /// Creates a new EWMA volatility calculator.
@@ -46,11 +47,17 @@ public sealed class EwmaVolatility
     /// Adds a new return value and updates the EWMA variance.
     /// </summary>
     /// <param name="r">Return value (e.g., log return). Non-finite values are ignored.</param>
-    public void AddLogReturn(double logReturn)
+    public void AddLogReturn(double value)
     {
-        if (!double.IsFinite(logReturn))
+        if (!double.IsFinite(value))
             return;
 
+        if (!_lastValue.HasValue) {
+            _lastValue = value;
+            return;
+        }
+
+        var logReturn = System.Math.Log(value / _lastValue.Value);
         var rr = logReturn * logReturn;
         if (_variance is null)
         {
