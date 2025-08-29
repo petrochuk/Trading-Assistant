@@ -290,6 +290,8 @@ public class Position : IPosition, IJsonOnDeserialized
                             case "ES":
                                 if (optionSymbol == "EW") {
                                     expirationDate = expiration.LastBusinessDayOfMonth();
+                                    // Add default expiration time of 16:00:00 EST
+                                    expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 16, 0, 0, DateTimeKind.Unspecified);
                                     _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
                                 }
                                 else if (optionSymbol.Length == 3) {

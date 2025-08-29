@@ -58,6 +58,7 @@ public sealed class EwmaVolatility
         }
 
         var logReturn = System.Math.Log(value / _lastValue.Value);
+        _lastValue = value;
         var rr = logReturn * logReturn;
         if (_variance is null)
         {
