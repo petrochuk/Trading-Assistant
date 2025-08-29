@@ -22,6 +22,8 @@ public sealed class DeltaHedgerTests
         // Arrange
         var time = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
+        var testRealizedVol = new TestRealizedVol { TestValue = 0.2 };
+
         var underlyingPosition = new Position(new Contract
         {
             Symbol = "ES",
@@ -29,7 +31,7 @@ public sealed class DeltaHedgerTests
             Id = 1,
             Multiplier = 50,
             Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
-        });
+        }, testRealizedVol);
         underlyingPosition.MarketPrice = esMarketPrice;
         underlyingPosition.Size = 1;
 
@@ -45,7 +47,7 @@ public sealed class DeltaHedgerTests
             IsCall = true,
             Strike = 5010f,
             Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
-        });
+        }, testRealizedVol);
         callOptionPosition.MarketPrice = callOptionMarketPrice;
         callOptionPosition.Size = callSize;
         positions.TryAdd(callOptionPosition.Contract.Id, callOptionPosition);
@@ -85,6 +87,8 @@ public sealed class DeltaHedgerTests
         // Arrange
         var time = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
+        var testRealizedVol = new TestRealizedVol { TestValue = 0.2 };
+
         var underlyingPosition = new Position(new Contract
         {
             Symbol = "ES",
@@ -92,7 +96,7 @@ public sealed class DeltaHedgerTests
             Id = 1,
             Multiplier = 50,
             Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
-        });
+        }, testRealizedVol);
         underlyingPosition.MarketPrice = esMarketPrice;
         underlyingPosition.Size = -1; // Short position
         // Add 1 ES future position
@@ -106,7 +110,7 @@ public sealed class DeltaHedgerTests
             IsCall = false,
             Strike = 4990f,
             Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
-        });
+        }, testRealizedVol);
         putOptionPosition.MarketPrice = putOptionMarketPrice;
         putOptionPosition.Size = putSize;
         positions.TryAdd(putOptionPosition.Contract.Id, putOptionPosition);

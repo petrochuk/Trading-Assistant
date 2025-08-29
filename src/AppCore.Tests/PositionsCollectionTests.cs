@@ -1,5 +1,6 @@
 ﻿using AppCore.Extenstions;
 using AppCore.Models;
+using AppCore.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
@@ -21,8 +22,9 @@ public sealed class PositionsCollectionTests
         // Arrange
         var time = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
+        var testRealizedVol = new TestRealizedVol { TestValue = 0.2 };
 
-        var underlyingPosition = new Position(_esContract);
+        var underlyingPosition = new Position(_esContract, testRealizedVol);
         underlyingPosition.MarketPrice = 4950f; // Underlying price below strike
 
         var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, 
@@ -51,8 +53,9 @@ public sealed class PositionsCollectionTests
         // Arrange
         var time = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
+        var testRealizedVol = new TestRealizedVol { TestValue = 0.2 };
 
-        var underlyingPosition = new Position(_esContract);
+        var underlyingPosition = new Position(_esContract, testRealizedVol);
         underlyingPosition.MarketPrice = 5050f;
 
         var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, 
@@ -80,8 +83,10 @@ public sealed class PositionsCollectionTests
         // Arrange
         var time = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
+        var testRealizedVol = new TestRealizedVol { TestValue = 0.2 };
 
-        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future);
+        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future, 
+            realizedVolatility: testRealizedVol);
         underlyingPosition.MarketPrice = 4950f;
 
         var position1 = new Position(1, underlyingPosition.Contract.Symbol, AssetClass.FutureOption, 

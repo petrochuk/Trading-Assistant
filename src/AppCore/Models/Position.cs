@@ -13,7 +13,7 @@ public class Position
 
     public Contract Contract { get; set; }
 
-    public RVwithSubsampling? RealizedVol { get; private set; } = new RVwithSubsampling(PositionsCollection.RealizedVolPeriod, PositionsCollection.RealizedVolSamples);
+    public IRealizedVolatility? RealizedVol { get; private set; }
 
     #endregion
 
@@ -67,9 +67,11 @@ public class Position
 
     #region Constructors
 
-    public Position() {
-        Contract = new Contract() { 
-            Symbol = string.Empty 
+    public Position(Contract? contract = null, IRealizedVolatility? realizedVolatility = null) {
+        RealizedVol = realizedVolatility != null? realizedVolatility : new RVwithSubsampling(PositionsCollection.RealizedVolPeriod, PositionsCollection.RealizedVolSamples);
+
+        Contract = contract != null ? contract : Contract = new Contract() {
+            Symbol = string.Empty
         };
     }
 
@@ -77,7 +79,7 @@ public class Position
     /// Create a new position from an existing position.
     /// </summary>
     [SetsRequiredMembers]
-    public Position(IPosition position) {
+    public Position(IPosition position) : this() {
         _ = position ?? throw new ArgumentNullException(nameof(position));
         if (string.IsNullOrWhiteSpace(position.Symbol)) {
             throw new ArgumentNullException(nameof(position.Symbol), "Symbol is required.");
@@ -109,7 +111,9 @@ public class Position
     /// </summary>
     [SetsRequiredMembers]
     public Position(int contractId, string underlyingSymbol,
-        AssetClass assetClass, DateTimeOffset? expiration, float strike, bool isCall = true, float multiplier = 100) {
+        AssetClass assetClass, DateTimeOffset? expiration, float strike, bool isCall = true, float multiplier = 100,
+        IRealizedVolatility? realizedVolatility = null)
+         : this(realizedVolatility: realizedVolatility) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -147,7 +151,8 @@ public class Position
     /// Create a new position.
     /// </summary>
     [SetsRequiredMembers]
-    public Position(int contractId, string underlyingSymbol, AssetClass assetClass, DateTimeOffset? expiration = null, float multiplier = 1) {
+    public Position(int contractId, string underlyingSymbol, AssetClass assetClass, DateTimeOffset? expiration = null, 
+        float multiplier = 1, IRealizedVolatility? realizedVolatility = null) : this(realizedVolatility: realizedVolatility) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -169,13 +174,6 @@ public class Position
             Multiplier = multiplier,
             Expiration = expiration
         };
-    }
-
-    [SetsRequiredMembers]
-    public Position(Contract contract) {
-        Contract = contract ?? throw new ArgumentNullException(nameof(contract));
-
-        Size = 0;
     }
 
     #endregion

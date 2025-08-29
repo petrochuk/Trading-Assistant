@@ -5,7 +5,7 @@ namespace AppCore.Statistics;
 /// <summary>
 /// Calculates realized volatility using subsampling method.
 /// </summary>
-public class RVwithSubsampling
+public class RVwithSubsampling : IRealizedVolatility
 {
     private readonly TimeSpan _period;
     private List<EwmaVolatility> _subsamples = new();
