@@ -12,6 +12,7 @@ internal class TestBroker : IBroker
     public string BearerToken { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     public event EventHandler? OnConnected;
+    public event EventHandler? OnDisconnected;
     public event EventHandler<AuthenticatedArgs>? OnAuthenticated;
     public event EventHandler<TickleArgs>? OnTickle;
     public event EventHandler<AccountsArgs>? OnAccountsConnected;
@@ -27,6 +28,8 @@ internal class TestBroker : IBroker
 
     public void Connect() {
     }
+
+    public void Disconnect() { }
 
     public void StartTickle() {
     }

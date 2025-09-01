@@ -69,6 +69,21 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             return;
         }
 
+        // Check blackout periods
+        var now = _timeProvider.GetUtcNow().TimeOfDay;
+        if (_configuration.BlackOutStart != null && _configuration.BlackOutEnd != null)
+        {
+            // Normal case: blackout period does not cross midnight
+            if (_configuration.BlackOutStart < _configuration.BlackOutEnd)
+            {
+                if (now >= _configuration.BlackOutStart && now <= _configuration.BlackOutEnd)
+                {
+                    _logger.LogDebug($"Current time {now} is within blackout period {_configuration.BlackOutStart} - {_configuration.BlackOutEnd} for {_underlyingPosition.Symbol}. Skipping hedge.");
+                    return;
+                }
+            }
+        }
+
         // Try to acquire the semaphore without blocking
         if (!_hedgeSemaphore.Wait(0))
         {
