@@ -6,6 +6,7 @@ namespace AppCore.Interfaces;
 public interface IBroker : IDisposable
 {
     void Connect();
+    void Disconnect();
     void StartTickle();
     void StopTickle();
     void PlaceOrder(string accountId, Guid orderId, Contract contract, float size);
@@ -20,6 +21,8 @@ public interface IBroker : IDisposable
     string BearerToken { get; set; }
 
     event EventHandler? OnConnected;
+    event EventHandler? OnDisconnected;
+
     event EventHandler<AuthenticatedArgs>? OnAuthenticated;
     event EventHandler<TickleArgs>? OnTickle;
     event EventHandler<AccountsArgs>? OnAccountsConnected;

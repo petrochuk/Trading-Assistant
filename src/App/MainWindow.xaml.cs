@@ -31,6 +31,11 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         Enabled = true
     };
 
+    private Timer _reconnectTimer = new(TimeSpan.FromSeconds(30)) {
+        AutoReset = true,
+        Enabled = false
+    };
+
     #endregion
 
     #region Constructors
@@ -51,8 +56,11 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         _positionsRefreshTimer.Elapsed += PositionsRefreshTimer_Elapsed;
         _positionsRefreshTimer.Start();
 
+        _reconnectTimer.Elapsed += ReconnectTimer_Elapsed;
+
         // Subscribe to client events
         App.Instance.IBClient.OnConnected += IBClient_Connected;
+        App.Instance.IBClient.OnDisconnected += IBClient_Disconnected;
         App.Instance.IBClient.OnAuthenticated += IBClient_Authenticated;
         App.Instance.IBClient.OnTickle += IBClient_Tickle;
         App.Instance.IBClient.OnAccountsConnected += IBClient_AccountsConnected;
@@ -176,6 +184,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
     private void IBClient_Connected(object? sender, EventArgs e) {
         // Change the button text to "Connected" on main thread
+        _reconnectTimer.Stop();
         DispatcherQueue.TryEnqueue(() => {
             _logger.LogInformation("Connected to IBKR");
             ConnectButton.IsEnabled = true;
@@ -188,6 +197,16 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             // Request accounts
             App.Instance.IBClient.RequestAccounts();
         });
+    }
+
+    private void IBClient_Disconnected(object? sender, EventArgs e) {
+        _logger.LogWarning("Disconnected from IBKR event");
+        Reconnect();
+    }
+
+    private void ReconnectTimer_Elapsed(object? sender, ElapsedEventArgs e) {
+        _logger.LogInformation("Reconnecting to IBKR...");
+        App.Instance.IBClient.Connect();
     }
 
     private void IBClient_AccountsConnected(object? sender, AccountsArgs e) {
@@ -345,7 +364,13 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Reconnect() {
         lock (_lock) {
-            App.Instance.IBClient.StopTickle();
+            DispatcherQueue.TryEnqueue(() => {
+                ActiveAccount = null;
+                ActiveAccountLabel = "No Accounts";
+                ActiveAccountButton.IsEnabled = false;
+                ActiveAccountButton.Flyout = null;
+                PositionsControl.Positions = null;
+            });
 
             // Dispose all accounts 
             foreach (var account in _accounts.Values) {
@@ -357,14 +382,12 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             }
             _accounts.Clear();
 
-            ActiveAccount = null;
             _ibClientSession = string.Empty;
-            App.Instance.IBClient.BearerToken = string.Empty;
+            App.Instance.IBClient.Disconnect();
             App.Instance.IBWebSocket.Disconnect();
-            _logger.LogWarning("IBKR session lost, wait and reconnect");
+            _logger.LogWarning("IBKR session lost, starting reconnect...");
         }
-        System.Threading.Thread.Sleep(30000);
-        App.Instance.IBClient.Connect();
+        _reconnectTimer.Start();
     }
 
     private void IBWebSocket_Connected(object? sender, EventArgs e) {

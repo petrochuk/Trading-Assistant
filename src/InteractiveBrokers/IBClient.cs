@@ -65,7 +65,10 @@ public class IBClient : IBroker
             try {
                 _tickleRequest?.Execute(_httpClient);
             }
-            catch (Exception ex) {
+            catch (HttpRequestException httpEx) {
+                _logger.LogError(httpEx, $"Error sending tickle request: {httpEx.Message}");
+                OnDisconnected?.Invoke(this, EventArgs.Empty);
+            } catch (Exception ex) {
                 _logger.LogError(ex, $"Error sending tickle request: {ex.Message}");
             }
         };
@@ -95,6 +98,11 @@ public class IBClient : IBroker
     /// IB client connected event.
     /// </summary>
     public event EventHandler? OnConnected;
+
+    /// <summary>
+    /// IB client connected event.
+    /// </summary>
+    public event EventHandler? OnDisconnected;
 
     /// <summary>
     /// On tickle event.
@@ -159,6 +167,15 @@ public class IBClient : IBroker
             StartTickle();
 
             OnConnected?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public void Disconnect() {
+        StopTickle();
+        BearerToken = string.Empty;
+        // Read all available items from the channel until it's empty
+        while (_channel.Reader.TryRead(out var request)) {
+            _logger.LogWarning($"Discarding pending request: {request.Uri}");
         }
     }
 
@@ -271,8 +288,10 @@ public class IBClient : IBroker
                 try {
                     _logger.LogTrace($"Execute: {request.Uri}");
                     request.Execute(_httpClient);
-                }
-                catch (Exception ex) {
+                } catch (HttpRequestException httpEx) {
+                    _logger.LogError(httpEx, $"Error executing request {request.Uri} {httpEx.Message}");
+                    OnDisconnected?.Invoke(this, EventArgs.Empty);
+                } catch (Exception ex) {
                     _logger.LogError(ex, $"Error executing request: {request.Uri}");
                 }
             }

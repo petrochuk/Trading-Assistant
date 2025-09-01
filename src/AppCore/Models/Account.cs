@@ -162,6 +162,6 @@ public class Account : IDisposable
         _deltaHedgers.Clear();
         
         Positions.Underlyings.CollectionChanged -= OnUnderlyingsChanged;
-        _logger.LogInformation("Account disposed and hedge timer stopped");
+        _logger.LogInformation($"Account {Name} is disposed and hedge timer stopped");
     }
 }
