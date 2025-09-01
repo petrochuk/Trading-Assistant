@@ -31,6 +31,9 @@ internal class TestBroker : IBroker
     public void StartTickle() {
     }
 
+    public void StopTickle() {
+    }
+
     public void Dispose() {
     }
 

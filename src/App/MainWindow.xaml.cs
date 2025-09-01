@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     private Account? _activeAccount = null;
     private Dictionary<string, Account> _accounts = new();
     private string _ibClientSession = string.Empty;
+    private readonly System.Threading.Lock _lock = new();
 
     private Timer _positionsRefreshTimer = new(TimeSpan.FromMinutes(1)) {
         AutoReset = true,
@@ -79,7 +80,9 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             if (_activeAccountLabel != value)
             {
                 _activeAccountLabel = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveAccountLabel)));
+                DispatcherQueue.TryEnqueue(() => {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveAccountLabel)));
+                });
             }
         }
     }
@@ -91,7 +94,9 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             if (_activeAccount != value)
             {
                 _activeAccount = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveAccount)));
+                DispatcherQueue.TryEnqueue(() => {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveAccount)));
+                });
             }
         }
     }
@@ -146,9 +151,11 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        // Refresh account positions for each account
-        foreach (var account in _accounts.Values) {
-            App.Instance.IBClient.RequestAccountPositions(account.Id);
+        lock (_lock) {
+            // Refresh account positions for each account
+            foreach (var account in _accounts.Values) {
+                App.Instance.IBClient.RequestAccountPositions(account.Id);
+            }
         }
 
         return;
@@ -186,48 +193,50 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     private void IBClient_AccountsConnected(object? sender, AccountsArgs e) {
         _logger.LogInformation($"Received {e.Accounts.Count} accounts from IBKR");
 
-        _accounts.Clear();
-        foreach (var brokerAccount in e.Accounts) {
+        lock (_lock) {
+            _accounts.Clear();
+            foreach (var brokerAccount in e.Accounts) {
 
-            var accountFactory = AppCore.ServiceProvider.Instance.GetRequiredService<IAccountFactory>();
-            var account = accountFactory.CreateAccount(brokerAccount.Id, brokerAccount.Name);
-            account.Positions.OnPositionAdded += OnPositionAdded;
-            account.Positions.OnPositionRemoved += OnPositionRemoved;
-            account.Positions.PropertyChanged += Positions_PropertyChanged;
-            _accounts.Add(brokerAccount.Id, account);
+                var accountFactory = AppCore.ServiceProvider.Instance.GetRequiredService<IAccountFactory>();
+                var account = accountFactory.CreateAccount(brokerAccount.Id, brokerAccount.Name);
+                account.Positions.OnPositionAdded += OnPositionAdded;
+                account.Positions.OnPositionRemoved += OnPositionRemoved;
+                account.Positions.PropertyChanged += Positions_PropertyChanged;
+                _accounts.Add(brokerAccount.Id, account);
 
-            if (_activeAccount != null) {
-                // If this is an Individual account, we want to select the first one
-                _activeAccount = account;
+                if (_activeAccount != null) {
+                    // If this is an Individual account, we want to select the first one
+                    _activeAccount = account;
+                }
             }
-        }
 
-        if (_activeAccount == null) {
-            // If no individual account found, select the first one
-            _activeAccount = _accounts.Values.FirstOrDefault();
-        }
-
-        RiskGraphControl.Account = _activeAccount;
-        PositionsControl.Positions = _activeAccount != null ? _activeAccount.Positions : null;
-        DispatcherQueue.TryEnqueue(() => {
             if (_activeAccount == null) {
-                ActiveAccountLabel = "No Accounts";
-                ActiveAccountButton.IsEnabled = false;
-                return;
+                // If no individual account found, select the first one
+                _activeAccount = _accounts.Values.FirstOrDefault();
             }
-            ActiveAccountLabel = _activeAccount.Name;
-            var menuFlyout = new MenuFlyout();
-            foreach (var account in _accounts.Values) {
-                var menuItem = new MenuFlyoutItem() {
-                    Text = account.Name,
-                    Command = new RelayCommand<Account>(ActiveAccount_Click),
-                    CommandParameter = account
-                };
-                menuFlyout.Items.Add(menuItem);
-            }
-            ActiveAccountButton.Flyout = menuFlyout;
-            ActiveAccountButton.IsEnabled = true;
-        });
+
+            RiskGraphControl.Account = _activeAccount;
+            PositionsControl.Positions = _activeAccount != null ? _activeAccount.Positions : null;
+            DispatcherQueue.TryEnqueue(() => {
+                if (_activeAccount == null) {
+                    ActiveAccountLabel = "No Accounts";
+                    ActiveAccountButton.IsEnabled = false;
+                    return;
+                }
+                ActiveAccountLabel = _activeAccount.Name;
+                var menuFlyout = new MenuFlyout();
+                foreach (var account in _accounts.Values) {
+                    var menuItem = new MenuFlyoutItem() {
+                        Text = account.Name,
+                        Command = new RelayCommand<Account>(ActiveAccount_Click),
+                        CommandParameter = account
+                    };
+                    menuFlyout.Items.Add(menuItem);
+                }
+                ActiveAccountButton.Flyout = menuFlyout;
+                ActiveAccountButton.IsEnabled = true;
+            });
+        }
 
         App.Instance.IBWebSocket.RequestMarketData(_accounts.Values.ToList());
         PositionsRefreshTimer_Elapsed(null, new ElapsedEventArgs(DateTime.Now));
@@ -324,8 +333,38 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     private void IBClient_Tickle(object? sender, TickleArgs e) {
-        _ibClientSession = e.Session;
-        App.Instance.IBWebSocket.ClientSession = _ibClientSession;
+
+        if (e.IsConnected && e.IsAuthenticated) {
+            _ibClientSession = e.Session;
+            App.Instance.IBWebSocket.ClientSession = _ibClientSession;
+        }
+        else {
+            Reconnect();
+        }
+    }
+
+    private void Reconnect() {
+        lock (_lock) {
+            App.Instance.IBClient.StopTickle();
+
+            // Dispose all accounts 
+            foreach (var account in _accounts.Values) {
+                account.Positions.OnPositionAdded -= OnPositionAdded;
+                account.Positions.OnPositionRemoved -= OnPositionRemoved;
+                account.Positions.PropertyChanged -= Positions_PropertyChanged;
+                account.Positions.Clear();
+                account.Dispose();
+            }
+            _accounts.Clear();
+
+            ActiveAccount = null;
+            _ibClientSession = string.Empty;
+            App.Instance.IBClient.BearerToken = string.Empty;
+            App.Instance.IBWebSocket.Disconnect();
+            _logger.LogWarning("IBKR session lost, wait and reconnect");
+        }
+        System.Threading.Thread.Sleep(30000);
+        App.Instance.IBClient.Connect();
     }
 
     private void IBWebSocket_Connected(object? sender, EventArgs e) {

@@ -1,4 +1,5 @@
 ﻿using AppCore.Args;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics.CodeAnalysis;
 
 namespace InteractiveBrokers.Requests;
@@ -22,14 +23,16 @@ internal class Tickle : Request
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) not connected to local server");
         }
         if (!response.IServer.AuthStatus.connected) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) not connected");
+            Logger?.LogWarning($"IB Client ({httpClient.BaseAddress}) not connected to IBKR server");
         }
         if (!response.IServer.AuthStatus.authenticated) {
-            throw new IBClientException($"IB Client ({httpClient.BaseAddress}) not authenticated");
+            Logger?.LogWarning($"IB Client ({httpClient.BaseAddress}) not authenticated to IBKR server");
         }
 
         _responseHandler?.Invoke(this, new TickleArgs {
-            Session = response.Session
+            Session = response.Session,
+            IsConnected = response.IServer.AuthStatus.connected,
+            IsAuthenticated = response.IServer.AuthStatus.authenticated
         });
     }
 }

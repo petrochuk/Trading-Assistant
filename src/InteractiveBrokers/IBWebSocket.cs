@@ -17,7 +17,7 @@ public class IBWebSocket : IDisposable
     #region Fields
 
     private readonly Uri _uri;
-    private readonly Thread _mainThread;
+    private Thread? _mainThread;
     private readonly ILogger<IBWebSocket> _logger;
     private bool _isDisposed;
     private ClientWebSocket? _clientWebSocket;
@@ -66,12 +66,6 @@ public class IBWebSocket : IDisposable
         }
         else
             _uri = new UriBuilder("wss", _brokerConfiguration.HostName, 5000, authConfiguration.Value.WebSocketUrl).Uri;
-
-        // Initialize the main thread
-        _mainThread = new Thread(new ThreadStart(MainThread)) {
-            IsBackground = true,
-            Name = "IB WebSocket MainThread",
-        };
 
         _optionFieldsString = string.Join("\",\"", _optionFields.Select(f => ((int)f).ToString()).ToArray());
         _stockFieldsString = string.Join("\",\"", _stockFields.Select(f => ((int)f).ToString()).ToArray());
@@ -124,10 +118,16 @@ public class IBWebSocket : IDisposable
     #region Private Methods
 
     private void EnsureSocketConnected() {
-        if (_mainThread.ThreadState.HasFlag(ThreadState.Unstarted)) {
-            // Start the main thread if it yet started
+
+        if (_mainThread == null) {
+            // Initialize the main thread
+            _mainThread = new Thread(new ThreadStart(MainThread)) {
+                IsBackground = true,
+                Name = "IB WebSocket MainThread",
+            };
             _mainThread.Start();
         }
+
         _connectedEvent.WaitOne();
     }
 
@@ -205,6 +205,7 @@ public class IBWebSocket : IDisposable
         catch (Exception ex) {
             _logger.LogError($"Error: {ex.Message}");
         }
+        _connectedEvent.Reset();
         _logger.LogInformation($"WebSocket thread finished");
     }
 
@@ -377,6 +378,20 @@ public class IBWebSocket : IDisposable
         }
     }
 
+    public void Disconnect() {
+        ClientSession = string.Empty;
+        BearerToken = string.Empty;
+        if (_clientWebSocket != null && _clientWebSocket.State != WebSocketState.Closed && _clientWebSocket.State != WebSocketState.Aborted) {
+            _clientWebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "App closed", CancellationToken.None);
+        }
+        if (_mainThread != null && _mainThread.IsAlive) {
+            _mainThread.Join();
+        }
+        _connectedEvent.Reset();
+        _clientWebSocket = null;
+        _mainThread = null;
+    }
+
     #endregion
 
     #region IDisposable
@@ -384,13 +399,7 @@ public class IBWebSocket : IDisposable
     protected virtual void Dispose(bool disposing) {
         if (!_isDisposed) {
             if (disposing) {
-                if (_clientWebSocket != null && _clientWebSocket.State != WebSocketState.Closed && _clientWebSocket.State != WebSocketState.Aborted) {
-                    _clientWebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "App closed", CancellationToken.None);
-                }
-                if (_mainThread.IsAlive) {
-                    _mainThread.Join();
-                }
-                _clientWebSocket = null;
+                Disconnect();
             }
             _isDisposed = true;
         }

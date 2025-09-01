@@ -139,8 +139,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         if (_disposed)
             return;
 
-        _disposed = true;
-        _hedgeSemaphore?.Dispose();
+        if (_hedgeSemaphore != null) {
+            _hedgeSemaphore.Wait();
+            _hedgeSemaphore.Dispose();
+        }
         _logger.LogDebug($"DeltaHedger for {_underlyingPosition.Symbol} disposed.");
+        _disposed = true;
     }
 }

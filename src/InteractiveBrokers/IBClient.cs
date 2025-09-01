@@ -190,6 +190,13 @@ public class IBClient : IBroker
         _tickleTimer.Start();
     }
 
+    public void StopTickle() {
+        if (_tickleTimer == null) {
+            return;
+        }
+        _tickleTimer.Stop();
+    }
+
     #endregion
 
     #region Account management
