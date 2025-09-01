@@ -266,7 +266,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
             // Make sure each underlying has a valid contract(s)
             foreach (var underlying in account.Positions.Underlyings) {
-                if (underlying.Contracts.Any()) {
+                if (underlying.ContractsById.Any()) {
                     continue;
                 }
                 App.Instance.IBClient.FindContracts(underlying.Symbol, underlying.AssetClass);
@@ -278,12 +278,11 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
     private void IBClient_OnContractFound(object? sender, ContractFoundArgs e) {
         _logger.LogInformation($"Found {e.Contracts.Count} contracts for {e.Symbol}");
+
         foreach (var account in _accounts.Values) {
+            account.Positions.ReconcileContracts(e.Symbol, e.AssetClass, e.Contracts);
+
             foreach (var underlying in account.Positions.Underlyings) {
-                if (underlying.Contracts.Any() || underlying.Symbol != e.Symbol || underlying.AssetClass != e.AssetClass) {
-                    continue;
-                }
-                underlying.AddContracts(e.Contracts);
                 foreach (var contract in e.Contracts) {
                     App.Instance.IBWebSocket.RequestContractMarketData(contract);
                 }

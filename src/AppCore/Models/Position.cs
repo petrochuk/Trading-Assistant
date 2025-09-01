@@ -44,6 +44,10 @@ public class Position
 
     public float Beta { get; set; } = 1;
 
+    public UnderlyingPosition? Underlying { get; set; }
+
+    public int? UnderlyingContractId { get; set; }
+
     #endregion
 
     #region Constructors

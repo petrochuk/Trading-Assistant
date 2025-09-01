@@ -17,9 +17,11 @@ public class UnderlyingPosition
 
     public IRealizedVolatility? RealizedVol { get; private set; }
 
-    private Dictionary<int, Contract> _contracts = new Dictionary<int, Contract>();
-    public IReadOnlyDictionary<int, Contract> Contracts {
-        get => _contracts;
+    private Dictionary<int, Contract> _contractsById = new Dictionary<int, Contract>();
+    private SortedList<DateTimeOffset, Contract> _contractsByExpiration = new SortedList<DateTimeOffset, Contract>();
+
+    public IReadOnlyDictionary<int, Contract> ContractsById {
+        get => _contractsById;
     }
 
     [SetsRequiredMembers]
@@ -60,20 +62,54 @@ public class UnderlyingPosition
     }
 
     public void UpdateMarketPrice(int contractId, float markPrice) {
-        if (Contracts.TryGetValue(contractId, out var contract)) {
+        if (ContractsById.TryGetValue(contractId, out var contract)) {
             contract.MarketPrice = markPrice;
         }
     }
 
     public void AddContracts(List<Contract> contracts) {
+        if (AssetClass == AssetClass.Stock) { 
+            if (contracts.Count != 1 || contracts[0].Symbol != Symbol || contracts[0].AssetClass != AssetClass.Stock) {
+                throw new ArgumentException("Invalid contract for stock underlying position", nameof(contracts));
+            }
+
+            if (_contractsById.ContainsKey(contracts[0].Id))
+                return;
+            _contractsById[contracts[0].Id] = contracts[0];
+            FrontContract = contracts[0];
+
+            return;
+        }
 
         var frontMonth = DateTimeOffset.MaxValue;
         foreach (var contract in contracts) {
-            _contracts.Add(contract.Id, contract);
+            if (_contractsById.ContainsKey(contract.Id))
+                continue;
+            _contractsById.Add(contract.Id, contract);
+            _contractsByExpiration.Add(contract.Expiration!.Value, contract);
             if (contract.Expiration!.Value < frontMonth) {
                 frontMonth = contract.Expiration.Value;
                 FrontContract = contract;
             }
         }
+    }
+
+    /// <summary>
+    /// Finds contract ID by expiration date.
+    /// </summary>
+    /// <param name="expiration"></param>
+    /// <returns></returns>
+    public bool FindContractId(DateTimeOffset expiration, out int contractId) {
+        contractId = 0;
+        for (var idx = 0; idx < _contractsByExpiration.Count; idx++) {
+            if (_contractsByExpiration.Keys[idx] < expiration) {
+                continue;
+            }
+
+            contractId = _contractsByExpiration.Values[idx].Id;
+            return true;
+        }
+
+        return false;
     }
 }

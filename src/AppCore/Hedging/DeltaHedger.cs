@@ -58,6 +58,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             return;
         }
 
+        if (_underlyingPosition.FrontContract == null) {
+            _logger.LogWarning($"No front contract available for {_underlyingPosition.Symbol}. Cannot hedge.");
+            return;
+        }
+
         if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value)
         {
             _logger.LogDebug($"Hedge execution delayed for {_underlyingPosition.Symbol}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.GetUtcNow():hh\\:mm\\:ss}.");
@@ -76,9 +81,8 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
 
             var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition);
-            /*
             if (greeks == null || float.IsNaN(greeks.Value.Delta) || float.IsNaN(greeks.Value.Charm)) {
-                _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Contract} or NaN. Cannot hedge.");
+                _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
 
@@ -97,8 +101,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             // Set a delay to prevent immediate re-hedging
             _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(2);
             _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
-            _broker.PlaceOrder(_accountId, _activeOrderId.Value, Contract, deltaHedgeSize);
-            */
+            _broker.PlaceOrder(_accountId, _activeOrderId.Value, _underlyingPosition.FrontContract, deltaHedgeSize);
         }
         finally
         {
@@ -108,8 +111,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
     private void Broker_OnOrderPlaced(object? sender, OrderPlacedArgs e)
     {
-        /*
-        if (e.AccountId != _accountId || e.Contract.Id != _underlyingPosition.Contract.Id)
+        if (e.AccountId != _accountId || _underlyingPosition.FrontContract == null || e.Contract.Id != _underlyingPosition.FrontContract.Id)
         {
             _logger.LogDebug($"Order placed for different account or contract. Ignoring: AccountId={e.AccountId}, ContractId={e.Contract.Id}");
             return;
@@ -127,7 +129,6 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _activeOrderId = null; // Reset active order ID
             return;
         }
-        */
 
         _logger.LogInformation($"Delta hedge order {_activeOrderId} placed successfully for {_underlyingPosition.Symbol}.");
         _activeOrderId = null; // Reset active order ID after successful placement
