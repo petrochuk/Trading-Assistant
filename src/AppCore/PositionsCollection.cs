@@ -161,7 +161,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             underlyingPosition = _selectedPosition;
         }
 
-        if (!underlyingPosition.Contract.MarketPrice.HasValue || underlyingPosition.Contract.MarketPrice == 0)
+        if (underlyingPosition.FrontContract == null || !underlyingPosition.FrontContract.MarketPrice.HasValue || underlyingPosition.FrontContract.MarketPrice == 0)
             return null;
 
         var realizedVol = 0.0;
@@ -179,7 +179,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         lock (_lock) {
             foreach (var position in Values) {
                 // Skip any positions that are not in the same underlying, 0 size
-                if (position.Contract.Symbol != underlyingPosition.Contract.Symbol || 
+                if (position.Contract.Symbol != underlyingPosition.Symbol || 
                     position.Size == 0) {
                     continue;
                 }
@@ -201,7 +201,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     //greeks.Delta += position.Delta.Value * position.Size;
                     var bls = new BlackNScholesCaculator();
                     bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
-                    bls.StockPrice = underlyingPosition.Contract.MarketPrice.Value;
+                    bls.StockPrice = underlyingPosition.FrontContract.MarketPrice.Value;
                     bls.Strike = position.Contract.Strike;
                     // Market implied vol
                     var marketIV = position.Contract.IsCall ? bls.GetCallIVBisections(position.Contract.MarketPrice.Value) : bls.GetPutIVBisections(position.Contract.MarketPrice.Value);

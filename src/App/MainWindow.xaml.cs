@@ -283,8 +283,8 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
                 if (underlying.Contracts.Any() || underlying.Symbol != e.Symbol || underlying.AssetClass != e.AssetClass) {
                     continue;
                 }
+                underlying.AddContracts(e.Contracts);
                 foreach (var contract in e.Contracts) {
-                    underlying.Contracts.Add(contract.Id, contract);
                     App.Instance.IBWebSocket.RequestContractMarketData(contract);
                 }
             }

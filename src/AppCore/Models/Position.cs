@@ -13,8 +13,6 @@ public class Position
 
     public Contract Contract { get; set; }
 
-    public IRealizedVolatility? RealizedVol { get; private set; }
-
     #endregion
 
     #region Properties
@@ -50,8 +48,7 @@ public class Position
 
     #region Constructors
 
-    public Position(Contract? contract = null, IRealizedVolatility? realizedVolatility = null) {
-        RealizedVol = realizedVolatility != null? realizedVolatility : new RVwithSubsampling(PositionsCollection.RealizedVolPeriod, PositionsCollection.RealizedVolSamples);
+    public Position(Contract? contract = null) {
 
         Contract = contract != null ? contract : Contract = new Contract() {
             Symbol = string.Empty
@@ -94,9 +91,7 @@ public class Position
     /// </summary>
     [SetsRequiredMembers]
     public Position(int contractId, string underlyingSymbol,
-        AssetClass assetClass, DateTimeOffset? expiration, float strike, bool isCall = true, float multiplier = 100,
-        IRealizedVolatility? realizedVolatility = null)
-         : this(realizedVolatility: realizedVolatility) {
+        AssetClass assetClass, DateTimeOffset? expiration, float strike, bool isCall = true, float multiplier = 100) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -135,7 +130,7 @@ public class Position
     /// </summary>
     [SetsRequiredMembers]
     public Position(int contractId, string underlyingSymbol, AssetClass assetClass, DateTimeOffset? expiration = null, 
-        float multiplier = 1, IRealizedVolatility? realizedVolatility = null) : this(realizedVolatility: realizedVolatility) {
+        float multiplier = 1) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -191,12 +186,6 @@ public class Position
             Theta = theta ?? Theta;
             Vega = vega ?? Vega;
         }
-    }
-
-    public void UpdateStdDev()
-    {
-        if (Contract.MarketPrice.HasValue)
-            RealizedVol?.AddValue(Contract.MarketPrice.Value);
     }
 
     #endregion
