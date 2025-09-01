@@ -85,12 +85,20 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void UpdateGreeks() {
-        if (Account == null) {
+        if (Account == null || Account.Positions.SelectedPosition == null) {
             ClearGreeks();
             return;
         }
 
-        var greeks = Account.Positions!.CalculateGreeks();
+        var selectedSymbol = Account.Positions.SelectedPosition.Symbol;
+        bool useRealizedVol = true;
+        float minIV = 0;
+        if (Account.DeltaHedgers.TryGetValue(selectedSymbol, out var hedger)) { 
+            useRealizedVol = false;
+            minIV = hedger.Configuration.MinIV;
+        }
+
+        var greeks = Account.Positions!.CalculateGreeks(minIV, useRealizedVol: useRealizedVol);
         if (greeks == null) {
             ClearGreeks();
             return;
@@ -99,7 +107,6 @@ public sealed partial class RiskGraph : UserControl
         if (Account.Positions.SelectedPosition != null && Account.Positions.SelectedPosition.RealizedVol != null) {
 
             if (Account.Positions.SelectedPosition.RealizedVol.TryGetValue(out var rv)) {
-                // Annualize RV
                 RVText.Text = rv.ToString("P2");
             }
         }
@@ -125,18 +132,18 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void DrawRiskIntervals() {
-        if (Account == null || !Account.Positions.Any() || Account.Positions.SelectedPosition == null) {
+        if (Account == null || !Account.Positions.Any() || Account.Positions.SelectedPosition == null || Account.Positions.SelectedPosition.FrontContract == null) {
             return;
         }
 
         // First calculate the risk curves for each interval
-        var midPrice = Account.Positions.SelectedPosition.MarketPrice;
+        var midPrice = Account.Positions.SelectedPosition.FrontContract.MarketPrice;
         if (!midPrice.HasValue) {
             _logger.LogTrace("No market price available for underlying");
             return;
         }
 
-        var underlyingSymbol = Account.Positions.SelectedPosition.Contract.Symbol;
+        var underlyingSymbol = Account.Positions.SelectedPosition.Symbol;
         var minPrice = midPrice.Value * 0.95f;
         var maxPrice = midPrice.Value * 1.05f;
         var priceIncrement = (maxPrice - minPrice) / 100f;

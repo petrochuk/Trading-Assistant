@@ -20,12 +20,12 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
     }
 
     public IDeltaHedger Create(IBroker broker, 
-        string accountId, Position underlyingPosition, PositionsCollection positions, DeltaHedgerConfiguration configuration)
+        string accountId, UnderlyingPosition underlying, PositionsCollection positions, DeltaHedgerConfiguration configuration)
     {
-        var symbolConfiguration = configuration.Configs[underlyingPosition.Contract.Symbol];
+        var symbolConfiguration = configuration.Configs[underlying.Symbol];
         if (symbolConfiguration == null)
-            throw new ArgumentException($"No configuration found for symbol {underlyingPosition.Contract.Symbol}", nameof(configuration));
+            throw new ArgumentException($"No configuration found for symbol {underlying.Symbol}", nameof(configuration));
 
-        return new DeltaHedger(_logger, _timeProvider, broker, accountId, underlyingPosition, positions, symbolConfiguration);
+        return new DeltaHedger(_logger, _timeProvider, broker, accountId, underlying, positions, symbolConfiguration);
     }
 }

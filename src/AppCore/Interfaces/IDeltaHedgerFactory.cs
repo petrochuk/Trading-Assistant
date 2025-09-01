@@ -14,5 +14,5 @@ public interface IDeltaHedgerFactory
     /// <param name="positions">The positions collection.</param>
     /// <param name="configuration">The delta hedger configuration.</param>
     /// <returns>A new instance of <see cref="IDeltaHedger"/>.</returns>
-    IDeltaHedger Create(IBroker broker, string accountId, Position underlyingPosition, PositionsCollection positions, DeltaHedgerConfiguration configuration);
+    IDeltaHedger Create(IBroker broker, string accountId, UnderlyingPosition underlying, PositionsCollection positions, DeltaHedgerConfiguration configuration);
 }

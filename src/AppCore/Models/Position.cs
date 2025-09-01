@@ -13,28 +13,11 @@ public class Position
 
     public Contract Contract { get; set; }
 
-    public IRealizedVolatility? RealizedVol { get; private set; }
-
     #endregion
 
     #region Properties
 
     public float Size { get; set; }
-
-    float? _marketPrice;
-    public float? MarketPrice {
-        get => _marketPrice;
-        set {
-            if (value.HasValue && value <= 0 && Contract.AssetClass != AssetClass.FutureOption && Contract.AssetClass != AssetClass.Option) {
-                throw new ArgumentOutOfRangeException(nameof(value), "Market price must be greater than 0 for futures.");
-            }
-            // DEBUG
-            if (Contract.Symbol == "ES" && Contract.AssetClass == AssetClass.Future && value.HasValue && value < 1000) {
-                throw new ArgumentOutOfRangeException(nameof(value), "Market price for ES should not be less than 1000.");
-            }
-            _marketPrice = value;
-        }
-    }
 
     /// <summary>
     /// Used for StdDev to calculate log return
@@ -49,8 +32,6 @@ public class Position
         }
     }
 
-    public bool IsDataStreaming { get; set; } = false;
-
     /// <summary>
     /// Estimated delta with sigmoid function.
     /// </summary>
@@ -63,12 +44,15 @@ public class Position
 
     public float Beta { get; set; } = 1;
 
+    public UnderlyingPosition? Underlying { get; set; }
+
+    public int? UnderlyingContractId { get; set; }
+
     #endregion
 
     #region Constructors
 
-    public Position(Contract? contract = null, IRealizedVolatility? realizedVolatility = null) {
-        RealizedVol = realizedVolatility != null? realizedVolatility : new RVwithSubsampling(PositionsCollection.RealizedVolPeriod, PositionsCollection.RealizedVolSamples);
+    public Position(Contract? contract = null) {
 
         Contract = contract != null ? contract : Contract = new Contract() {
             Symbol = string.Empty
@@ -95,6 +79,7 @@ public class Position
             Id = position.ContractId,
             Symbol = position.Symbol,
             AssetClass = position.AssetClass,
+            MarketPrice = position.MarketPrice,
             Multiplier = position.Multiplier,
             Strike = position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option ? position.Strike : 0,
             IsCall = position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option ? position.IsCall : false,
@@ -102,7 +87,6 @@ public class Position
         };
 
         Size = position.Size;
-        MarketPrice = position.MarketPrice;
         MarketValue = position.MarketValue;
     }
 
@@ -111,9 +95,7 @@ public class Position
     /// </summary>
     [SetsRequiredMembers]
     public Position(int contractId, string underlyingSymbol,
-        AssetClass assetClass, DateTimeOffset? expiration, float strike, bool isCall = true, float multiplier = 100,
-        IRealizedVolatility? realizedVolatility = null)
-         : this(realizedVolatility: realizedVolatility) {
+        AssetClass assetClass, DateTimeOffset? expiration, float strike, bool isCall = true, float multiplier = 100) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -152,7 +134,7 @@ public class Position
     /// </summary>
     [SetsRequiredMembers]
     public Position(int contractId, string underlyingSymbol, AssetClass assetClass, DateTimeOffset? expiration = null, 
-        float multiplier = 1, IRealizedVolatility? realizedVolatility = null) : this(realizedVolatility: realizedVolatility) {
+        float multiplier = 1) {
 
         if (contractId <= 0) {
             throw new ArgumentOutOfRangeException(nameof(contractId), "Contract ID is required.");
@@ -192,7 +174,7 @@ public class Position
 
         lock (_lock) {
             Size = value.Size;
-            MarketPrice = value.MarketPrice;
+            Contract.MarketPrice = value.MarketPrice;
             MarketValue = value.MarketValue;
         }
     }
@@ -210,15 +192,9 @@ public class Position
         }
     }
 
-    public void UpdateStdDev()
-    {
-        if (MarketPrice.HasValue)
-            RealizedVol?.AddValue(MarketPrice.Value);
-    }
-
     #endregion
 
     public override string ToString() {
-        return $"{Contract} {Size} @ {MarketPrice:C}";
+        return $"{Contract} {Size} @ {Contract.MarketPrice:C}";
     }
 }

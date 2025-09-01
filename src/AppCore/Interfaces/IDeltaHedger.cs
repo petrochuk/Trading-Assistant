@@ -1,10 +1,13 @@
-﻿using AppCore.Models;
+﻿using AppCore.Configuration;
+using AppCore.Models;
 
 namespace AppCore.Interfaces;
 
 public interface IDeltaHedger : IDisposable
 {
-    Contract Contract { get; }
-
     void Hedge();
+
+    DeltaHedgerSymbolConfiguration Configuration { get; }
+
+    UnderlyingPosition UnderlyingPosition { get; }
 }

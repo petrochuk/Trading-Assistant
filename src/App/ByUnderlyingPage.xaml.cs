@@ -18,7 +18,7 @@ public sealed partial class ByUnderlyingPage : Page
     }
 
     private void UnderlyingList_SelectionChanged(object sender, SelectionChangedEventArgs e) {
-        if (_positions != null && UnderlyingList.SelectedItem is Position selectedPosition) {
+        if (_positions != null && UnderlyingList.SelectedItem is UnderlyingPosition selectedPosition) {
             _positions.SelectedPosition = selectedPosition;
         }
     }
