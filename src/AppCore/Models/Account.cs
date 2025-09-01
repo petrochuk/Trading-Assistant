@@ -58,6 +58,8 @@ public class Account : IDisposable
     public string Id { get; init; } = string.Empty;
 
     public float NetLiquidationValue { get; set; }
+    
+    public IReadOnlyDictionary<string, IDeltaHedger> DeltaHedgers => _deltaHedgers;
 
     public override string ToString() {
         return $"{Name} ({Id})";
@@ -68,28 +70,28 @@ public class Account : IDisposable
     private void OnUnderlyingsChanged(object? sender, NotifyCollectionChangedEventArgs e) {
         if (e.Action == NotifyCollectionChangedAction.Add) {
             foreach (var item in e.NewItems ?? Array.Empty<object>()) {
-                if (item is Position position) {
+                if (item is UnderlyingPosition underlying) {
 
-                    if (_deltaHedgers.ContainsKey(position.Contract.Symbol)) {
-                        _logger.LogInformation($"Delta hedger for {position.Contract.Symbol} already exists");
+                    if (_deltaHedgers.ContainsKey(underlying.Symbol)) {
+                        _logger.LogInformation($"Delta hedger for {underlying.Symbol} already exists");
                         continue;
                     }
 
-                    if (!_deltaHedgerConfiguration.Configs.ContainsKey(position.Contract.Symbol)) {
-                        _logger.LogInformation($"Delta hedger configuration not found for {position.Contract.Symbol}. Skipping.");
+                    if (!_deltaHedgerConfiguration.Configs.ContainsKey(underlying.Symbol)) {
+                        _logger.LogInformation($"Delta hedger configuration not found for {underlying.Symbol}. Skipping.");
                         continue;
                     }
 
-                    var deltaHedger = _deltaHedgerFactory.Create(_broker, Id, position, Positions, _deltaHedgerConfiguration);
-                    if (_deltaHedgers.TryAdd(position.Contract.Symbol, deltaHedger)) {
-                        _logger.LogInformation($"Delta hedger added for {position.Contract.Symbol}");
+                    var deltaHedger = _deltaHedgerFactory.Create(_broker, Id, underlying, Positions, _deltaHedgerConfiguration);
+                    if (_deltaHedgers.TryAdd(underlying.Symbol, deltaHedger)) {
+                        _logger.LogInformation($"Delta hedger added for {underlying.Symbol}");
                     }
                 }
             }
         }
         else if (e.Action == NotifyCollectionChangedAction.Remove) {
             // Build list of symbols
-            var symbols = new HashSet<string>(Positions.Underlyings.Select(p => p.Contract.Symbol));
+            var symbols = new HashSet<string>(Positions.Underlyings.Select(u => u.Symbol));
 
             // Remove hedgers for positions no longer in the underlyings collection
             var toRemove = _deltaHedgers.Keys.Except(symbols).ToList();
@@ -125,7 +127,7 @@ public class Account : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Error executing delta hedger for contract {hedger.Contract}");
+                    _logger.LogError(ex, $"Error executing delta hedger for {hedger.UnderlyingPosition.Symbol}");
                 }
             }
 
@@ -154,7 +156,7 @@ public class Account : IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error disposing delta hedger for contract {hedger.Contract}");
+                _logger.LogError(ex, $"Error disposing delta hedger for {hedger.UnderlyingPosition.Symbol}");
             }
         }
         _deltaHedgers.Clear();

@@ -1,4 +1,5 @@
-﻿using AppCore.Args;
+﻿using AppCore;
+using AppCore.Args;
 using AppCore.Configuration;
 using AppCore.Extenstions;
 using AppCore.Interfaces;
@@ -234,12 +235,12 @@ public class IBClient : IBroker
 
     #region Contract management
 
-    public void FindContract(Contract contract) {
-        var request = new Requests.FindContract(contract, OnContractFound, BearerToken);
+    public void FindContracts(string symbol, AssetClass assetClass) {
+        var request = new Requests.FindContracts(symbol, assetClass, OnContractFound, BearerToken);
 
-        _logger.LogInformation($"Looking for {contract}");
+        _logger.LogInformation($"Looking for {symbol} contract");
         if (!_channel.Writer.TryWrite(request)) {
-            throw new IBClientException($"Failed to find {contract}");
+            throw new IBClientException($"Failed to find {symbol}");
         }
     }
     

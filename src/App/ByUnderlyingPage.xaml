@@ -15,8 +15,8 @@
              BorderBrush="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
              SelectionMode="Single">
         <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="models:Position">
-                <TextBlock Text="{x:Bind Contract}" FontSize="16" Margin="5"/>
+            <DataTemplate x:DataType="models:UnderlyingPosition">
+                <TextBlock Text="{x:Bind Symbol}" FontSize="16" Margin="5"/>
             </DataTemplate>
         </ListBox.ItemTemplate>
     </ListBox>

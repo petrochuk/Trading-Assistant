@@ -18,7 +18,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     private readonly IBroker _broker;
     private readonly string _accountId;
     private readonly DeltaHedgerSymbolConfiguration _configuration;
-    private readonly Position _underlyingPosition;
+    private readonly UnderlyingPosition _underlyingPosition;
     private readonly PositionsCollection _positions;
     private readonly SemaphoreSlim _hedgeSemaphore = new(1, 1);
     private Guid? _activeOrderId;
@@ -29,8 +29,8 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     /// Initializes a new instance of the <see cref="DeltaHedger"/> class.
     /// </summary>
     /// <param name="configuration">The delta hedger configuration.</param>
-    public DeltaHedger(ILogger<DeltaHedger> logger, TimeProvider timeProvider, IBroker broker, string accountId, 
-        Position underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
+    public DeltaHedger(ILogger<DeltaHedger> logger, TimeProvider timeProvider, IBroker broker, string accountId,
+        UnderlyingPosition underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -45,37 +45,38 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         _broker.OnOrderPlaced += Broker_OnOrderPlaced;
     }
 
-    public Position UnderlyingPosition => _underlyingPosition;
+    public UnderlyingPosition UnderlyingPosition => _underlyingPosition;
 
-    public Contract Contract => _underlyingPosition.Contract;
+    public DeltaHedgerSymbolConfiguration Configuration => _configuration;
 
     public void Hedge() {
         if (_disposed)
             throw new ObjectDisposedException(nameof(DeltaHedger), "Cannot hedge after the hedger has been disposed.");
 
         if (_activeOrderId.HasValue) {
-            _logger.LogDebug($"Hedge order already in progress for contract {_underlyingPosition.Contract}. Skipping.");
+            _logger.LogDebug($"Hedge order already in progress for {_underlyingPosition.Symbol}. Skipping.");
             return;
         }
 
         if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value)
         {
-            _logger.LogDebug($"Hedge execution delayed for contract {_underlyingPosition.Contract}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.GetUtcNow():hh\\:mm\\:ss}.");
+            _logger.LogDebug($"Hedge execution delayed for {_underlyingPosition.Symbol}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.GetUtcNow():hh\\:mm\\:ss}.");
             return;
         }
 
         // Try to acquire the semaphore without blocking
         if (!_hedgeSemaphore.Wait(0))
         {
-            _logger.LogDebug($"Hedge execution already in progress for contract {_underlyingPosition.Contract}. Skipping overlapping execution.");
+            _logger.LogDebug($"Hedge order already in progress for  {_underlyingPosition.Symbol}. Skipping overlapping execution.");
             return;
         }
 
         try
         {
-            _logger.LogDebug($"Executing delta hedger for contract {_underlyingPosition.Contract}");
+            _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
 
             var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition);
+            /*
             if (greeks == null || float.IsNaN(greeks.Value.Delta) || float.IsNaN(greeks.Value.Charm)) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Contract} or NaN. Cannot hedge.");
                 return;
@@ -92,11 +93,12 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             // Round delta down to 0 in whole numbers
             var deltaHedgeSize = 0 < deltaPlus1 ? MathF.Ceiling(_configuration.Delta - deltaPlus1) : MathF.Floor(-_configuration.Delta - deltaPlus1);
 
-            _logger.LogDebug($"Placing delta hedge size: {deltaHedgeSize} for contract {_underlyingPosition.Contract}");
+            _logger.LogDebug($"Placing delta hedge size: {deltaHedgeSize} for {_underlyingPosition.Symbol}");
             // Set a delay to prevent immediate re-hedging
             _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(2);
             _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
             _broker.PlaceOrder(_accountId, _activeOrderId.Value, Contract, deltaHedgeSize);
+            */
         }
         finally
         {
@@ -106,6 +108,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
     private void Broker_OnOrderPlaced(object? sender, OrderPlacedArgs e)
     {
+        /*
         if (e.AccountId != _accountId || e.Contract.Id != _underlyingPosition.Contract.Id)
         {
             _logger.LogDebug($"Order placed for different account or contract. Ignoring: AccountId={e.AccountId}, ContractId={e.Contract.Id}");
@@ -124,8 +127,9 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _activeOrderId = null; // Reset active order ID
             return;
         }
+        */
 
-        _logger.LogInformation($"Delta hedge order {_activeOrderId} placed successfully for contract {_underlyingPosition.Contract}.");
+        _logger.LogInformation($"Delta hedge order {_activeOrderId} placed successfully for {_underlyingPosition.Symbol}.");
         _activeOrderId = null; // Reset active order ID after successful placement
     }
 
@@ -136,6 +140,6 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
         _disposed = true;
         _hedgeSemaphore?.Dispose();
-        _logger.LogDebug($"DeltaHedger for contract {_underlyingPosition.Contract} disposed.");
+        _logger.LogDebug($"DeltaHedger for {_underlyingPosition.Symbol} disposed.");
     }
 }

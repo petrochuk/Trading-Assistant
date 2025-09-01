@@ -53,7 +53,7 @@ internal class TestBroker : IBroker
     public void RequestContractDetails(int contractId) {
     }
 
-    public void FindContract(Contract contract) {
+    public void FindContracts(string symbol, AssetClass assetClass) {
     }
 
     public void SuppressWarnings() {

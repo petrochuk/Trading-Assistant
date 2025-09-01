@@ -21,21 +21,6 @@ public class Position
 
     public float Size { get; set; }
 
-    float? _marketPrice;
-    public float? MarketPrice {
-        get => _marketPrice;
-        set {
-            if (value.HasValue && value <= 0 && Contract.AssetClass != AssetClass.FutureOption && Contract.AssetClass != AssetClass.Option) {
-                throw new ArgumentOutOfRangeException(nameof(value), "Market price must be greater than 0 for futures.");
-            }
-            // DEBUG
-            if (Contract.Symbol == "ES" && Contract.AssetClass == AssetClass.Future && value.HasValue && value < 1000) {
-                throw new ArgumentOutOfRangeException(nameof(value), "Market price for ES should not be less than 1000.");
-            }
-            _marketPrice = value;
-        }
-    }
-
     /// <summary>
     /// Used for StdDev to calculate log return
     /// </summary>
@@ -48,8 +33,6 @@ public class Position
             _marketValue = value;
         }
     }
-
-    public bool IsDataStreaming { get; set; } = false;
 
     /// <summary>
     /// Estimated delta with sigmoid function.
@@ -95,6 +78,7 @@ public class Position
             Id = position.ContractId,
             Symbol = position.Symbol,
             AssetClass = position.AssetClass,
+            MarketPrice = position.MarketPrice,
             Multiplier = position.Multiplier,
             Strike = position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option ? position.Strike : 0,
             IsCall = position.AssetClass == AssetClass.FutureOption || position.AssetClass == AssetClass.Option ? position.IsCall : false,
@@ -102,7 +86,6 @@ public class Position
         };
 
         Size = position.Size;
-        MarketPrice = position.MarketPrice;
         MarketValue = position.MarketValue;
     }
 
@@ -192,7 +175,7 @@ public class Position
 
         lock (_lock) {
             Size = value.Size;
-            MarketPrice = value.MarketPrice;
+            Contract.MarketPrice = value.MarketPrice;
             MarketValue = value.MarketValue;
         }
     }
@@ -212,13 +195,13 @@ public class Position
 
     public void UpdateStdDev()
     {
-        if (MarketPrice.HasValue)
-            RealizedVol?.AddValue(MarketPrice.Value);
+        if (Contract.MarketPrice.HasValue)
+            RealizedVol?.AddValue(Contract.MarketPrice.Value);
     }
 
     #endregion
 
     public override string ToString() {
-        return $"{Contract} {Size} @ {MarketPrice:C}";
+        return $"{Contract} {Size} @ {Contract.MarketPrice:C}";
     }
 }

@@ -4,5 +4,9 @@ namespace AppCore.Args;
 
 public class ContractFoundArgs : EventArgs
 {
-    public required Contract Contract { get; init; }
+    public required string Symbol { get; init; }
+
+    public required AssetClass AssetClass { get; init; }
+
+    public List<Contract> Contracts { get; init; } = new List<Contract>();
 }

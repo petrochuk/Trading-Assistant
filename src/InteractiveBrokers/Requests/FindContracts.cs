@@ -6,27 +6,28 @@ using System.Globalization;
 
 namespace InteractiveBrokers.Requests;
 
-internal class FindContract : Request
+internal class FindContracts : Request
 {
     EventHandler<ContractFoundArgs>? _responseHandler;
-
-    private readonly Contract _contract;
+    private readonly string _symbol;
+    private readonly AssetClass _assetClass;
 
     [SetsRequiredMembers]
-    public FindContract(Contract contract, EventHandler<ContractFoundArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
-        _contract = contract ?? throw new ArgumentNullException(nameof(contract));
-        if (string.IsNullOrWhiteSpace(contract.Symbol))
-            throw new ArgumentNullException(nameof(contract.Symbol), "Contract symbol cannot be null or empty");
+    public FindContracts(string symbol, AssetClass assetClass, EventHandler<ContractFoundArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
+        if (string.IsNullOrWhiteSpace(symbol))
+            throw new ArgumentNullException(nameof(symbol), "Symbol cannot be null or empty");
 
-        if (contract.AssetClass == AssetClass.Stock) {
-            Uri = $"v1/api/trsrv/stocks?symbols={contract.Symbol}";
+        if (assetClass == AssetClass.Stock) {
+            Uri = $"v1/api/trsrv/stocks?symbols={symbol}";
         }
-        else if (contract.AssetClass == AssetClass.Future) {
-            Uri = $"v1/api/trsrv/futures?symbols={contract.Symbol}";
+        else if (assetClass == AssetClass.Future) {
+            Uri = $"v1/api/trsrv/futures?symbols={symbol}";
         }
         else
-            throw new IBClientException($"Invalid contract asset class {contract.AssetClass} for contract request");
+            throw new IBClientException($"Invalid asset class {assetClass} for contract request");
 
+        _symbol = symbol;
+        _assetClass = assetClass;
         _responseHandler = responseHandler;
     }
 
@@ -36,6 +37,24 @@ internal class FindContract : Request
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {contractsResponse.Count} contracts response");
         }
 
+        var args = new ContractFoundArgs() {
+            Symbol = _symbol,
+            AssetClass = _assetClass,
+        };
+
+        if (_assetClass == AssetClass.Future) {
+            foreach (var contract in contractsResponse.First().Value) {
+                args.Contracts.Add(new() {
+                    Symbol = _symbol,
+                    AssetClass = _assetClass,
+                    Id = contract.conid,
+                    UnderlyingContractId = contract.underlyingConid,
+                    Expiration = DateTime.ParseExact(contract.expirationDate.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture),
+                });
+            }
+        }
+
+        /*
         // Find contract with lowest expiration date
         Models.Contract? contract = null;
         int contractId = 0;
@@ -79,14 +98,16 @@ internal class FindContract : Request
 
         var contractDetails = new ContractFoundArgs {
             Contract = new () {
-                Symbol = _contract.Symbol,
-                AssetClass = _contract.AssetClass,
+                Symbol = _symbol,
+                AssetClass = _assetClass,
                 Id = contractId,
                 UnderlyingContractId = contract != null ? contract.underlyingConid : null,
                 Expiration = contract != null ? DateTime.ParseExact(contract.expirationDate.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture) : null,
             }
         };
 
-        _responseHandler?.Invoke(this, contractDetails);
+        */
+
+        _responseHandler?.Invoke(this, args);
     }
 }

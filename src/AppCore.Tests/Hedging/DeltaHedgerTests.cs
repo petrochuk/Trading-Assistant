@@ -24,19 +24,12 @@ public sealed class DeltaHedgerTests
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
         var testRealizedVol = new TestRealizedVol { TestValue = 0.2 };
 
-        var underlyingPosition = new Position(new Contract
-        {
-            Symbol = "ES",
-            AssetClass = AssetClass.Future,
-            Id = 1,
-            Multiplier = 50,
-            Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
-        }, testRealizedVol);
-        underlyingPosition.MarketPrice = esMarketPrice;
-        underlyingPosition.Size = 1;
+        var underlyingPosition = new UnderlyingPosition("ES", AssetClass.Future);
+        //underlyingPosition.Contract.MarketPrice = esMarketPrice;
+        //underlyingPosition.Size = 1;
 
         // Add 1 ES future position
-        positions.TryAdd(underlyingPosition.Contract.Id, underlyingPosition);
+        //positions.TryAdd(underlyingPosition.Contract.Id, underlyingPosition);
 
         // Add ES OTM call option positions which should be delta hedged
         var callOptionPosition = new Position(new Contract {
@@ -48,7 +41,7 @@ public sealed class DeltaHedgerTests
             Strike = 5010f,
             Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
         }, testRealizedVol);
-        callOptionPosition.MarketPrice = callOptionMarketPrice;
+        callOptionPosition.Contract.MarketPrice = callOptionMarketPrice;
         callOptionPosition.Size = callSize;
         positions.TryAdd(callOptionPosition.Contract.Id, callOptionPosition);
 
@@ -73,7 +66,7 @@ public sealed class DeltaHedgerTests
         }
 
         var order = testBroker.PlacedOrders[0];
-        Assert.AreEqual(underlyingPosition.Contract.Symbol, order.Contract.Symbol, "Order should be for the underlying contract.");
+        Assert.AreEqual(underlyingPosition.Symbol, order.Contract.Symbol, "Order should be for the underlying contract.");
         Assert.AreEqual(expectedHedgeSize, order.Size, "Order quantity should match the delta hedge requirement.");
     }
 
@@ -89,18 +82,12 @@ public sealed class DeltaHedgerTests
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, time, new ExpirationCalendar());
         var testRealizedVol = new TestRealizedVol { TestValue = 0.2 };
 
-        var underlyingPosition = new Position(new Contract
-        {
-            Symbol = "ES",
-            AssetClass = AssetClass.Future,
-            Id = 1,
-            Multiplier = 50,
-            Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
-        }, testRealizedVol);
-        underlyingPosition.MarketPrice = esMarketPrice;
-        underlyingPosition.Size = -1; // Short position
+        var underlyingPosition = new UnderlyingPosition("ES", AssetClass.Future);
+//            Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
+        //underlyingPosition.Contract.MarketPrice = esMarketPrice;
+        //underlyingPosition.Size = -1; // Short position
         // Add 1 ES future position
-        positions.TryAdd(underlyingPosition.Contract.Id, underlyingPosition);
+        //positions.TryAdd(underlyingPosition.Contract.Id, underlyingPosition);
         // Add 5 ES OTM put option positions which should be delta hedged
         var putOptionPosition = new Position(new Contract {
             Symbol = "ES",
@@ -111,7 +98,7 @@ public sealed class DeltaHedgerTests
             Strike = 4990f,
             Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
         }, testRealizedVol);
-        putOptionPosition.MarketPrice = putOptionMarketPrice;
+        putOptionPosition.Contract.MarketPrice = putOptionMarketPrice;
         putOptionPosition.Size = putSize;
         positions.TryAdd(putOptionPosition.Contract.Id, putOptionPosition);
         var deltaHedgerFactory = new DeltaHedgerFactory(NullLogger<DeltaHedger>.Instance, time);
@@ -135,7 +122,7 @@ public sealed class DeltaHedgerTests
         }
 
         var order = testBroker.PlacedOrders[0];
-        Assert.AreEqual(underlyingPosition.Contract.Symbol, order.Contract.Symbol, "Order should be for the underlying contract.");
+        Assert.AreEqual(underlyingPosition.Symbol, order.Contract.Symbol, "Order should be for the underlying contract.");
         Assert.AreEqual(expectedHedgeSize, order.Size, "Order quantity should match the delta hedge requirement.");
     }
 }

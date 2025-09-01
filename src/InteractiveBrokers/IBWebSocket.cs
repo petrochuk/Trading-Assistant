@@ -105,18 +105,18 @@ public class IBWebSocket : IDisposable
         EnsureSocketConnected();
     }
 
-    public void RequestPositionMarketData(Position position) {
+    public void RequestContractMarketData(Contract contract) {
         EnsureSocketConnected();
 
-        RequestMarketData(position);
+        RequestMarketData(contract);
     }
 
-    public void StopPositionMarketData(Position position) {
+    public void StopContractMarketData(Contract contract) {
         if (_clientWebSocket == null || _mainThread == null) {
             return;
         }
 
-        StopMarketData(position);
+        StopMarketData(contract);
     }
 
     #endregion
@@ -245,23 +245,23 @@ public class IBWebSocket : IDisposable
         }
     }
 
-    private void RequestMarketData(Position position) {
-        if (position.IsDataStreaming) {
+    private void RequestMarketData(Contract contract) {
+        if (contract.IsDataStreaming) {
             return;
         }
 
-        position.IsDataStreaming = true;
-        if (position.Contract.AssetClass == AssetClass.Option || position.Contract.AssetClass == AssetClass.FutureOption) {
+        contract.IsDataStreaming = true;
+        if (contract.AssetClass == AssetClass.Option || contract.AssetClass == AssetClass.FutureOption) {
             // Request market data for options
-            var request = $@"smd+{position.Contract.Id}+{{""fields"":[""{_optionFieldsString}""]}}";
-            _logger.LogTrace($"Requesting market data for option {position.Contract}");
+            var request = $@"smd+{contract.Id}+{{""fields"":[""{_optionFieldsString}""]}}";
+            _logger.LogTrace($"Requesting market data for option {contract}");
 
             _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
-        else if (position.Contract.AssetClass == AssetClass.Stock || position.Contract.AssetClass == AssetClass.Future) {
+        else if (contract.AssetClass == AssetClass.Stock || contract.AssetClass == AssetClass.Future) {
             // Request market data for stocks and futures
-            var request = $@"smd+{position.Contract.Id}+{{""fields"":[""{_stockFieldsString}""]}}";
-            _logger.LogTrace($"Requesting market data for stock {position.Contract}");
+            var request = $@"smd+{contract.Id}+{{""fields"":[""{_stockFieldsString}""]}}";
+            _logger.LogTrace($"Requesting market data for stock {contract}");
             _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
     }
@@ -278,13 +278,13 @@ public class IBWebSocket : IDisposable
         _clientWebSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
     }
 
-    private void StopMarketData(Position position) {
-        if (!position.IsDataStreaming) {
+    private void StopMarketData(Contract contract) {
+        if (!contract.IsDataStreaming) {
             return;
         }
-        position.IsDataStreaming = false;
-        var request = $@"umd+{position.Contract.Id}+{{}}";
-        _logger.LogTrace($"Stopping market data for {position.Contract}");
+        contract.IsDataStreaming = false;
+        var request = $@"umd+{contract.Id}+{{}}";
+        _logger.LogTrace($"Stopping market data for {contract}");
         if (_clientWebSocket != null && _clientWebSocket.State == WebSocketState.Open) {
             _clientWebSocket.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
@@ -310,15 +310,6 @@ public class IBWebSocket : IDisposable
             if (account.Positions.TryGetValue(contractId, out var position)) {
                 positions.Add(position);
             }
-
-            var underlyingPosition = account.Positions.FindUnderlying(contractId);
-            if (underlyingPosition != null) {
-                positions.Add(underlyingPosition);
-            }
-        }
-        if (positions.Count == 0) {
-            _logger.LogWarning($"Position(s) with contract ID {contractId} not found in any account");
-            return;
         }
 
         // Beta
@@ -336,13 +327,18 @@ public class IBWebSocket : IDisposable
         if (message.TryGetValue(((int)MarketDataFields.MarkPrice).ToString(), out var markElement) && markElement.ValueKind == JsonValueKind.String) {
             if (!string.IsNullOrWhiteSpace(markElement.GetString()) && float.TryParse(markElement.GetString(), out var markPrice)) {
                 foreach (var position in positions) {
-                    position.MarketPrice = markPrice;
+                    position.Contract.MarketPrice = markPrice;
+                }
+                foreach (var account in _accounts) {
+                    foreach(var underlying in account.Positions.Underlyings) {
+                        underlying.UpdateMarketPrice(contractId, markPrice);
+                    }
                 }
             }
         }
 
         // Update greeks for options
-        if (positions[0].Contract.AssetClass == AssetClass.Option || positions[0].Contract.AssetClass == AssetClass.FutureOption) {
+        if (positions.Count > 0 && (positions[0].Contract.AssetClass == AssetClass.Option || positions[0].Contract.AssetClass == AssetClass.FutureOption)) {
             float? delta = null;
             if (!message.TryGetValue(((int)MarketDataFields.Delta).ToString(), out var deltaElement) || deltaElement.ValueKind != JsonValueKind.String) {
                 _logger.LogTrace($"Missing delta for {contractId}");

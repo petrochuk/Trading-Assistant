@@ -53,10 +53,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
     #region Properties
 
-    public ObservableCollection<Position> Underlyings { get; set; } = new();
+    public ObservableCollection<UnderlyingPosition> Underlyings { get; set; } = new();
 
-    Position? _selectedPosition = null;
-    public Position? SelectedPosition { 
+    UnderlyingPosition? _selectedPosition = null;
+    public UnderlyingPosition? SelectedPosition { 
         get => _selectedPosition;
         set {
             if (_selectedPosition != value) {
@@ -72,15 +72,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
     public void Reconcile(Dictionary<int, IPosition> positions) {
         lock (_lock) { 
-            // Remove positions that are not in the new list
-            foreach (var contractId in Keys.ToList()) {
-                if (!positions.ContainsKey(contractId)) {
-                    if (_selectedPosition != null && contractId != _selectedPosition.Contract.Id) {
-                        SelectedPosition = null;
-                    }
-                }
-            }
-
             // Add or update positions from the new list
             foreach (var positionKV in positions) {
                 if (TryGetValue(positionKV.Key, out var existingPosition)) {
@@ -92,8 +83,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         continue;
                     }
                     var position = new Position(positionKV.Value);
-                    if (position.Contract.Symbol == "ES" && position.Contract.AssetClass == AssetClass.Future && position.Contract.Id != 637533641)
-                        Debugger.Break();
                     if (TryAdd(positionKV.Key, position)) {
                         _logger.LogInformation($"Added {position.Size} position {position.Contract}");
                         OnPositionAdded?.Invoke(this, position);
@@ -122,12 +111,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
     }
 
-    public Position? FindUnderlying(int contractId) {
-        lock (_lock) {
-            return Underlyings.Where(p => p.Contract.Id == contractId).FirstOrDefault();
-        }
-    }
-
     private void RemovePosition(int contractId) {
         if (TryRemove(contractId, out var removedPosition)) {
             _logger.LogInformation($"Removed position {removedPosition!.Contract}");
@@ -140,45 +123,22 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         var newUnderlyings = new Dictionary<string, string>();
 
         foreach (var position in Values) {
-            var existingUnderlying = Underlyings.FirstOrDefault(u => u.Contract.Symbol == position.Contract.Symbol);
+            var existingUnderlying = Underlyings.FirstOrDefault(u => u.Symbol == position.Contract.Symbol);
             newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
 
             switch (position.Contract.AssetClass) {
                 case AssetClass.Stock:
+                case AssetClass.Future:
                     if (existingUnderlying == null)
-                        Underlyings.Add(position);
+                        Underlyings.Add(new UnderlyingPosition(position.Contract.Symbol, position.Contract.AssetClass, position));
                     break;
                 case AssetClass.Option:
-                    if (existingUnderlying == null) {
-                        // Add placeholder for position
-                        var contract = new Contract() {
-                            Symbol = position.Contract.Symbol,
-                            AssetClass = AssetClass.Stock,
-                        };
-                        Underlyings.Add(new Position(contract) {
-                            Size = 0
-                        });
-                    }
-                    break;
-                case AssetClass.Future:
-                    // Replace with front month future
-                    if (existingUnderlying != null && position.Contract.Expiration < existingUnderlying.Contract.Expiration) {
-                        Underlyings.Remove(existingUnderlying);
-                        Underlyings.Add(position);
-                    }
+                    if (existingUnderlying == null)
+                        Underlyings.Add(new UnderlyingPosition(position.Contract.Symbol, AssetClass.Stock));
                     break;
                 case AssetClass.FutureOption:
-                    if (existingUnderlying == null) {
-                        // Add placeholder for position
-                        var contract = new Contract() {
-                            Symbol = position.Contract.Symbol,
-                            AssetClass = AssetClass.Future,
-                            Expiration = _expirationCalendar.GetFrontMonthExpiration(position.Contract.Symbol, _timeProvider.EstNow()),
-                        };
-                        Underlyings.Add(new Position(contract) {
-                            Size = 0
-                        });
-                    }
+                    if (existingUnderlying == null)
+                        Underlyings.Add(new UnderlyingPosition(position.Contract.Symbol, AssetClass.Future));
                     break;
             }
         }
@@ -186,14 +146,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         // Remove underlyings that are not in the new list
         for (int i = Underlyings.Count - 1; i >= 0; i--) {
             var underlying = Underlyings[i];
-            if (!newUnderlyings.ContainsKey(underlying.Contract.Symbol)) {
-                _logger.LogInformation($"Removing underlying {underlying.Contract.Symbol}");
+            if (!newUnderlyings.ContainsKey(underlying.Symbol)) {
+                _logger.LogInformation($"Removing underlying {underlying.Symbol}");
                 Underlyings.RemoveAt(i);
             }
         }
     }
 
-    public Greeks? CalculateGreeks(float minIV = 0, Position? underlyingPosition = null) {
+    public Greeks? CalculateGreeks(float minIV = 0, UnderlyingPosition? underlyingPosition = null, bool useRealizedVol = true) {
         if (underlyingPosition == null) {
             if (_selectedPosition == null) {
                 return null;
@@ -201,11 +161,15 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             underlyingPosition = _selectedPosition;
         }
 
-        if (!underlyingPosition.MarketPrice.HasValue || underlyingPosition.MarketPrice == 0)
+        if (!underlyingPosition.Contract.MarketPrice.HasValue || underlyingPosition.Contract.MarketPrice == 0)
             return null;
 
-        if (underlyingPosition.RealizedVol == null || !underlyingPosition.RealizedVol.TryGetValue(out var realizedVol))
-            return null;
+        var realizedVol = 0.0;
+        if (underlyingPosition.RealizedVol == null || !underlyingPosition.RealizedVol.TryGetValue(out realizedVol)) {
+            if (useRealizedVol) {
+                return null;
+            }
+        }
 
         if (realizedVol < minIV) {
             realizedVol = minIV;
@@ -220,7 +184,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     continue;
                 }
 
-                if (!position.MarketPrice.HasValue) {
+                if (!position.Contract.MarketPrice.HasValue) {
                     _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate Greeks.");
                     return null;
                 }
@@ -237,10 +201,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     //greeks.Delta += position.Delta.Value * position.Size;
                     var bls = new BlackNScholesCaculator();
                     bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
-                    bls.StockPrice = underlyingPosition.MarketPrice.Value;
+                    bls.StockPrice = underlyingPosition.Contract.MarketPrice.Value;
                     bls.Strike = position.Contract.Strike;
                     // Market implied vol
-                    // bls.ImpliedVolatility = position.Contract.IsCall ? bls.GetCallIVBisections(position.MarketPrice.Value) : bls.GetPutIVBisections(position.MarketPrice.Value);
+                    var marketIV = position.Contract.IsCall ? bls.GetCallIVBisections(position.Contract.MarketPrice.Value) : bls.GetPutIVBisections(position.Contract.MarketPrice.Value);
                     // Actual realized vol
                     bls.ImpliedVolatility = (float)realizedVol;
                     bls.CalculateAll();
@@ -335,13 +299,13 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             if (position.Contract.Symbol != underlyingSymbol)
                 continue;
 
-            if (!position.MarketPrice.HasValue) {
+            if (!position.Contract.MarketPrice.HasValue) {
                 _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate P&L.");
                 continue;
             }
 
             if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
-                totalPL += position.Size * (currentPrice - position.MarketPrice.Value) * position.Contract.Multiplier;
+                totalPL += position.Size * (currentPrice - position.Contract.MarketPrice.Value) * position.Contract.Multiplier;
             } 
             else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
                 var optionPrice = CalculateOptionPrice(lookaheadSpan, midPrice, currentTime, currentPrice, bls, position);
@@ -350,7 +314,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     return null;
                 }
 
-                totalPL += position.Size * (optionPrice.Value - position.MarketPrice.Value) * position.Contract.Multiplier;
+                totalPL += position.Size * (optionPrice.Value - position.Contract.MarketPrice.Value) * position.Contract.Multiplier;
             }
         }
 
@@ -358,7 +322,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     }
 
     private float? CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCaculator bls, Position position) {
-        if (!position.MarketPrice.HasValue) {
+        if (!position.Contract.MarketPrice.HasValue) {
             _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate option price.");
             return null;
         }
@@ -385,14 +349,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         bls.Strike = position.Contract.Strike;
         if (position.Contract.IsCall) {
             // Estimate IV
-            var currentIV = bls.GetCallIVBisections(position.MarketPrice.Value);
+            var currentIV = bls.GetCallIVBisections(position.Contract.MarketPrice.Value);
             bls.ImpliedVolatility = currentIV;
             bls.StockPrice = currentPrice;
             bls.DaysLeft -= (float)lookaheadSpan.TotalDays;
             optionPrice = bls.CalculateCall();
         } else {
             // Estimate IV
-            var currentIV = bls.GetPutIVBisections(position.MarketPrice.Value);
+            var currentIV = bls.GetPutIVBisections(position.Contract.MarketPrice.Value);
             // Keep existing IV and move market price to calculate new option price
             bls.ImpliedVolatility = currentIV;
             bls.StockPrice = currentPrice;
@@ -411,9 +375,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     {
         foreach (var position in Underlyings)
         {
-            if (position.Contract.AssetClass != AssetClass.Stock && position.Contract.AssetClass != AssetClass.Future)
-                continue;
-
             position.UpdateStdDev();
         }
     }

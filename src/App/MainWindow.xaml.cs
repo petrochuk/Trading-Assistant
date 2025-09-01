@@ -127,7 +127,6 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         PositionsControl.Positions = account.Positions;
         ActiveAccountLabel = account.Name;
         PositionsRefreshTimer_Elapsed(null, new ElapsedEventArgs(DateTime.Now));
-        RequestMarketDataForAccount(account);
     }
 
     #endregion
@@ -135,11 +134,11 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     #region Positions Event Handlers
 
     private void OnPositionAdded(object? sender, Position position) {
-        App.Instance.IBWebSocket.RequestPositionMarketData(position);
+        App.Instance.IBWebSocket.RequestContractMarketData(position.Contract);
     }
 
     private void OnPositionRemoved(object? sender, Position position) {
-        App.Instance.IBWebSocket.StopPositionMarketData(position);
+        App.Instance.IBWebSocket.RequestContractMarketData(position.Contract);
     }
 
     private void PositionsRefreshTimer_Elapsed(object? sender, ElapsedEventArgs e) {
@@ -265,12 +264,12 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         DispatcherQueue?.TryEnqueue(() => {
             account.Positions.Reconcile(e.Positions);
 
-            // Make sure each underlying has a valid contract
-            foreach (var position in account.Positions.Underlyings) {
-                if (0 < position.Contract.Id) {
+            // Make sure each underlying has a valid contract(s)
+            foreach (var underlying in account.Positions.Underlyings) {
+                if (underlying.Contracts.Any()) {
                     continue;
                 }
-                App.Instance.IBClient.FindContract(position.Contract);
+                App.Instance.IBClient.FindContracts(underlying.Symbol, underlying.AssetClass);
             }
 
             RiskGraphControl.Redraw();
@@ -278,11 +277,23 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     private void IBClient_OnContractFound(object? sender, ContractFoundArgs e) {
-        App.Instance.IBClient.RequestContractDetails(e.Contract.Id);
+        _logger.LogInformation($"Found {e.Contracts.Count} contracts for {e.Symbol}");
+        foreach (var account in _accounts.Values) {
+            foreach (var underlying in account.Positions.Underlyings) {
+                if (underlying.Contracts.Any() || underlying.Symbol != e.Symbol || underlying.AssetClass != e.AssetClass) {
+                    continue;
+                }
+                foreach (var contract in e.Contracts) {
+                    underlying.Contracts.Add(contract.Id, contract);
+                    App.Instance.IBWebSocket.RequestContractMarketData(contract);
+                }
+            }
+        }
     }
 
     private void IBClient_OnContractDetails(object? sender, ContractDetailsArgs e) {
 
+        /*
         foreach (var account in _accounts.Values) {
             foreach (var position in account.Positions.Underlyings) {
                 if (position.Contract.Symbol != e.Contract.Symbol) {
@@ -310,6 +321,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
                 }
             }
         }
+        */
     }
 
     private void IBClient_Tickle(object? sender, TickleArgs e) {
@@ -323,8 +335,6 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             _logger.LogInformation("No accounts found, cannot request market data");
             return;
         }
-
-        RequestMarketDataForAccount(_activeAccount);
     }
 
     private void IBWebSocket_AccountData(object? sender, AccountDataArgs e) {
@@ -354,7 +364,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
     private void RequestMarketDataForAccount(Account account) {
         foreach (var position in account.Positions) {
-            App.Instance.IBWebSocket.RequestPositionMarketData(position.Value);
+            App.Instance.IBWebSocket.RequestContractMarketData(position.Value.Contract);
         }
     }
 
