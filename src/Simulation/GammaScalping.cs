@@ -12,17 +12,17 @@ internal class GammaScalping : ISimulation
 
         var bnsCalc = new BlackNScholesCaculator();
         var startTime = new DateTime(2025, 1, 1, 9, 30, 0);
-        var expiration = new DateTime(2025, 1, 31, 16, 0, 0);
+        var expiration = new DateTime(2025, 3, 31, 16, 0, 0);
         var timeStep = TimeSpan.FromDays(1);
 
         // Initialize the Black-Scholes calculator with initial values
         var startingPrice = 5000.0f;
-        var numberOfPaths = 100000;
+        var numberOfPaths = 10000;
         var totalPayouts = 0.0f;
         var totalHedgedPayouts = 0.0f;
         var impliedVolatility = 0.2f;
-        var realizedVolatility = 0.2f;
-        var hedgeVolatility = 0.50f;
+        var realizedVolatility = 0.25f;
+        var hedgeVolatility = 1.0f;
 
         for (int i = 0; i < numberOfPaths; i++)
         {
