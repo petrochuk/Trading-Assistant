@@ -104,7 +104,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     private void UpdateUnderlying(Position position) {
         if (position.Contract.AssetClass != AssetClass.Option && position.Contract.AssetClass != AssetClass.FutureOption)
             return;
-        if (position.Underlying != null)
+        if (position.Underlying != null && position.UnderlyingContractId != null)
             return;
         var underlying = Underlyings.FirstOrDefault(u => u.Symbol == position.Contract.Symbol && u.AssetClass == (position.Contract.AssetClass == AssetClass.Option ? AssetClass.Stock : AssetClass.Future));
         if (underlying != null) {
