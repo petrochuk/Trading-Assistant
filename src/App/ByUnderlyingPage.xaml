@@ -11,6 +11,7 @@
 
     <ListBox x:Name="UnderlyingList" SelectionChanged="UnderlyingList_SelectionChanged" ItemsSource="{x:Bind Positions.Underlyings, Mode=OneWay}"
              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+             SelectedItem="{x:Bind Positions.SelectedPosition, Mode=TwoWay}"
              Margin="8" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
              BorderBrush="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
              SelectionMode="Single">

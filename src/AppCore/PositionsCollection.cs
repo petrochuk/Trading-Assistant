@@ -153,7 +153,15 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             if (!newUnderlyings.ContainsKey(underlying.Symbol)) {
                 _logger.LogInformation($"Removing underlying {underlying.Symbol}");
                 Underlyings.RemoveAt(i);
+                if (_selectedPosition == underlying) {
+                    SelectedPosition = null;
+                }
             }
+        }
+
+        // Select the first underlying if none is selected
+        if (SelectedPosition == null && Underlyings.Count > 0) {
+            SelectedPosition = Underlyings[0];
         }
     }
 
