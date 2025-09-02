@@ -70,6 +70,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         App.Instance.IBClient.OnContractDetails += IBClient_OnContractDetails;
 
         App.Instance.IBWebSocket.Connected += IBWebSocket_Connected;
+        App.Instance.IBWebSocket.Disconnected += IBWebSocket_Disconnected;
         App.Instance.IBWebSocket.OnAccountData += IBWebSocket_AccountData;
     }
 
@@ -202,6 +203,12 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     private void IBClient_Disconnected(object? sender, EventArgs e) {
         _logger.LogWarning("Disconnected from IBKR event");
         Reconnect();
+    }
+
+    private void IBWebSocket_Disconnected(object? sender, DisconnectedArgs e) {
+        _logger.LogWarning($"Disconnected from IBKR WebSocket. Unexpected: {e.IsUnexpected}");
+        if (e.IsUnexpected)
+            Reconnect();
     }
 
     private void ReconnectTimer_Elapsed(object? sender, ElapsedEventArgs e) {

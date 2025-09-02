@@ -20,6 +20,7 @@ public class IBWebSocket : IDisposable
     private Thread? _mainThread;
     private readonly ILogger<IBWebSocket> _logger;
     private bool _isDisposed;
+    private bool _disconnecting = false;
     private ClientWebSocket? _clientWebSocket;
     private ManualResetEvent _connectedEvent = new(false);
     private List<MarketDataFields> _optionFields = new() {
@@ -84,6 +85,8 @@ public class IBWebSocket : IDisposable
 
     public event EventHandler? Connected;
 
+    public event EventHandler<DisconnectedArgs>? Disconnected;
+
     public event EventHandler<AccountDataArgs>? OnAccountData;
 
     #endregion
@@ -128,6 +131,7 @@ public class IBWebSocket : IDisposable
             _mainThread.Start();
         }
 
+        _disconnecting = false;
         _connectedEvent.WaitOne();
     }
 
@@ -201,6 +205,9 @@ public class IBWebSocket : IDisposable
         }
         catch (WebSocketException ex) {
             _logger.LogError($"WebSocket error: {ex.Message}");
+            Disconnected?.Invoke(this, 
+                new DisconnectedArgs { IsUnexpected = !_disconnecting }
+                );
         }
         catch (Exception ex) {
             _logger.LogError($"Error: {ex.Message}");
@@ -379,6 +386,7 @@ public class IBWebSocket : IDisposable
     }
 
     public void Disconnect() {
+        _disconnecting = true;
         ClientSession = string.Empty;
         BearerToken = string.Empty;
         if (_clientWebSocket != null && _clientWebSocket.State != WebSocketState.Closed && _clientWebSocket.State != WebSocketState.Aborted) {
