@@ -1,5 +1,6 @@
 ﻿using AppCore.Args;
 using AppCore.Configuration;
+using AppCore.Extenstions;
 using AppCore.Interfaces;
 using AppCore.Models;
 using Microsoft.Extensions.Logging;
@@ -70,7 +71,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         }
 
         // Check blackout periods
-        var now = _timeProvider.GetUtcNow().TimeOfDay;
+        var now = _timeProvider.EstNow().TimeOfDay;
         if (_configuration.BlackOutStart != null && _configuration.BlackOutEnd != null)
         {
             // Normal case: blackout period does not cross midnight
