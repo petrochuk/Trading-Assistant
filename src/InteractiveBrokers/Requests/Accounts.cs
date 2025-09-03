@@ -16,7 +16,7 @@ internal class Accounts : Request
     }
 
     public override void Execute(HttpClient httpClient) {
-        var accountsResponse = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.Accounts);
+        var accountsResponse = GetResponse(httpClient, Uri, 5, SourceGeneratorContext.Default.Accounts);
         if (accountsResponse.AccountIds.Count < 1) {
             throw new IBClientException($"IB Client ({httpClient.BaseAddress}) provided {accountsResponse.AccountIds.Count} accounts response");
         }

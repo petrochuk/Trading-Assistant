@@ -208,7 +208,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
     private void IBWebSocket_Disconnected(object? sender, DisconnectedArgs e) {
         _logger.LogWarning($"Disconnected from IBKR WebSocket. Unexpected: {e.IsUnexpected}");
         if (e.IsUnexpected)
-            Reconnect();
+            Reconnect(disconnectWebsocket: false);
     }
 
     private void ReconnectTimer_Elapsed(object? sender, ElapsedEventArgs e) {
@@ -369,8 +369,9 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private void Reconnect() {
+    private void Reconnect(bool disconnectWebsocket = true) {
         lock (_lock) {
+            _logger.LogInformation("Cleaning up existing session and accounts...");
             DispatcherQueue.TryEnqueue(() => {
                 ActiveAccount = null;
                 ActiveAccountLabel = "No Accounts";
@@ -389,10 +390,12 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             }
             _accounts.Clear();
 
+            _logger.LogInformation("Disconnecting IB Client and WebSocket...");
             _ibClientSession = string.Empty;
             App.Instance.IBClient.Disconnect();
-            App.Instance.IBWebSocket.Disconnect();
-            _logger.LogWarning("IBKR session lost, starting reconnect...");
+            if (disconnectWebsocket)
+                App.Instance.IBWebSocket.Disconnect();
+            _logger.LogWarning("Starting reconnect timer...");
         }
         _reconnectTimer.Start();
     }

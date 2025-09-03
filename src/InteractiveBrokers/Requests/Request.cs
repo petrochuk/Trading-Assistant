@@ -18,6 +18,28 @@ internal abstract class Request
 
     public abstract void Execute(HttpClient httpClient);
 
+    protected T GetResponse<T>(HttpClient httpClient, string uri, int retryCount, JsonTypeInfo<T> jsonTypeInfo,
+        HttpMethod? httpMethod = null, HttpContent? httpContent = null) {
+        if (retryCount < 1) {
+            throw new ArgumentOutOfRangeException(nameof(retryCount), "Retry count must be at least 1.");
+        }
+
+        for (int attempt = 1; attempt <= retryCount; attempt++) {
+            try {
+                return GetResponse(httpClient, uri, jsonTypeInfo, httpMethod, httpContent);
+            } catch (Exception ex) {
+                Logger?.LogError(ex, $"Attempt {attempt} to get response from {uri} failed.");
+                if (attempt == retryCount) {
+                    throw;
+                }
+                // Add a delay before retrying
+                Thread.Sleep(1000 * attempt); // Exponential backoff
+            }
+        }
+
+        throw new IBClientException($"Failed to get response from {uri} after {retryCount} attempts.");
+    }
+
     protected T GetResponse<T>(HttpClient httpClient, string uri, JsonTypeInfo<T> jsonTypeInfo,
         HttpMethod? httpMethod = null, HttpContent? httpContent = null) {
         _ = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
