@@ -236,7 +236,6 @@ public class IBClient : IBroker
             Logger = AppCore.ServiceProvider.Instance.GetService<ILogger<Requests.Request>>()
         };
 
-        _logger.LogInformation($"Requesting positions for account {accountId.Mask()}");
         if (!_channel.Writer.TryWrite(request)) {
             throw new IBClientException("Failed to request account positions");
         }

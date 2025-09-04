@@ -162,6 +162,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
         lock (_lock) {
             // Refresh account positions for each account
+            _logger.LogInformation($"Requesting positions for all accounts");
             foreach (var account in _accounts.Values) {
                 App.Instance.IBClient.RequestAccountPositions(account.Id);
             }

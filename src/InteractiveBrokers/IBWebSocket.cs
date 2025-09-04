@@ -123,6 +123,7 @@ public class IBWebSocket : IDisposable
     private void EnsureSocketConnected() {
 
         if (_mainThread == null) {
+            _logger.LogInformation("Starting IB WebSocket MainThread");
             // Initialize the main thread
             _mainThread = new Thread(new ThreadStart(MainThread)) {
                 IsBackground = true,
@@ -214,6 +215,7 @@ public class IBWebSocket : IDisposable
         }
         _connectedEvent.Reset();
         _logger.LogInformation($"WebSocket thread finished");
+        _mainThread = null;
     }
 
     private void HandleAccountData(string accountId, string messageString) {

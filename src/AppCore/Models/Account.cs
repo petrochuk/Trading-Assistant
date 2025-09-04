@@ -49,7 +49,7 @@ public class Account : IDisposable
             _logger.LogInformation($"Delta hedge timer started with interval: {_deltaHedgerConfiguration.HedgeInterval}");
         }
         else {
-            _logger.LogInformation($"Account {Id} is not supported for delta hedging. Skipping timer initialization.");
+            _logger.LogInformation($"Account {Name} is not supported for delta hedging. Skipping timer initialization.");
         }
     }
 
