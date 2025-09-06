@@ -1,4 +1,6 @@
-﻿using AppCore.Statistics;
+﻿using AppCore.Extenstions;
+using AppCore.Statistics;
+using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
@@ -67,7 +69,7 @@ public class UnderlyingPosition
         }
     }
 
-    public void AddContracts(List<Contract> contracts) {
+    public void AddContracts(List<Contract> contracts, TimeProvider timeProvider) {
         if (AssetClass == AssetClass.Stock) { 
             if (contracts.Count != 1 || contracts[0].Symbol != Symbol || contracts[0].AssetClass != AssetClass.Stock) {
                 throw new ArgumentException("Invalid contract for stock underlying position", nameof(contracts));
@@ -87,7 +89,8 @@ public class UnderlyingPosition
                 continue;
             _contractsById.Add(contract.Id, contract);
             _contractsByExpiration.Add(contract.Expiration!.Value, contract);
-            if (contract.Expiration!.Value < frontMonth) {
+            // Find the front month contract that expires after 5 days from now
+            if (contract.Expiration!.Value < frontMonth && timeProvider.EstNow().AddDays(5) < contract.Expiration!.Value) {
                 frontMonth = contract.Expiration.Value;
                 FrontContract = contract;
             }

@@ -401,7 +401,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         lock (_lock) {
             foreach (var underlying in Underlyings) {
                 if (underlying.Symbol == symbol && underlying.AssetClass == assetClass) {
-                    underlying.AddContracts(contracts);
+                    underlying.AddContracts(contracts, _timeProvider);
                     break;
                 }
             }
