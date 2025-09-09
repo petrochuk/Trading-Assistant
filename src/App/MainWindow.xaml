@@ -47,6 +47,10 @@
                     </AppBarButton.Flyout>
                     -->
                 </AppBarButton>
+                <AppBarSeparator />
+                <AppBarElementContainer >
+                    <local:AccountDetailsControl x:Name="AccountDetailsControl" Account="{x:Bind ActiveAccount, Mode=OneWay}" />
+                </AppBarElementContainer>
             </CommandBar>
         </StackPanel>
         <local:RiskGraph Grid.Column="0" Grid.Row="1" x:Name="RiskGraphControl">

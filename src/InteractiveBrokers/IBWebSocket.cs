@@ -49,7 +49,11 @@ public class IBWebSocket : IDisposable
     private IReadOnlyList<Account>? _accounts;
     private readonly BrokerConfiguration _brokerConfiguration;
     private readonly AuthenticationConfiguration _authConfiguration;
-    private static readonly string[] AccountKeys = ["NetLiquidation"];
+    private static readonly string[] AccountKeys = [
+        nameof(AccountSummaryTopic.NetLiquidation), 
+        nameof(AccountSummaryTopic.ExcessLiquidity),
+        nameof(AccountSummaryTopic.PostExpirationExcess)
+    ];
     private const string AccountDataHeader = "ssd+";
 
     #endregion
@@ -281,7 +285,7 @@ public class IBWebSocket : IDisposable
             _logger.LogError($"WebSocket is not connected. Cannot request account updates for {accountId.Mask()}");
             return;
         }
-        var request = $@"{AccountDataHeader}{accountId}+{{""keys"":[""{string.Join(',', AccountKeys)}""],""fields"":[""currency"",""monetaryValue""]}}";
+        var request = $@"{AccountDataHeader}{accountId}+{{""keys"":[""{string.Join("\",\"", AccountKeys)}""],""fields"":[""currency"",""monetaryValue""]}}";
         // All keys for debugging purposes
         // var request = $@"{AccountDataHeader}{accountId}+{{""keys"":[],""fields"":[""currency"",""monetaryValue""]}}";
         _logger.LogTrace($"Requesting account updates for {accountId.Mask()}");

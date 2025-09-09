@@ -233,13 +233,13 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
                 if (_activeAccount != null) {
                     // If this is an Individual account, we want to select the first one
-                    _activeAccount = account;
+                    ActiveAccount = account;
                 }
             }
 
             if (_activeAccount == null) {
                 // If no individual account found, select the first one
-                _activeAccount = _accounts.Values.FirstOrDefault();
+                ActiveAccount = _accounts.Values.FirstOrDefault();
             }
 
             RiskGraphControl.Account = _activeAccount;
@@ -415,17 +415,27 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             _logger.LogWarning($"Account {e.AccountId} not found in list of accounts");
             return;
         }
+        if (!e.MonetaryValue.HasValue)
+            return;
 
         switch (e.DataKey) {
-            case "NetLiquidation":
-                if (e.MonetaryValue.HasValue) {
+            case nameof(AccountSummaryTopic.NetLiquidation):
+                DispatcherQueue?.TryEnqueue(() => {
                     account.NetLiquidationValue = e.MonetaryValue.Value;
-                    if (_activeAccount != null && _activeAccount.Id == e.AccountId) {
-                        DispatcherQueue?.TryEnqueue(() => {
-                            RiskGraphControl.Redraw();
-                        });
-                    }
-                }
+                });
+                break;
+            case nameof(AccountSummaryTopic.ExcessLiquidity):
+                DispatcherQueue?.TryEnqueue(() => {
+                    account.ExcessLiquidity = e.MonetaryValue.Value;
+                });
+                break;
+            case nameof(AccountSummaryTopic.PostExpirationExcess):
+                DispatcherQueue?.TryEnqueue(() => {
+                    account.PostExpirationExcess = e.MonetaryValue.Value;
+                });
+                break;
+            default:
+                _logger.LogWarning($"Unhandled account data key received: {e.DataKey}");
                 break;
         }
     }

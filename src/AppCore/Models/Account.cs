@@ -3,13 +3,14 @@ using AppCore.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
+using System.ComponentModel;
 
 namespace AppCore.Models;
 
 /// <summary>
 /// Brokerage account.
 /// </summary>
-public class Account : IDisposable
+public class Account : IDisposable, INotifyPropertyChanged
 {
     #region Fields
     
@@ -20,6 +21,12 @@ public class Account : IDisposable
     private readonly DeltaHedgerConfiguration _deltaHedgerConfiguration;
     private readonly Timer? _hedgeTimer;
     private bool _disposed = false;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     #endregion
 
@@ -57,8 +64,65 @@ public class Account : IDisposable
 
     public string Id { get; init; } = string.Empty;
 
-    public float NetLiquidationValue { get; set; }
-    
+    private float _netLiquidationValue;
+    public float NetLiquidationValue {
+        get => _netLiquidationValue;
+        set {
+            if (_netLiquidationValue != value) {
+                _netLiquidationValue = value;
+                ExcessLiquidityPct = _netLiquidationValue != 0 ? (_excessLiquidity / _netLiquidationValue): 0;
+                PostExpirationExcessPct = _netLiquidationValue != 0 ? (_postExpirationExcess / _netLiquidationValue) : 0;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private float _excessLiquidity;
+    public float ExcessLiquidity {
+        get => _excessLiquidity;
+        set {
+            if (_excessLiquidity != value) {
+                _excessLiquidity = value;
+                ExcessLiquidityPct = _netLiquidationValue != 0 ? (_excessLiquidity / _netLiquidationValue): 0;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private float _excessLiquidityPct;
+    public float ExcessLiquidityPct {
+        get => _excessLiquidityPct;
+        set {
+            if (_excessLiquidityPct != value) {
+                _excessLiquidityPct = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private float _postExpirationExcess;
+    public float PostExpirationExcess {
+        get => _postExpirationExcess;
+        set {
+            if (_postExpirationExcess != value) {
+                _postExpirationExcess = value;
+                PostExpirationExcessPct = _netLiquidationValue != 0 ? (_postExpirationExcess / _netLiquidationValue) : 0;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private float _postExpirationExcessPct;
+    public float PostExpirationExcessPct {
+        get => _postExpirationExcessPct;
+        set {
+            if (_postExpirationExcessPct != value) {
+                _postExpirationExcessPct = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public IReadOnlyDictionary<string, IDeltaHedger> DeltaHedgers => _deltaHedgers;
 
     public override string ToString() {
