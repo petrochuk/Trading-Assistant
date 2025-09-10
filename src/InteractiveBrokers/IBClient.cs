@@ -47,11 +47,13 @@ public class IBClient : IBroker
         _brokerConfiguration = brokerConfiguration?.Value ?? throw new ArgumentNullException(nameof(brokerConfiguration));
         _authConfiguration = authConfiguration?.Value ?? throw new ArgumentNullException(nameof(authConfiguration));
 
-        _authConfiguration.PrivateKeyPath = _authConfiguration.PrivateKeyPath.Replace("<MyDocuments>", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+        _authConfiguration.PrivateKeyPath = _authConfiguration.PrivateKeyPath.Replace("<TradingAssistant>", ConfigurationFiles.Directory);
 
         // Disable SSL certificate validation IB Client Portal API Gateway
         var handler = new HttpClientHandler {
             ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true,
+            CookieContainer = new System.Net.CookieContainer(),
+            UseCookies = true
         };
         _baseUri = new UriBuilder("https", brokerConfiguration.Value.HostName).Uri;
         _httpClient = new HttpClient(handler) { BaseAddress = _baseUri };

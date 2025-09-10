@@ -52,15 +52,17 @@ public partial class App : Application
         var serviceCollection = new ServiceCollection();
 
         // App configuration
-        var userAppSettings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Work", "TradingAssistant", "appsettings.json");
-        var configuration = new ConfigurationBuilder()
+        var configurationBuilder = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", false, true)
-            .AddJsonFile(userAppSettings, true, true)
+            .AddJsonFile("appsettings.json", false, true);
 #if DEBUG
-            .AddJsonFile("appsettings.Debug.json", true, true)
+        configurationBuilder.AddJsonFile("appsettings.Debug.json", true, true);
 #endif
-            .Build();
+        var userAppSettings = ConfigurationFiles.UserAppSettings;
+        if (!string.IsNullOrWhiteSpace(userAppSettings))
+            configurationBuilder.AddJsonFile(userAppSettings, true, true);
+
+        var configuration = configurationBuilder.Build();
 
         // Uncomment to enable SelfLog self diagnostics
         // Serilog.Debugging.SelfLog.Enable(msg => Debug.WriteLine(msg));
