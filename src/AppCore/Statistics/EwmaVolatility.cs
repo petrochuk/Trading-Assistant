@@ -123,4 +123,12 @@ public sealed class EwmaVolatility
             return "Not enough data";
         return $"EWMA Vol: {Value}, Count: {Count}, Variance: {Variance}, Lambda: {Lambda}";
     }
+
+    internal void Reset(double initialSubsampleVariance) {
+        if (initialSubsampleVariance < 0)
+            throw new ArgumentOutOfRangeException(nameof(initialSubsampleVariance), "Initial variance must be non-negative.");
+        _variance = initialSubsampleVariance;
+        _count = 0;
+        _lastValue = null;
+    }
 }

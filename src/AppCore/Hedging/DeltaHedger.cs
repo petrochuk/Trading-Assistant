@@ -39,9 +39,10 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         if (string.IsNullOrWhiteSpace(accountId))
             throw new ArgumentException("Account ID cannot be null or empty.", nameof(accountId));
         _accountId = accountId;
-        _underlyingPosition = underlyingPosition ?? throw new ArgumentNullException(nameof(underlyingPosition));
-        _positions = positions ?? throw new ArgumentNullException(nameof(positions));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _underlyingPosition = underlyingPosition ?? throw new ArgumentNullException(nameof(underlyingPosition));
+        _underlyingPosition.RealizedVol?.Reset(_configuration.MinIV);
+        _positions = positions ?? throw new ArgumentNullException(nameof(positions));
 
         _broker.OnOrderPlaced += Broker_OnOrderPlaced;
     }

@@ -10,6 +10,7 @@ public class RVwithSubsampling : IRealizedVolatility
     private readonly TimeSpan _period;
     private List<EwmaVolatility> _subsamples = new();
     private int _currentSubsampleIndex = 0;
+    Lock _lock = new();
 
     public RVwithSubsampling(TimeSpan period, int subsamplesCount)
     {
@@ -28,6 +29,21 @@ public class RVwithSubsampling : IRealizedVolatility
     public TimeSpan Period => _period;
 
     public TimeSpan SubsamplePeriod => TimeSpan.FromTicks(_period.Ticks / _subsamples.Count);
+
+    /// <summary>
+    /// Resets the realized volatility calculator to the initial value.
+    /// </summary>
+    /// <param name="initialValue">annualized initial value</param>
+    public void Reset(double initialValue = 0) {
+        lock (_lock) 
+        {
+            var initialSubsampleValue = initialValue / System.Math.Sqrt(TimeExtensions.DaysPerYear * 24.0 * (60.0 / _period.TotalMinutes));
+            foreach (var subsample in _subsamples) {
+                subsample.Reset(initialSubsampleValue);
+            }
+            _currentSubsampleIndex = 0;
+        }
+    }
 
     public void AddValue(double value)
     {
