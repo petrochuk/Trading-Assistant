@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
+using static AppCore.Args.AccountsArgs;
 
 namespace AppCore;
 
@@ -409,6 +410,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             // Set underlying for each position
             foreach (var position in Values) {
                 UpdateUnderlying(position);
+            }
+        }
+    }
+
+    public void UpdateMarketPrice(int contractId, float markPrice) {
+        lock (_lock) {
+            foreach (var underlying in Underlyings) {
+                underlying.UpdateMarketPrice(contractId, markPrice);
             }
         }
     }

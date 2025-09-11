@@ -344,9 +344,7 @@ public class IBWebSocket : IDisposable
                     position.Contract.MarketPrice = markPrice;
                 }
                 foreach (var account in _accounts) {
-                    foreach(var underlying in account.Positions.Underlyings) {
-                        underlying.UpdateMarketPrice(contractId, markPrice);
-                    }
+                    account.Positions.UpdateMarketPrice(contractId, markPrice);
                 }
             }
         }
