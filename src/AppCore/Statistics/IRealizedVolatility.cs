@@ -6,5 +6,5 @@ public interface IRealizedVolatility
 
     bool TryGetValue(out double value);
 
-    void Reset(double initialValue = 0);
+    void Reset(double? initialValue = null);
 }

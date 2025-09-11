@@ -124,10 +124,12 @@ public sealed class EwmaVolatility
         return $"EWMA Vol: {Value}, Count: {Count}, Variance: {Variance}, Lambda: {Lambda}";
     }
 
-    internal void Reset(double initialSubsampleVariance) {
-        if (initialSubsampleVariance < 0)
+    internal void Reset(double? initialSubsampleVariance) {
+        if (initialSubsampleVariance.HasValue && initialSubsampleVariance.Value < 0)
             throw new ArgumentOutOfRangeException(nameof(initialSubsampleVariance), "Initial variance must be non-negative.");
-        _variance = initialSubsampleVariance;
+
+        if (initialSubsampleVariance.HasValue)
+            _variance = initialSubsampleVariance.Value;
         _count = 0;
         _lastValue = null;
     }

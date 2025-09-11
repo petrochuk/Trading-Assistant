@@ -18,9 +18,15 @@
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
+
+        <!-- Liquidity -->
         <TextBlock Grid.Column="0" Grid.Row="0" Text="Liq" MinWidth="60" FontSize="14" Margin="2" HorizontalTextAlignment="Center"/>
-        <TextBlock Grid.Column="0" Grid.Row="1" Text="{x:Bind sys:String.Format('{0:P}', Account.ExcessLiquidityPct), Mode=OneWay}" FontSize="15" Margin="2" HorizontalTextAlignment="Center"/>
+        <TextBlock Grid.Column="0" Grid.Row="1" Text="{x:Bind sys:String.Format('{0:P}', Account.ExcessLiquidityPct), Mode=OneWay}" 
+                   FontSize="15" Margin="2" HorizontalTextAlignment="Center"/>
+
+        <!-- Post Expiration Liquidity -->
         <TextBlock Grid.Column="1" Grid.Row="0" Text="OpEx Liq" MinWidth="60" FontSize="14" Margin="2" HorizontalTextAlignment="Center"/>
-        <TextBlock Grid.Column="1" Grid.Row="1" Text="{x:Bind sys:String.Format('{0:P}', Account.PostExpirationExcessPct), Mode=OneWay}" FontSize="15" Margin="2" HorizontalTextAlignment="Center"/>
+        <TextBlock Grid.Column="1" Grid.Row="1" Text="{x:Bind sys:String.Format('{0:P}', Account.PostExpirationExcessPct), Mode=OneWay}" 
+                   FontSize="15" Margin="2" HorizontalTextAlignment="Center"/>
     </Grid>
 </UserControl>

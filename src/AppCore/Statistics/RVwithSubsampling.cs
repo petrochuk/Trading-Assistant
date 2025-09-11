@@ -34,10 +34,10 @@ public class RVwithSubsampling : IRealizedVolatility
     /// Resets the realized volatility calculator to the initial value.
     /// </summary>
     /// <param name="initialValue">annualized initial value</param>
-    public void Reset(double initialValue = 0) {
+    public void Reset(double? initialValue = null) {
         lock (_lock) 
         {
-            var initialSubsampleValue = initialValue / System.Math.Sqrt(TimeExtensions.DaysPerYear * 24.0 * (60.0 / _period.TotalMinutes));
+            var initialSubsampleValue = initialValue.HasValue ? initialValue / System.Math.Sqrt(TimeExtensions.DaysPerYear * 24.0 * (60.0 / _period.TotalMinutes)) : (double?)null;
             foreach (var subsample in _subsamples) {
                 subsample.Reset(initialSubsampleValue);
             }
