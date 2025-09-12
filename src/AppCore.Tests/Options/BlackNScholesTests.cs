@@ -22,8 +22,8 @@ public class BlackNScholesTests
         Assert.AreEqual(expectedIV, iv, 0.005f);
         bls.ImpliedVolatility = iv;
 
-        var callPrice = bls.CalculateCall();
-        Assert.AreEqual(optionPrice, callPrice, 0.005f);
+        bls.CalculateAll();
+        Assert.AreEqual(optionPrice, bls.CallValue, 0.005f);
     }
 
     [TestMethod]
@@ -67,8 +67,8 @@ public class BlackNScholesTests
         Assert.AreEqual(expectedIV, iv, 0.005f);
         bls.ImpliedVolatility = iv;
 
-        var putPrice = bls.CalculatePut();
-        Assert.AreEqual(optionPrice, putPrice, 0.005f);
+        bls.CalculateAll();
+        Assert.AreEqual(optionPrice, bls.PutValue, 0.005f);
     }
 
     [TestMethod]
