@@ -29,11 +29,11 @@ public sealed class EwmaVolatility
     /// <summary>
     /// Creates a new EWMA volatility calculator from a smoothing period using the EMA mapping: alpha = 2/(period+1), lambda = 1 - alpha.
     /// </summary>
-    /// <param name="period">The smoothing period (&gt;= 1). Larger periods result in slower reaction.</param>
+    /// <param name="period">The smoothing period (>= 1). Larger periods result in slower reaction.</param>
     public static EwmaVolatility FromPeriod(int period)
     {
         if (period < 1)
-            throw new ArgumentOutOfRangeException(nameof(period), "Period must be &gt;= 1.");
+            throw new ArgumentOutOfRangeException(nameof(period), "Period must be >= 1.");
         // EMA alpha = 2/(N+1); here lambda = 1 - alpha
         var alpha = 2.0 / (period + 1.0);
         var lambda = 1.0 - alpha;
