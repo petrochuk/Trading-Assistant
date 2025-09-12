@@ -37,9 +37,9 @@ public class RVwithSubsampling : IRealizedVolatility
     public void Reset(double? initialValue = null) {
         lock (_lock) 
         {
-            var initialSubsampleValue = initialValue.HasValue ? initialValue / System.Math.Sqrt(TimeExtensions.DaysPerYear * 24.0 * (60.0 / _period.TotalMinutes)) : (double?)null;
+            var initialSubsampleVariance = initialValue.HasValue ? System.Math.Pow(initialValue.Value / System.Math.Sqrt(TimeExtensions.DaysPerYear * 24.0 * (60.0 / _period.TotalMinutes)), 2) : (double?)null;
             foreach (var subsample in _subsamples) {
-                subsample.Reset(initialSubsampleValue);
+                subsample.Reset(initialSubsampleVariance);
             }
             _currentSubsampleIndex = 0;
         }
