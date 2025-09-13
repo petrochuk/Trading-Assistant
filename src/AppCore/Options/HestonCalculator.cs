@@ -942,22 +942,11 @@ public class HestonCalculator
         float bestRho = Correlation;
 
         // Grid search ranges (simplified)
-        float[] v0Range = { 0.1f, 0.2f, 0.3f, 0.4f };
-        float[] thetaRange = { 0.1f, 0.2f, 0.3f, 0.4f };
-        float[] kappaRange = { 0.5f, 1.0f, 2.0f, 3.0f };
-        float[] sigmaRange = { 0.1f, 0.3f, 0.5f, 0.7f };
-        float[] rhoRange = { -0.7f, -0.5f, -0.3f, 0.0f, 0.3f };
-
-        foreach (float v0 in v0Range)
-        {
-            foreach (float theta in thetaRange)
-            {
-                foreach (float kappa in kappaRange)
-                {
-                    foreach (float sigma in sigmaRange)
-                    {
-                        foreach (float rho in rhoRange)
-                        {
+        for (float v0 = 0.03f; v0 <= 0.40f; v0 += 0.01f) {
+            for (float theta = 0.03f; theta <= 0.40f; theta += 0.01f) {
+                for (float kappa= 0.01f; kappa <= 5.0f; kappa += 0.1f) {
+                    for(float sigma= 0.1f; sigma <= 2.0f; sigma += 0.1f) {
+                        for (float rho = -2.0f; rho <= 2.0f; rho += 0.1f) {
                             CurrentVolatility = v0;
                             LongTermVolatility = theta;
                             VolatilityMeanReversion = kappa;

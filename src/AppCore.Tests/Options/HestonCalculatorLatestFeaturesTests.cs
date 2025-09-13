@@ -154,6 +154,34 @@ public class HestonCalculatorLatestFeaturesTests
         }
     }
 
+    [TestMethod]
+    public void TestHeston_RealMarketScenario()
+    {
+        var strikes = new float[] { 6300f, 6350f, 6400f, 6450f, 6500f, 6550f, 6600f, 6650f, 6700f };
+        var prices = new float[] { 289f, 239f, 189f, 139.25f, 90.5f, 42.5f, 6.7f, 0.3f, 0.05f };
+        var expires = new float[] { 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f };
+
+        var heston = new HestonCalculator
+        {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            StockPrice = 6592.5f,
+            DaysLeft = 1.0f,
+            CurrentVolatility = 0.10f,
+            LongTermVolatility = 0.15f,
+            VolatilityMeanReversion = 1.5f,
+            VolatilityOfVolatility = 0.95f,
+            Correlation = -0.9f
+        };
+
+        foreach (var strike in strikes)
+        {
+            heston.Strike = strike;
+            heston.CalculateAll();
+        }
+
+        //heston.CalibrateToMarketPrices(prices, strikes, expires);
+    }
+
     /// <summary>
     /// Test performance of different integration methods
     /// </summary>
