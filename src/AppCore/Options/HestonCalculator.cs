@@ -181,17 +181,9 @@ public class HestonCalculator
         // Validate parameters and apply adjustments if needed
         ValidateAndAdjustParameters();
 
-        // For short time to expiration or extreme parameters, use approximation
-        if (ExpiryTime < 0.01f || VolatilityOfVolatility > 2.0f || 
-            MathF.Abs(Correlation) > 0.95f || VolatilityMeanReversion > 50.0f)
-        {
-            CalculateHestonApproximate();
-            return;
-        }
-
         try
         {
-            // Calculate using characteristic function approach
+            // Calculate using simplified characteristic function approach
             float S = StockPrice;
             float K = Strike;
             float r = RiskFreeInterestRate;
@@ -202,7 +194,7 @@ public class HestonCalculator
             float sigma = VolatilityOfVolatility;
             float rho = Correlation;
 
-            // Use improved integration method based on latest research
+            // Use improved integration method
             var (p1, p2) = CalculateHestonProbabilities(S, K, r, T, v0, theta, kappa, sigma, rho);
 
             // Calculate option values using probabilities
@@ -221,7 +213,8 @@ public class HestonCalculator
             if (CallValue < intrinsicCall || PutValue < intrinsicPut || 
                 CallValue > S || PutValue > K ||
                 float.IsNaN(CallValue) || float.IsNaN(PutValue) ||
-                float.IsInfinity(CallValue) || float.IsInfinity(PutValue))
+                float.IsInfinity(CallValue) || float.IsInfinity(PutValue) ||
+                (CallValue == 0 && PutValue == 0 && ExpiryTime > 0)) // New check for zero values
             {
                 CalculateHestonApproximate();
             }
@@ -235,21 +228,26 @@ public class HestonCalculator
 
     /// <summary>
     /// Calculate the two probabilities P1 and P2 needed for Heston option pricing
-    /// Using latest Gatheral (2006) and Lord-Kahl (2010) improvements
+    /// Using simplified but stable integration approach
     /// </summary>
     private (float p1, float p2) CalculateHestonProbabilities(float S, float K, float r, float T, 
         float v0, float theta, float kappa, float sigma, float rho)
     {
         float logMoneyness = MathF.Log(S / K);
         
-        // Integration bounds - use adaptive bounds based on latest research
-        float upperBound = DetermineIntegrationBounds(T, sigma);
+        // Use fixed integration bounds that work well in practice
+        float upperBound = IntegrationMethod == HestonIntegrationMethod.Adaptive ? 
+            DetermineIntegrationBounds(T, sigma) : 100.0f;
         
-        float p1 = 0.5f + (1.0f / MathF.PI) * IntegrateCharacteristicFunction(
+        // Use stable integration with proper error handling
+        float integral1 = IntegrateCharacteristicFunction(
             logMoneyness, r, T, v0, theta, kappa, sigma, rho, upperBound, j: 1);
         
-        float p2 = 0.5f + (1.0f / MathF.PI) * IntegrateCharacteristicFunction(
+        float integral2 = IntegrateCharacteristicFunction(
             logMoneyness, r, T, v0, theta, kappa, sigma, rho, upperBound, j: 2);
+
+        float p1 = 0.5f + integral1 / MathF.PI;
+        float p2 = 0.5f + integral2 / MathF.PI;
 
         // Ensure probabilities are in valid range
         p1 = MathF.Max(0, MathF.Min(1, p1));
@@ -264,26 +262,26 @@ public class HestonCalculator
     /// </summary>
     private float DetermineIntegrationBounds(float T, float sigma)
     {
-        // Adaptive upper bound based on volatility of volatility and time to expiration
-        float baseBound = 100.0f;
-        float adjustment = MathF.Max(1.0f, sigma * MathF.Sqrt(T) * 10.0f);
-        return MathF.Min(baseBound * adjustment, 1000.0f);
+        // Conservative but stable bounds
+        float baseBound = 50.0f;
+        float adjustment = MathF.Max(1.0f, sigma * MathF.Sqrt(T) * 5.0f);
+        return MathF.Min(baseBound * adjustment, 200.0f);
     }
 
     /// <summary>
-    /// Integrate the characteristic function using advanced numerical methods
-    /// Implements Lord-Kahl (2010) optimal choice of branch cut
+    /// Integrate the characteristic function using stable numerical methods
     /// </summary>
     private float IntegrateCharacteristicFunction(float logK, float r, float T, 
         float v0, float theta, float kappa, float sigma, float rho, float upperBound, int j)
     {
         int numPoints = IntegrationMethod == HestonIntegrationMethod.Adaptive ? 
-            DetermineOptimalQuadraturePoints(T, sigma) : 1000;
+            DetermineOptimalQuadraturePoints(T, sigma) : 500;
         
         float integral = 0.0f;
         float du = upperBound / numPoints;
 
-        for (int i = 1; i <= numPoints; i++)
+        // Use trapezoidal rule for stability
+        for (int i = 0; i <= numPoints; i++)
         {
             float u = i * du;
             
@@ -291,20 +289,19 @@ public class HestonCalculator
             {
                 var integrand = CalculateIntegrand(u, logK, r, T, v0, theta, kappa, sigma, rho, j);
                 
-                // Apply Simpson's rule weights for better accuracy
-                float weight = (i == 1 || i == numPoints) ? 1.0f : 
-                              (i % 2 == 0) ? 4.0f : 2.0f;
+                // Apply trapezoidal rule weights
+                float weight = (i == 0 || i == numPoints) ? 0.5f : 1.0f;
                 
                 integral += weight * integrand;
             }
             catch (Exception)
             {
-                // Skip problematic points to maintain stability
+                // Skip problematic points but continue integration
                 continue;
             }
         }
 
-        return integral * du / 3.0f; // Simpson's rule normalization
+        return integral * du;
     }
 
     /// <summary>
@@ -312,31 +309,33 @@ public class HestonCalculator
     /// </summary>
     private int DetermineOptimalQuadraturePoints(float T, float sigma)
     {
-        // More points needed for high vol-of-vol or short time to expiration
+        // Reasonable number of points for stability vs performance
         float complexity = sigma / MathF.Max(0.01f, MathF.Sqrt(T));
-        return (int)MathF.Max(500, MathF.Min(2000, 500 + complexity * 1000));
+        return (int)MathF.Max(200, MathF.Min(1000, 200 + complexity * 300));
     }
 
     /// <summary>
     /// Calculate the integrand for the characteristic function
-    /// Uses Lord-Kahl branch cut selection for improved numerical stability
+    /// Simplified stable implementation
     /// </summary>
     private float CalculateIntegrand(float u, float logK, float r, float T, 
         float v0, float theta, float kappa, float sigma, float rho, int j)
     {
+        if (u == 0.0f) return 0.0f; // Avoid division by zero
+        
         try
         {
             // Use complex arithmetic for proper handling
             Complex i = Complex.ImaginaryOne;
-            Complex phi = u * i;
+            Complex phi = new Complex(u, 0.0);
             
-            // Apply Little Heston Trap correction (Albrecher et al., 2007)
+            // Apply Little Heston Trap correction
             if (j == 1)
             {
                 phi = phi - i;
             }
 
-            // Calculate characteristic function with branch cut optimization
+            // Calculate characteristic function
             Complex characteristic = CalculateCharacteristicFunction(phi, T, v0, theta, kappa, sigma, rho);
             
             // Check for problematic values
@@ -381,7 +380,7 @@ public class HestonCalculator
 
     /// <summary>
     /// Calculate Heston characteristic function with improved numerical stability
-    /// Implements Gatheral (2006) and Kahl-Jäckel (2006) optimizations
+    /// Based on standard Heston model formulation
     /// </summary>
     private Complex CalculateCharacteristicFunction(Complex phi, float T, 
         float v0, float theta, float kappa, float sigma, float rho)
@@ -390,25 +389,25 @@ public class HestonCalculator
         {
             Complex i = Complex.ImaginaryOne;
             
-            // Calculate discriminant with care for numerical stability
+            // Standard Heston characteristic function formulation
             Complex a = kappa - rho * sigma * i * phi;
-            Complex b = sigma * sigma;
-            Complex discriminant = a * a + b * phi * (i + phi);
+            Complex b = kappa * theta;
+            Complex c = 0.5f * sigma * sigma;
             
-            // Use principal square root with proper branch cut
+            // Calculate discriminant
+            Complex discriminant = a * a + c * phi * (i + phi);
             Complex d = Complex.Sqrt(discriminant);
             
-            // Apply Kahl-Jäckel branch cut selection
+            // Ensure proper branch cut selection
             if (d.Real < 0)
             {
                 d = -d;
             }
 
-            // Calculate g with improved numerical stability
+            // Calculate g (ratio of roots)
             Complex g1 = a - d;
             Complex g2 = a + d;
             
-            // Avoid division by zero
             if (Complex.Abs(g2) < 1e-15)
             {
                 return Complex.Zero;
@@ -416,33 +415,21 @@ public class HestonCalculator
             
             Complex g = g1 / g2;
 
-            // Avoid |g| = 1 which causes numerical issues
-            if (Complex.Abs(g) > 0.999)
-            {
-                // Use alternative formulation near unit circle
-                Complex denominator = a + d + 2.0 * Complex.Sqrt(discriminant.Real);
-                if (Complex.Abs(denominator) < 1e-15)
-                {
-                    return Complex.Zero;
-                }
-                g = (a - d) / denominator;
-            }
-
-            // Calculate A and B functions
+            // Calculate exponential term
             Complex expDT = Complex.Exp(-d * T);
             Complex gExpDT = g * expDT;
-            
-            // Avoid log of zero or negative numbers
-            Complex logArg = (1.0 - gExpDT) / (1.0 - g);
-            if (Complex.Abs(logArg) < 1e-15 || logArg.Real <= 0)
+
+            // Calculate A function (related to log stock price drift)
+            Complex logTerm = (1.0 - gExpDT) / (1.0 - g);
+            if (Complex.Abs(logTerm) < 1e-15 || logTerm.Real <= 0)
             {
                 return Complex.Zero;
             }
             
-            Complex A = kappa * theta / (sigma * sigma) * 
-                       (g1 * T - 2.0 * Complex.Log(logArg));
-            
-            Complex denomB = sigma * sigma * (1.0 - gExpDT);
+            Complex A = (b / c) * (g1 * T - 2.0 * Complex.Log(logTerm));
+
+            // Calculate B function (related to volatility)
+            Complex denomB = c * (1.0 - gExpDT);
             if (Complex.Abs(denomB) < 1e-15)
             {
                 return Complex.Zero;
@@ -450,15 +437,15 @@ public class HestonCalculator
             
             Complex B = g1 * (1.0 - expDT) / denomB;
 
-            // Check for problematic values before exponentiation
+            // Final characteristic function
             Complex exponent = A + B * v0;
-            if (double.IsNaN(exponent.Real) || double.IsNaN(exponent.Imaginary) ||
-                exponent.Real > 100 || exponent.Real < -100) // Prevent overflow
+            
+            // Prevent overflow/underflow
+            if (exponent.Real > 100.0 || exponent.Real < -100.0)
             {
                 return Complex.Zero;
             }
 
-            // Return characteristic function
             return Complex.Exp(exponent);
         }
         catch (Exception)

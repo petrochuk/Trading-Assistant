@@ -1,5 +1,4 @@
 using AppCore.Options;
-using System;
 
 namespace AppCore.Tests.Options;
 
@@ -11,6 +10,7 @@ public class HestonCalculatorTests
         float strike = 100.0f) {
         return new HestonCalculator
         {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
             StockPrice = stockPrice,
             Strike = strike,
             RiskFreeInterestRate = 0.05f,
@@ -30,7 +30,6 @@ public class HestonCalculatorTests
     [DataRow(5000.0f, 5000.0f)]
     public void TestHeston_BasicCallPutCalculation(float stockPrice, float strike) {
         var heston = CreateStandardHeston(stockPrice, strike);
-        // heston.IntegrationMethod = HestonIntegrationMethod.Adaptive;
         heston.CalculateCallPut();
 
         // Basic sanity checks
@@ -126,16 +125,20 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
-    public void TestHeston_DeltaNeutralityProperty()
+    [DataRow(100.0f, 100.0f)]
+    [DataRow(5000.0f, 5100.0f)]
+    [DataRow(5000.0f, 4900.0f)]
+    //[DataRow(5000.0f, 3000.0f)]
+    public void TestHeston_DeltaNeutralityProperty(float stockPrice, float strike)
     {
-        var heston = CreateStandardHeston();
+        var heston = CreateStandardHeston(stockPrice, strike);
         heston.CalculateAll();
 
-        float combinedDelta = heston.DeltaCall + heston.DeltaPut;
+        float combinedDelta = heston.DeltaCall - heston.DeltaPut;
         
         Assert.IsTrue(heston.DeltaCall >= 0 && heston.DeltaCall <= 1, $"Call delta should be between 0 and 1, got {heston.DeltaCall}");
         Assert.IsTrue(heston.DeltaPut >= -1 && heston.DeltaPut <= 0, $"Put delta should be between -1 and 0, got {heston.DeltaPut}");
-        Assert.IsTrue(combinedDelta > 0f && combinedDelta < 1.5f, $"Combined delta should be reasonable, got {combinedDelta}");
+        Assert.AreEqual(1f, combinedDelta, 0.1f, $"Combined delta (Call - Put) should be close to 1, got {combinedDelta}");
     }
 
     [TestMethod]
