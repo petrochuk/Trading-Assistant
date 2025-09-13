@@ -487,16 +487,10 @@ public class HestonCalculator
     /// </summary>
     private void CalculateHestonApproximate()
     {
-        // Use average effective volatility to maintain put-call parity
-        float callEffectiveVariance = CalculateEffectiveVariance(isCall: true);
-        float putEffectiveVariance = CalculateEffectiveVariance(isCall: false);
-        
-        // Use average to maintain put-call parity while capturing some correlation effect
-        float avgEffectiveVariance = (callEffectiveVariance + putEffectiveVariance) / 2.0f;
-        float effectiveVol = MathF.Sqrt(avgEffectiveVariance);
+        // Calculate standard Black-Scholes first
+        float effectiveVol = MathF.Sqrt(CalculateEffectiveVariance());
 
-        // Calculate standard Black-Scholes with average effective volatility
-        var d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + avgEffectiveVariance / 2.0f) * ExpiryTime) /
+        var d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + effectiveVol * effectiveVol / 2.0f) * ExpiryTime) /
                  (effectiveVol * MathF.Sqrt(ExpiryTime));
         var d2 = d1 - effectiveVol * MathF.Sqrt(ExpiryTime);
 
@@ -507,15 +501,23 @@ public class HestonCalculator
 
         var discountFactor = MathF.Exp(-RiskFreeInterestRate * ExpiryTime);
 
-        // Apply correlation adjustments to the final option values instead of volatilities
+        // Calculate base Black-Scholes values
         float baseCallValue = StockPrice * nd1 - Strike * discountFactor * nd2;
         float basePutValue = Strike * discountFactor * nMinusD2 - StockPrice * nMinusD1;
 
-        // Apply correlation adjustments that preserve put-call parity
+        // Apply small correlation adjustment that maintains option pricing bounds
         float correlationAdjustment = CalculateCorrelationAdjustment();
         
-        CallValue = MathF.Max(0, baseCallValue + correlationAdjustment);
-        PutValue = MathF.Max(0, basePutValue - correlationAdjustment);
+        // Ensure the adjustment doesn't violate basic option pricing constraints
+        float intrinsicCall = MathF.Max(0, StockPrice - Strike);
+        float intrinsicPut = MathF.Max(0, Strike - StockPrice);
+        
+        CallValue = MathF.Max(intrinsicCall, baseCallValue + correlationAdjustment);
+        PutValue = MathF.Max(intrinsicPut, basePutValue - correlationAdjustment);
+        
+        // Final bounds check - options can't be worth more than underlying or strike
+        CallValue = MathF.Min(CallValue, StockPrice);
+        PutValue = MathF.Min(PutValue, Strike * discountFactor);
     }
 
     /// <summary>
@@ -528,9 +530,26 @@ public class HestonCalculator
         var T = ExpiryTime;
         var v0 = CurrentVolatility * CurrentVolatility;
 
-        // Correlation adjustment that shifts value between calls and puts but preserves total
-        // Using a smaller multiplier to reduce put-call parity violations
-        return rho * xi * MathF.Sqrt(v0) * T * (StockPrice - Strike * MathF.Exp(-RiskFreeInterestRate * T)) * 0.5f;
+        // Calculate base adjustment
+        float baseAdjustment = rho * xi * MathF.Sqrt(v0) * T * (StockPrice - Strike * MathF.Exp(-RiskFreeInterestRate * T));
+        
+        // Scale down the adjustment to prevent extreme values for OTM options
+        float scalingFactor = 0.1f; // Reduced from 0.5f to prevent extreme adjustments
+        
+        // Additional damping for extreme moneyness
+        float moneyness = StockPrice / Strike;
+        float dampingFactor = 1.0f;
+        
+        if (moneyness > 5.0f || moneyness < 0.2f) // Very OTM cases
+        {
+            dampingFactor = 0.01f; // Heavily damped
+        }
+        else if (moneyness > 2.0f || moneyness < 0.5f) // Moderately OTM cases
+        {
+            dampingFactor = 0.1f; // Moderately damped
+        }
+        
+        return baseAdjustment * scalingFactor * dampingFactor;
     }
 
     /// <summary>
@@ -565,22 +584,9 @@ public class HestonCalculator
         // Vol of vol adjustment
         float volOfVolAdjustment = xi * xi * T / 8.0f;
         
-        // Correlation adjustment - different for calls vs puts
-        // In Heston model, negative correlation means when stock goes down, volatility goes up
-        // This creates negative skew (fat left tail), which increases put values and decreases call values
-        float correlationAdjustment;
-        if (isCall)
-        {
-            // For calls: negative correlation increases effective volatility on downside (bad for calls)
-            correlationAdjustment = rho * xi * MathF.Sqrt(baseVariance) * T * 0.8f;
-        }
-        else
-        {
-            // For puts: negative correlation increases effective volatility on downside (good for puts)
-            correlationAdjustment = -rho * xi * MathF.Sqrt(baseVariance) * T * 0.8f;
-        }
-        
-        float effectiveVariance = baseVariance + volOfVolAdjustment + correlationAdjustment;
+        // Use a single effective variance for both calls and puts to maintain put-call parity
+        // The correlation effect will be handled in the final price adjustment
+        float effectiveVariance = baseVariance + volOfVolAdjustment;
         
         // Ensure positive variance
         return MathF.Max(0.001f, effectiveVariance);
@@ -619,6 +625,21 @@ public class HestonCalculator
         const float bump = 1.0f; // Use $1 bump instead of 1% for more stable calculation
         float originalPrice = StockPrice;
 
+        // For extremely deep OTM options, use analytical bounds instead of finite difference
+        float moneyness = StockPrice / Strike;
+        if (moneyness > 50.0f) // Extremely deep OTM put, ITM call
+        {
+            DeltaCall = 1.0f; // Extremely deep ITM call delta approaches 1
+            DeltaPut = 0.0f;  // Extremely deep OTM put delta approaches 0
+            return;
+        }
+        else if (moneyness < 0.02f) // Extremely deep OTM call, ITM put  
+        {
+            DeltaCall = 0.0f;  // Extremely deep OTM call delta approaches 0
+            DeltaPut = -1.0f;  // Extremely deep ITM put delta approaches -1
+            return;
+        }
+
         // Bump stock price up
         StockPrice = originalPrice + bump;
         CalculateCallPut();
@@ -634,6 +655,10 @@ public class HestonCalculator
         // Calculate delta using central difference
         DeltaCall = (callUp - callDown) / (2.0f * bump);
         DeltaPut = (putUp - putDown) / (2.0f * bump);
+
+        // Apply bounds to ensure valid delta ranges
+        DeltaCall = MathF.Max(0.0f, MathF.Min(1.0f, DeltaCall));
+        DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
 
         // Restore original price
         StockPrice = originalPrice;
