@@ -130,11 +130,8 @@ public class HestonCalculatorTests
         var heston = CreateStandardHeston();
         heston.CalculateAll();
 
-        // For ATM options, call delta is typically around 0.5 and put delta around -0.5
-        // But the sum doesn't need to equal exactly 1 for all option types
         float combinedDelta = heston.DeltaCall + heston.DeltaPut;
         
-        // Check that deltas are in reasonable ranges
         Assert.IsTrue(heston.DeltaCall >= 0 && heston.DeltaCall <= 1, $"Call delta should be between 0 and 1, got {heston.DeltaCall}");
         Assert.IsTrue(heston.DeltaPut >= -1 && heston.DeltaPut <= 0, $"Put delta should be between -1 and 0, got {heston.DeltaPut}");
         Assert.IsTrue(combinedDelta > 0f && combinedDelta < 1.5f, $"Combined delta should be reasonable, got {combinedDelta}");
@@ -367,5 +364,88 @@ public class HestonCalculatorTests
         relativeError = MathF.Abs(heston.PutValue - blackScholes.PutValue) / blackScholes.PutValue;
         Assert.IsTrue(relativeError < 0.01f, 
             $"Heston should approximate Black-Scholes when vol is constant. Heston: {heston.PutValue}, BS: {blackScholes.PutValue}, Error: {relativeError:P2}");
+    }
+
+    [TestMethod]
+    public void TestHeston_PutCallParity_MultiStrikeMaturity()
+    {
+        var strikes = new float[] { 80f, 90f, 100f, 110f, 120f };
+        var maturities = new float[] { 10f/365f, 30f/365f, 90f/365f };
+        foreach (var T in maturities)
+        {
+            foreach (var K in strikes)
+            {
+                var heston = new HestonCalculator
+                {
+                    StockPrice = 100f,
+                    Strike = K,
+                    RiskFreeInterestRate = 0.03f,
+                    ExpiryTime = T,
+                    CurrentVolatility = 0.25f,
+                    LongTermVolatility = 0.25f,
+                    VolatilityMeanReversion = 5.0f,
+                    VolatilityOfVolatility = 0.05f,
+                    Correlation = 0.0f
+                };
+                heston.CalculateCallPut();
+                float discountedStrike = K * MathF.Exp(-0.03f * T);
+                float parityDiff = (heston.CallValue - heston.PutValue) - (heston.StockPrice - discountedStrike);
+                Assert.AreEqual(0f, parityDiff, 0.15f, $"Put-call parity drift too large for K={K}, T={T}, diff={parityDiff}");
+            }
+        }
+    }
+
+    [TestMethod]
+    public void TestHeston_CallPriceMonotonicDecreasingInStrike()
+    {
+        var strikes = new float[] { 80f, 90f, 100f, 110f, 120f };
+        float prev = float.MaxValue;
+        foreach (var K in strikes)
+        {
+            var heston = new HestonCalculator
+            {
+                StockPrice = 100f,
+                Strike = K,
+                RiskFreeInterestRate = 0.01f,
+                ExpiryTime = 60f/365f,
+                CurrentVolatility = 0.2f,
+                LongTermVolatility = 0.2f,
+                VolatilityMeanReversion = 10.0f,
+                VolatilityOfVolatility = 0.001f,
+                Correlation = 0.0f
+            };
+            heston.CalculateCallPut();
+            Assert.IsTrue(heston.CallValue <= prev + 0.05f, $"Call price should not increase materially with higher strike. K={K}, C={heston.CallValue}, prev={prev}");
+            prev = heston.CallValue;
+        }
+    }
+
+    [TestMethod]
+    public void TestHeston_CallConvexityInStrike()
+    {
+        // Check simple convexity: C(K-) - 2C(K) + C(K+) >= 0 (within tolerance)
+        float T = 45f/365f;
+        float r = 0.02f;
+        float[] K = { 95f, 100f, 105f };
+        float[] C = new float[3];
+        for (int i = 0; i < 3; i++)
+        {
+            var heston = new HestonCalculator
+            {
+                StockPrice = 100f,
+                Strike = K[i],
+                RiskFreeInterestRate = r,
+                ExpiryTime = T,
+                CurrentVolatility = 0.22f,
+                LongTermVolatility = 0.22f,
+                VolatilityMeanReversion = 25.0f,
+                VolatilityOfVolatility = 0.0001f,
+                Correlation = 0.0f
+            };
+            heston.CalculateCallPut();
+            C[i] = heston.CallValue;
+        }
+        float secondDiff = C[0] - 2*C[1] + C[2];
+        Assert.IsTrue(secondDiff >= -0.25f, $"Call price should be convex in strike (within tolerance). Second diff={secondDiff}");
     }
 }
