@@ -30,6 +30,7 @@ public class HestonCalculatorTests
     [DataRow(5000.0f, 5000.0f)]
     public void TestHeston_BasicCallPutCalculation(float stockPrice, float strike) {
         var heston = CreateStandardHeston(stockPrice, strike);
+        // heston.IntegrationMethod = HestonIntegrationMethod.Adaptive;
         heston.CalculateCallPut();
 
         // Basic sanity checks
@@ -323,17 +324,28 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
-    [DataRow(100.0f, 100.0f)]
-    [DataRow(500.0f, 500.0f)]
-    [DataRow(1000.0f, 1000.0f)]
-    [DataRow(5000.0f, 5000.0f)]
-    [DataRow(1000.0f, 1100.0f)]
-    [DataRow(5000.0f, 4900.0f)]
-    public void TestHeston_CompareWithBlackScholes(float stockPrice, float strike) {
+    [DataRow(100.0f, 100.0f, HestonIntegrationMethod.Approximation)]
+    [DataRow(100.0f, 100.0f, HestonIntegrationMethod.Adaptive)]
+    [DataRow(500.0f, 500.0f, HestonIntegrationMethod.Approximation)]
+    [DataRow(500.0f, 500.0f, HestonIntegrationMethod.Adaptive)]
+    [DataRow(1000.0f, 1000.0f, HestonIntegrationMethod.Approximation)]
+    [DataRow(1000.0f, 1000.0f, HestonIntegrationMethod.Adaptive)]
+    [DataRow(5000.0f, 5000.0f, HestonIntegrationMethod.Approximation)]
+    [DataRow(5000.0f, 5000.0f, HestonIntegrationMethod.Adaptive)]
+    [DataRow(1000.0f, 1100.0f, HestonIntegrationMethod.Approximation)]
+    [DataRow(1000.0f, 1100.0f, HestonIntegrationMethod.Adaptive)]
+    [DataRow(5000.0f, 4900.0f, HestonIntegrationMethod.Approximation)]
+    [DataRow(5000.0f, 4900.0f, HestonIntegrationMethod.Adaptive)]
+    [DataRow(5000.0f, 3000.0f, HestonIntegrationMethod.Approximation)]
+    [DataRow(5000.0f, 3000.0f, HestonIntegrationMethod.Adaptive)]
+    [DataRow(5000.0f, 7000.0f, HestonIntegrationMethod.Approximation)]
+    [DataRow(5000.0f, 7000.0f, HestonIntegrationMethod.Adaptive)]
+    public void TestHeston_CompareWithBlackScholes(float stockPrice, float strike, HestonIntegrationMethod hestonIntegrationMethod) {
         // When Heston parameters reduce to constant volatility, 
         // it should approximate Black-Scholes
         var heston = new HestonCalculator
         {
+            IntegrationMethod = hestonIntegrationMethod,
             StockPrice = stockPrice,
             Strike = strike,
             RiskFreeInterestRate = 0.05f,
@@ -342,7 +354,7 @@ public class HestonCalculatorTests
             LongTermVolatility = 0.2f,
             VolatilityMeanReversion = 100.0f, // Very fast mean reversion
             VolatilityOfVolatility = 0.001f, // Very low vol of vol
-            Correlation = 0.0f // No correlation
+            Correlation = 0f // No correlation
         };
 
         var blackScholes = new BlackNScholesCaculator
@@ -357,11 +369,11 @@ public class HestonCalculatorTests
         heston.CalculateAll();
         blackScholes.CalculateAll();
 
-        // Should be reasonably close (within 20% given the approximation)
-        float relativeError = MathF.Abs(heston.CallValue - blackScholes.CallValue) / blackScholes.CallValue;
+        // Should be reasonably close
+        float relativeError = heston.CallValue == blackScholes.CallValue ? 0 : MathF.Abs(heston.CallValue - blackScholes.CallValue) / blackScholes.CallValue;
         Assert.IsTrue(relativeError < 0.01f, 
             $"Heston should approximate Black-Scholes when vol is constant. Heston: {heston.CallValue}, BS: {blackScholes.CallValue}, Error: {relativeError:P2}");
-        relativeError = MathF.Abs(heston.PutValue - blackScholes.PutValue) / blackScholes.PutValue;
+        relativeError = heston.PutValue == blackScholes.PutValue ? 0 : MathF.Abs(heston.PutValue - blackScholes.PutValue) / blackScholes.PutValue;
         Assert.IsTrue(relativeError < 0.01f, 
             $"Heston should approximate Black-Scholes when vol is constant. Heston: {heston.PutValue}, BS: {blackScholes.PutValue}, Error: {relativeError:P2}");
     }
