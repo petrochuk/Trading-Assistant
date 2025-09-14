@@ -157,9 +157,21 @@ public class HestonCalculatorLatestFeaturesTests
     [TestMethod]
     public void TestHeston_RealMarketScenario()
     {
-        var strikes = new float[] { 6300f, 6350f, 6400f, 6450f, 6500f, 6550f, 6600f, 6650f, 6700f };
-        var prices = new float[] { 289f, 239f, 189f, 139.25f, 90.5f, 42.5f, 6.7f, 0.3f, 0.05f };
-        var expires = new float[] { 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f };
+        var strikes = new float[] { 
+            6300f, 6350f, 6400f, 6450f, 6500f, 6550f, 6600f, 6650f, 6700f,
+            6300f, 6350f, 6400f, 6450f, 6500f, 6550f, 6600f, 6650f, 6700f,
+            6300f, 6350f, 6400f, 6450f, 6500f, 6550f, 6600f, 6650f, 6700f,
+        };
+        var expires = new float[] { 
+            1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f,
+            2f, 2f, 2f, 2f, 2f, 2f, 2f, 2f, 2f,
+            4f, 4f, 4f, 4f, 4f, 4f, 4f, 4f, 4f
+        };
+        var prices = new float[] { 
+            0.8f, 1f, 1.2f, 1.5f, 2.1f, 4.1f, 18.25f, 61.5f, 111.5f,
+            1.45f, 1.7f, 2.15f, 2.7f, 4.1f, 8f, 23.25f, 62f, 111.6f,
+            2.9f, 3.65f, 4.9f, 7.1f, 11.3f, 20.25f, 38f, 69.5f, 113.25f
+        };
 
         var heston = new HestonCalculator
         {
@@ -168,18 +180,17 @@ public class HestonCalculatorLatestFeaturesTests
             DaysLeft = 1.0f,
             CurrentVolatility = 0.10f,
             LongTermVolatility = 0.15f,
-            VolatilityMeanReversion = 1.5f,
+            VolatilityMeanReversion = 10f,
             VolatilityOfVolatility = 0.95f,
-            Correlation = -0.9f
+            Correlation = -1f
         };
 
-        foreach (var strike in strikes)
+        for (var idx = 0; idx < strikes.Length; idx++)
         {
-            heston.Strike = strike;
+            heston.Strike = strikes[idx];
+            heston.DaysLeft = expires[idx];
             heston.CalculateAll();
         }
-
-        //heston.CalibrateToMarketPrices(prices, strikes, expires);
     }
 
     /// <summary>

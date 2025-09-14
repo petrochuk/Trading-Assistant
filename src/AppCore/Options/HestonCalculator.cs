@@ -925,57 +925,131 @@ public class HestonCalculator
     /// Simple calibration method to fit Heston parameters to market option prices
     /// This is a basic implementation - in practice, more sophisticated optimization would be used
     /// </summary>
-    /// <param name="marketCallPrices">Array of market call option prices</param>
+    /// <param name="marketPutPrices">Array of market put option prices</param>
     /// <param name="strikes">Array of corresponding strike prices</param>
-    /// <param name="expiries">Array of corresponding expiry times</param>
-    public void CalibrateToMarketPrices(float[] marketCallPrices, float[] strikes, float[] expiries)
+    /// <param name="expiries">Array of corresponding expiry times in days</param>
+    public void CalibrateToMarketPrices(float[] marketPutPrices, float[] strikes, float[] expiries)
     {
-        if (marketCallPrices.Length != strikes.Length || strikes.Length != expiries.Length)
+        if (marketPutPrices.Length != strikes.Length || strikes.Length != expiries.Length)
             throw new ArgumentException("Arrays must have the same length");
 
         // Simple grid search for calibration (in practice, use more sophisticated optimization)
-        float bestError = float.MaxValue;
-        float bestV0 = CurrentVolatility;
         float bestTheta = LongTermVolatility;
         float bestKappa = VolatilityMeanReversion;
         float bestSigma = VolatilityOfVolatility;
         float bestRho = Correlation;
+        float bestV0 = CurrentVolatility;
+        float bestError = float.MaxValue;
 
         // Grid search ranges (simplified)
-        for (float v0 = 0.03f; v0 <= 0.40f; v0 += 0.01f) {
-            for (float theta = 0.03f; theta <= 0.40f; theta += 0.01f) {
-                for (float kappa= 0.01f; kappa <= 5.0f; kappa += 0.1f) {
-                    for(float sigma= 0.1f; sigma <= 2.0f; sigma += 0.1f) {
-                        for (float rho = -2.0f; rho <= 2.0f; rho += 0.1f) {
-                            CurrentVolatility = v0;
-                            LongTermVolatility = theta;
-                            VolatilityMeanReversion = kappa;
-                            VolatilityOfVolatility = sigma;
-                            Correlation = rho;
+        var thetaStart = 0.03f;
+        var thetaEnd = 0.50f;
+        var thetaStep = (thetaEnd - thetaStart) / 5.0f;
 
-                            float totalError = 0;
-                            for (int i = 0; i < marketCallPrices.Length; i++)
-                            {
-                                Strike = strikes[i];
-                                ExpiryTime = expiries[i];
-                                CalculateCallPut();
-                                float error = MathF.Abs(CallValue - marketCallPrices[i]);
-                                totalError += error * error; // Sum of squared errors
-                            }
+        var kappaStart = 0.1f;
+        var kappaEnd = 100.0f;
+        var kappaStep = (kappaEnd - kappaStart) / 5.0f;
 
-                            if (totalError < bestError)
-                            {
-                                bestError = totalError;
-                                bestV0 = v0;
-                                bestTheta = theta;
-                                bestKappa = kappa;
-                                bestSigma = sigma;
-                                bestRho = rho;
+        var sigmaStart = 0.1f;
+        var sigmaEnd = 2.0f;
+        var sigmaStep = (sigmaEnd - sigmaStart) / 5.0f;
+
+        var rhoStart = -1f;
+        var rhoEnd = 1.0f;
+        var rhoStep = (rhoEnd - rhoStart) / 5.0f;
+
+        var v0Start = 0.03f;
+        var v0End = 0.4f;
+        var v0Step = (v0End - v0Start) / 5.0f;
+
+        bool calibrationComplete = false;
+        while (!calibrationComplete) {
+            calibrationComplete = true;
+            for (float theta = thetaStart; theta <= thetaEnd; theta += thetaStep) {
+                for (float kappa= kappaStart; kappa <= kappaEnd; kappa += kappaStep) {
+                    for(float sigma= sigmaStart; sigma <= sigmaEnd; sigma += sigmaStep) {
+                        for (float rho = rhoStart; rho <= rhoEnd; rho += rhoStep) {
+                            for (float v0 = v0Start; v0 <= v0End; v0 += v0Step) {
+                                CurrentVolatility = v0;
+                                LongTermVolatility = theta;
+                                VolatilityMeanReversion = kappa;
+                                VolatilityOfVolatility = sigma;
+                                Correlation = rho;
+
+                                float totalError = 0;
+                                for (int i = 0; i < marketPutPrices.Length; i++)
+                                {
+                                    Strike = strikes[i];
+                                    DaysLeft = expiries[i];
+                                    CalculateCallPut();
+                                    //float error = PutValue / marketPutPrices[i] - 1;
+                                    float error = MathF.Abs(PutValue - marketPutPrices[i]);
+                                    totalError += error * error; // Sum of squared errors
+                                }
+
+                                if (totalError < bestError)
+                                {
+                                    bestError = totalError;
+                                    bestV0 = v0;
+                                    bestTheta = theta;
+                                    bestKappa = kappa;
+                                    bestSigma = sigma;
+                                    bestRho = rho;
+                                    calibrationComplete = false; // Continue searching
+                                }
                             }
                         }
                     }
                 }
             }
+
+            if (calibrationComplete)
+                break; // No better parameters found, exit loop
+
+            var rangeChanged = false;
+            // Narrow down search range around best parameters
+            thetaStart = MathF.Max(0.01f, bestTheta - thetaStep);
+            thetaEnd = bestTheta + thetaStep;
+            thetaStep /= 2.0f;
+            if (0.01f <= thetaStep)
+                rangeChanged = true;
+            else
+                thetaStep = 0.01f;
+
+            kappaStart = MathF.Max(0.001f, bestKappa - kappaStep);
+            kappaEnd = bestKappa + kappaStep;
+            kappaStep /= 2.0f;
+            if (0.01f <= kappaStep)
+                rangeChanged = true;
+            else
+                kappaStep = 0.01f;
+
+            sigmaStart = MathF.Max(0.01f, bestSigma - sigmaStep);
+            sigmaEnd = bestSigma + sigmaStep;
+            sigmaStep /= 2.0f;
+            if (0.01f <= sigmaStep)
+                rangeChanged = true;
+            else
+                sigmaStep = 0.01f;
+
+            rhoStart = MathF.Max(-1f, bestRho - rhoStep);
+            rhoEnd = MathF.Min(1f, bestRho + rhoStep);
+            rhoStep /= 2.0f;
+            if (0.01f <= rhoStep)
+                rangeChanged = true;
+            else
+                rhoStep = 0.01f;
+
+            v0Start = MathF.Max(0.01f, bestV0 - v0Step);
+            v0End = bestV0 + v0Step;
+            v0Step /= 2.0f;
+            if (0.01f <= v0Step)
+                rangeChanged = true;
+            else
+                v0Step = 0.01f;
+
+            if (!rangeChanged)
+                calibrationComplete = true; // Stop if ranges can't be narrowed further
         }
 
         // Set best parameters
