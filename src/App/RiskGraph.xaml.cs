@@ -111,9 +111,9 @@ public sealed partial class RiskGraph : UserControl
             }
         }
 
-        DeltaPlus1Text.Text = $"{greeks.Value.DeltaBLS:N2}";
+        DeltaHestonText.Text = $"{greeks.Value.DeltaHeston:N2}";
 
-        DeltaText.Text = $"{greeks.Value.DeltaBLS:N2}";
+        DeltaBlSText.Text = $"{greeks.Value.DeltaBLS:N2}";
         GammaText.Text = $"{greeks.Value.Gamma:N4}";
         CharmText.Text = $"{greeks.Value.Charm:N2}";
         VannaText.Text = $"{greeks.Value.Vanna:N2}";
@@ -124,11 +124,12 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void ClearGreeks() {
-        DeltaText.Text = string.Empty;
-        GammaText.Text = string.Empty;
-        CharmText.Text = string.Empty;
-        ThetaText.Text = string.Empty;
-        VegaText.Text = string.Empty;
+        DeltaHestonText.Text = "-";
+        DeltaBlSText.Text = "-";
+        GammaText.Text = "-";
+        CharmText.Text = "-";
+        ThetaText.Text = "-";
+        VegaText.Text = "-";
     }
 
     private void DrawRiskIntervals() {

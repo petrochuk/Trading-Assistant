@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Serilog;
+using System.Collections.Generic;
 using System.IO;
 namespace TradingAssistant;
 
@@ -70,6 +71,7 @@ public partial class App : Application
             .AddSingleton(configuration)
             .Configure<BrokerConfiguration>(configuration.GetSection("Broker"))
             .Configure<AuthenticationConfiguration>(configuration.GetSection("Authentication"))
+            .Configure<List<ContractConfiguration>>(configuration.GetSection("Contracts"))
             .Configure<DeltaHedgerConfiguration>(configuration.GetSection("DeltaHedger"));
 
         // Logging

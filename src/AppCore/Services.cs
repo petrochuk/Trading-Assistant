@@ -11,6 +11,7 @@ public static class IServiceCollectionExtension
 
         services
             .AddTransient<IAccountFactory, AccountFactory>()
+            .AddSingleton<IContractFactory, ContractFactory>()
             .AddSingleton<ExpirationCalendar>()
             .AddTransient<IDeltaHedgerFactory, DeltaHedgerFactory>();
 

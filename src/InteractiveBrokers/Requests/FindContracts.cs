@@ -1,6 +1,6 @@
 ﻿using AppCore;
 using AppCore.Args;
-using AppCore.Models;
+using AppCore.Interfaces;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
@@ -11,11 +11,14 @@ internal class FindContracts : Request
     EventHandler<ContractFoundArgs>? _responseHandler;
     private readonly string _symbol;
     private readonly AssetClass _assetClass;
+    private readonly IContractFactory _contractFactory;
 
     [SetsRequiredMembers]
-    public FindContracts(string symbol, AssetClass assetClass, EventHandler<ContractFoundArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
+    public FindContracts(string symbol, AssetClass assetClass, IContractFactory contractFactory,
+        EventHandler<ContractFoundArgs>? responseHandler, string? bearerToken) : base (bearerToken) {
         if (string.IsNullOrWhiteSpace(symbol))
             throw new ArgumentNullException(nameof(symbol), "Symbol cannot be null or empty");
+        _contractFactory = contractFactory ?? throw new ArgumentNullException(nameof(contractFactory));
 
         if (assetClass == AssetClass.Stock) {
             Uri = $"v1/api/trsrv/stocks?symbols={symbol}";
@@ -57,13 +60,9 @@ internal class FindContracts : Request
                         throw new IBClientException($"Unsupported future symbol: {_symbol}");
                 }
 
-                args.Contracts.Add(new() {
-                    Symbol = _symbol,
-                    AssetClass = _assetClass,
-                    Id = contract.conid,
-                    UnderlyingContractId = contract.underlyingConid,
-                    Expiration = expirationTime,
-                });
+                args.Contracts.Add(_contractFactory.Create(
+                    _symbol, _assetClass, contract.conid, contract.underlyingConid, expirationTime
+                ));
             }
         }
         else if (_assetClass == AssetClass.Stock) {
@@ -85,13 +84,9 @@ internal class FindContracts : Request
             if (contractId == 0) {
                 throw new IBClientException($"No {_symbol} contracts found for US exchange");
             }
-            args.Contracts.Add(new() {
-                Symbol = _symbol,
-                AssetClass = _assetClass,
-                Id = contractId,
-                UnderlyingContractId = null,
-                Expiration = null,
-            });
+            args.Contracts.Add(_contractFactory.Create(
+                _symbol, _assetClass, contractId
+            ));
         }
 
         _responseHandler?.Invoke(this, args);

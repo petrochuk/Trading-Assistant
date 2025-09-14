@@ -40,12 +40,17 @@ public class IBClient : IBroker
     private ILogger<IBClient> _logger;
     private readonly BrokerConfiguration _brokerConfiguration;
     private readonly AuthenticationConfiguration _authConfiguration;
+    private readonly IContractFactory _contractFactory;
 
-    public IBClient(ILogger<IBClient> logger, IOptions<BrokerConfiguration> brokerConfiguration, IOptions<AuthenticationConfiguration> authConfiguration) {
+    public IBClient(ILogger<IBClient> logger, 
+        IOptions<BrokerConfiguration> brokerConfiguration, 
+        IOptions<AuthenticationConfiguration> authConfiguration,
+        IContractFactory contractFactory) {
 
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _brokerConfiguration = brokerConfiguration?.Value ?? throw new ArgumentNullException(nameof(brokerConfiguration));
         _authConfiguration = authConfiguration?.Value ?? throw new ArgumentNullException(nameof(authConfiguration));
+        _contractFactory = contractFactory ?? throw new ArgumentNullException(nameof(contractFactory));
 
         _authConfiguration.PrivateKeyPath = _authConfiguration.PrivateKeyPath.Replace("<TradingAssistant>", ConfigurationFiles.Directory);
 
@@ -261,7 +266,7 @@ public class IBClient : IBroker
     #region Contract management
 
     public void FindContracts(string symbol, AssetClass assetClass) {
-        var request = new Requests.FindContracts(symbol, assetClass, OnContractFound, BearerToken);
+        var request = new Requests.FindContracts(symbol, assetClass, _contractFactory, OnContractFound, BearerToken);
 
         _logger.LogInformation($"Looking for {symbol} contract");
         if (!_channel.Writer.TryWrite(request)) {

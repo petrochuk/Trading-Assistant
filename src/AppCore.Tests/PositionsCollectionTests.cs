@@ -118,7 +118,7 @@ public sealed class PositionsCollectionTests
     [TestMethod]
     public void RiskCurve_NoPositions() {
         // Arrange
-        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar());
+        var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, new FakeTimeProvider(), new ExpirationCalendar(), new TestContractFactory());
         
         // Act
         var riskCurve = positions.CalculateRiskCurve("ES", TimeSpan.FromMinutes(5), 4000, 5000, 6000, 10);
@@ -137,19 +137,29 @@ public sealed class PositionsCollectionTests
         // Arrange
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, 
             new FakeTimeProvider(new DateTimeOffset(2025, 4, 23, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)),
-            new ExpirationCalendar());
+            new ExpirationCalendar(), new TestContractFactory());
 
-        var underlyingPosition = new Position(contractId: 1, underlyingSymbol: "ES", assetClass: AssetClass.Future,
-            new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
-            multiplier: 50) {
-            Size = 1,
-        };
+        var contract1 = new Contract {
+            Symbol = "ES",
+            AssetClass = AssetClass.Future,
+            Id = 1,
+            Multiplier = 50,
+            Expiration = new DateTimeOffset(2025, 6, 20, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset)
+            };
+        var underlyingPosition = new Position(contract1);
         underlyingPosition.Contract.MarketPrice = 5401.25f;
         positions.TryAdd(underlyingPosition.Contract.Id, underlyingPosition);
 
-        var put = new Position(2, underlyingPosition.Contract.Symbol, AssetClass.FutureOption,
-            new DateTimeOffset(2025, 5, 2, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
-            5350, isCall: false, 50);
+        var contract2 = new Contract {
+            Symbol = "ES",
+            AssetClass = AssetClass.FutureOption,
+            Id = 2,
+            Multiplier = 50,
+            Expiration = new DateTimeOffset(2025, 5, 2, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
+            IsCall = false,
+            Strike = 5350,
+        };
+        var put = new Position(contract2);
         put.Contract.MarketPrice = 65.0f;
         put.Size = 1;
         put.UpdateGreeks(delta: -0.7f, gamma: 0.0f, theta: -put.Contract.MarketPrice, vega: 0.0f);

@@ -2,7 +2,7 @@
 
 namespace AppCore;
 
-[DebuggerDisplay("d:{Delta}, g:{Gamma}, t:{Theta}, v:{Vega}, vn:{Vanna}, c:{Charm}")]
+[DebuggerDisplay("d:{DeltaHeston}, g:{Gamma}, t:{Theta}, v:{Vega}, vn:{Vanna}, c:{Charm}")]
 public struct Greeks
 {
     public float DeltaBLS;

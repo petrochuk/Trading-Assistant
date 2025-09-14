@@ -98,18 +98,18 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
 
             var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition);
-            if (greeks == null || float.IsNaN(greeks.Value.DeltaBLS) || float.IsNaN(greeks.Value.Charm)) {
+            if (greeks == null || float.IsNaN(greeks.Value.DeltaHeston) || float.IsNaN(greeks.Value.Charm)) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
 
-            var deltaPlus1 = greeks.Value.DeltaBLS;
+            var deltaPlus1 = greeks.Value.DeltaHeston;
             if (MathF.Abs(deltaPlus1) < _configuration.Delta + _configuration.MinDeltaAdjustment) {
-                _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.DeltaBLS:f3}, Charm: {greeks.Value.Charm:f3}. No hedging required.");
+                _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.DeltaHeston:f3}, Charm: {greeks.Value.Charm:f3}. No hedging required.");
                 return;
             }
 
-            _logger.LogInformation($"Delta+1: Abs({deltaPlus1:f3}) exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.DeltaBLS:f3}, Charm: {greeks.Value.Charm:f3}. Executing hedge.");
+            _logger.LogInformation($"Delta+1: Abs({deltaPlus1:f3}) exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.DeltaHeston:f3}, Charm: {greeks.Value.Charm:f3}. Executing hedge.");
 
             // Round delta down to 0 in whole numbers
             var deltaHedgeSize = 0 < deltaPlus1 ? MathF.Ceiling(_configuration.Delta - deltaPlus1) : MathF.Floor(-_configuration.Delta - deltaPlus1);

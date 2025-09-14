@@ -2,6 +2,10 @@
 
 public class Contract
 {
+    public Contract() {
+
+    }
+
     public string Symbol { get; set; } = string.Empty;
 
     public AssetClass AssetClass { get; init; }
@@ -30,6 +34,10 @@ public class Contract
     }
 
     public bool IsDataStreaming { get; set; } = false;
+    public float LongTermVolatility { get; internal set; }
+    public float Correlation { get; internal set; }
+    public float VolatilityOfVolatility { get; internal set; }
+    public float VolatilityMeanReversion { get; internal set; }
 
     public override string ToString() {
         var sb = new System.Text.StringBuilder();

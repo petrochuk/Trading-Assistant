@@ -1,4 +1,6 @@
-﻿using AppCore.Extenstions;
+﻿using AppCore.Configuration;
+using AppCore.Extenstions;
+using AppCore.Interfaces;
 using AppCore.Models;
 using AppCore.Options;
 using Microsoft.Extensions.Logging;
@@ -7,7 +9,6 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
-using static AppCore.Args.AccountsArgs;
 
 namespace AppCore;
 
@@ -19,6 +20,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     private readonly ILogger _logger;
     private readonly TimeProvider _timeProvider;
     private readonly ExpirationCalendar _expirationCalendar;
+    private readonly IContractFactory _contractFactory;
     private readonly Lock _lock = new();
 
     public static readonly TimeSpan RealizedVolPeriod = TimeSpan.FromMinutes(5);
@@ -29,10 +31,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
     #region Constructors
 
-    public PositionsCollection(ILogger logger, TimeProvider timeProvider, ExpirationCalendar expirationCalendar) {
+    public PositionsCollection(ILogger logger, TimeProvider timeProvider, ExpirationCalendar expirationCalendar, IContractFactory contractFactory) {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _expirationCalendar = expirationCalendar ?? throw new ArgumentNullException(nameof(expirationCalendar));
+        _contractFactory = contractFactory ?? throw new ArgumentNullException(nameof(contractFactory));
 
         _stdDevTimer = new(RealizedVolPeriod / RealizedVolSamples) {
             AutoReset = true, Enabled = true
@@ -84,7 +87,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         continue;
                     }
 
-                    AddPosition(new Position(positionKV.Value));
+                    var contract = _contractFactory.Create(positionKV.Value);
+                    AddPosition(new Position(contract) { 
+                        Size = positionKV.Value.Size,
+                        MarketValue = positionKV.Value.MarketValue,
+                    });
                 }
             }
 
@@ -234,10 +241,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         DaysLeft = daysLeft,
                         Strike = position.Contract.Strike,
                         CurrentVolatility = (float)realizedVol,
-                        LongTermVolatility = 0.15f,
-                        VolatilityMeanReversion = 10f,
-                        VolatilityOfVolatility = 0.95f,
-                        Correlation = -1f
+                        LongTermVolatility = underlyingContract.LongTermVolatility,
+                        VolatilityMeanReversion = underlyingContract.VolatilityMeanReversion,
+                        VolatilityOfVolatility = underlyingContract.VolatilityOfVolatility,
+                        Correlation = underlyingContract.Correlation,
                     };
                     heston.CalculateAll();
 
