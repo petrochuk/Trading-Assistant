@@ -234,7 +234,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         return null;
                     }
 
-                    var daysLeft = (float)(position.Contract.Expiration.Value - _timeProvider.EstNow()).TotalDays;
+                    var daysLeft = _timeProvider.EstNow().BusinessDaysTo(position.Contract.Expiration.Value);
                     var heston = new HestonCalculator() {
                         IntegrationMethod = HestonIntegrationMethod.Adaptive,
                         StockPrice = underlyingContract.MarketPrice.Value,

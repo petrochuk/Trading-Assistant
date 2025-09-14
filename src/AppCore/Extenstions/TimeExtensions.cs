@@ -246,4 +246,100 @@ public static class TimeExtensions
             return holiday;
         }
     }
+
+    /// <summary>
+    /// Calculate business days between two dates taking into account weekends, holidays, and daily trading hours.
+    /// Trading 24/7 except weekends and holidays.
+    /// Weekend overnight trading starts Sunday 6 pm EST.
+    /// Every day trading breaks for 1 hour from 5 pm to 6 pm EST.
+    /// </summary>
+    /// <param name="fromDate"></param>
+    /// <param name="toDate"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    public static float BusinessDaysTo(this DateTimeOffset fromDate, DateTimeOffset toDate) {
+        if (toDate < fromDate)
+            throw new ArgumentOutOfRangeException($"fromDate {fromDate} should be before toDate {toDate}");
+        if (fromDate.Offset != toDate.Offset)
+            throw new ArgumentOutOfRangeException($"fromDate {fromDate} and toDate {toDate} should have the same offset");
+
+        if (fromDate == toDate)
+            return 0f;
+
+        // Work directly with the provided offset rather than converting to EST
+        // This assumes the input times are already in the desired timezone (likely EST/EDT)
+        
+        long totalBusinessTicks = 0L;
+        var current = fromDate.Date;
+
+        while (current <= toDate.Date)
+        {
+            var dayStart = current == fromDate.Date ? fromDate : new DateTimeOffset(current, fromDate.Offset);
+            var dayEnd = current == toDate.Date ? toDate : new DateTimeOffset(current.AddDays(1), fromDate.Offset);
+
+            totalBusinessTicks += GetBusinessTicksForDay(dayStart, dayEnd);
+            current = current.AddDays(1);
+        }
+
+        // Convert ticks to business days (using 24 hours per day)
+        var businessDayTicks = 24L * TimeSpan.TicksPerHour;
+        return (float)totalBusinessTicks / businessDayTicks;
+    }
+
+    private static long GetBusinessTicksForDay(DateTimeOffset dayStart, DateTimeOffset dayEnd)
+    {
+        var date = dayStart.Date;
+        var dayOfWeek = date.DayOfWeek;
+
+        // Check if it's a holiday
+        if (date.IsHoliday())
+            return 0L;
+
+        // Weekend handling
+        if (dayOfWeek == DayOfWeek.Saturday)
+        {
+            // No trading on Saturday
+            return 0L;
+        }
+        else if (dayOfWeek == DayOfWeek.Sunday)
+        {
+            // Trading starts Sunday 6 PM EST
+            var sundayTradingStart = new DateTimeOffset(date.Year, date.Month, date.Day, 18, 0, 0, dayStart.Offset);
+            
+            // If the entire period is before trading starts, no business time
+            if (dayEnd <= sundayTradingStart)
+                return 0L;
+            
+            // If period starts before trading, adjust start time
+            var actualStart = dayStart > sundayTradingStart ? dayStart : sundayTradingStart;
+            
+            // Calculate ticks from actual start to end
+            return (dayEnd - actualStart).Ticks;
+        }
+        else
+        {
+            // Regular weekday trading (Monday-Friday)
+            // Trading 24/7 except for 1-hour break from 5 PM to 6 PM EST
+            
+            var totalTicks = (dayEnd - dayStart).Ticks;
+
+            if (totalTicks <= 0)
+                return 0L;
+
+            // Calculate the 1-hour break (5 PM to 6 PM EST) overlap
+            var breakStart = new DateTimeOffset(date.Year, date.Month, date.Day, 17, 0, 0, dayStart.Offset);
+            var breakEnd = new DateTimeOffset(date.Year, date.Month, date.Day, 18, 0, 0, dayStart.Offset);
+
+            // Check if the time period overlaps with the break
+            if (dayStart < breakEnd && dayEnd > breakStart)
+            {
+                var overlapStart = dayStart > breakStart ? dayStart : breakStart;
+                var overlapEnd = dayEnd < breakEnd ? dayEnd : breakEnd;
+                var breakTicks = (overlapEnd - overlapStart).Ticks;
+                totalTicks -= breakTicks;
+            }
+
+            return totalTicks > 0L ? totalTicks : 0L;
+        }
+    }
 }
