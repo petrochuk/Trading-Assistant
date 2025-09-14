@@ -261,16 +261,19 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     bls.CalculateAll();
 
                     var charm = (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut);
-                    var theta = (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut);
+                    var thetaBLS = (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut);
+                    var thetaHeston = (position.Contract.IsCall ? heston.ThetaCall : heston.ThetaPut);
                     // If the position is close to expiration, charm can go to infinity. Estimate it as diff from delta.
                     if (bls.DaysLeft <= 1) {
                         if (position.Contract.IsCall) {
                             charm = bls.DeltaCall > 0.5 ? 1 - bls.DeltaCall : -bls.DeltaCall;
-                            theta = bls.DeltaCall > 0.5 ? -bls.PutValue : -bls.CallValue;
+                            thetaBLS = bls.DeltaCall > 0.5 ? -bls.PutValue : -bls.CallValue;
+                            thetaHeston = bls.DeltaCall > 0.5 ? -heston.PutValue : -heston.CallValue;
                         }
                         else {
                             charm = bls.DeltaPut < -0.5 ? 1 + bls.DeltaPut : -bls.DeltaPut;
-                            theta = bls.DeltaPut < -0.5 ? -bls.CallValue : -bls.PutValue;
+                            thetaBLS = bls.DeltaPut < -0.5 ? -bls.CallValue : -bls.PutValue;
+                            thetaHeston = bls.DeltaPut < -0.5 ? -heston.CallValue : -heston.PutValue;
                         }
                     }
 
@@ -280,7 +283,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
-                    greeks.Theta += theta * position.Size * position.Contract.Multiplier;
+
+                    greeks.ThetaBLS += thetaBLS * position.Size * position.Contract.Multiplier;
+                    greeks.ThetaHeston += thetaHeston * position.Size * position.Contract.Multiplier;
+
                     greeks.Vanna += (position.Contract.IsCall ? bls.VannaCall * 0.01f : bls.VannaPut * 0.01f) * position.Size;
                     greeks.Charm += charm * position.Size;
                 }

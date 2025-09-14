@@ -253,16 +253,16 @@ public class HestonCalculatorTests
         var putGreeks = heston.GetPutGreeks();
 
         // Verify Greeks structures are populated
-        Assert.AreEqual(heston.DeltaCall, callGreeks.DeltaBLS);
+        Assert.AreEqual(heston.DeltaCall, callGreeks.DeltaHeston);
         Assert.AreEqual(heston.Gamma, callGreeks.Gamma);
-        Assert.AreEqual(heston.ThetaCall, callGreeks.Theta);
+        Assert.AreEqual(heston.ThetaCall, callGreeks.ThetaHeston);
         Assert.AreEqual(heston.VegaCall, callGreeks.Vega);
         Assert.AreEqual(heston.VannaCall, callGreeks.Vanna);
         Assert.AreEqual(heston.CharmCall, callGreeks.Charm);
 
-        Assert.AreEqual(heston.DeltaPut, putGreeks.DeltaBLS);
+        Assert.AreEqual(heston.DeltaPut, putGreeks.DeltaHeston);
         Assert.AreEqual(heston.Gamma, putGreeks.Gamma);
-        Assert.AreEqual(heston.ThetaPut, putGreeks.Theta);
+        Assert.AreEqual(heston.ThetaPut, putGreeks.DeltaHeston);
         Assert.AreEqual(heston.VegaPut, putGreeks.Vega);
         Assert.AreEqual(heston.VannaPut, putGreeks.Vanna);
         Assert.AreEqual(heston.CharmPut, putGreeks.Charm);
