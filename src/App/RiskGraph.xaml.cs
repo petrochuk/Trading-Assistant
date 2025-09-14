@@ -111,9 +111,9 @@ public sealed partial class RiskGraph : UserControl
             }
         }
 
-        DeltaPlus1Text.Text = $"{greeks.Value.Delta:N2}";
+        DeltaPlus1Text.Text = $"{greeks.Value.DeltaBLS:N2}";
 
-        DeltaText.Text = $"{greeks.Value.Delta:N2}";
+        DeltaText.Text = $"{greeks.Value.DeltaBLS:N2}";
         GammaText.Text = $"{greeks.Value.Gamma:N4}";
         CharmText.Text = $"{greeks.Value.Charm:N2}";
         VannaText.Text = $"{greeks.Value.Vanna:N2}";

@@ -203,7 +203,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 }
 
                 if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
-                    greeks.Delta += position.Size;
+                    greeks.DeltaBLS += position.Size;
+                    greeks.DeltaHeston += position.Size;
                 }
                 else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
                     // Skip expired options
@@ -226,10 +227,26 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         return null;
                     }
 
-                    var bls = new BlackNScholesCaculator();
-                    bls.DaysLeft = (float)(position.Contract.Expiration!.Value - _timeProvider.EstNow()).TotalDays;
-                    bls.StockPrice = underlyingContract.MarketPrice.Value;
-                    bls.Strike = position.Contract.Strike;
+                    var daysLeft = (float)(position.Contract.Expiration.Value - _timeProvider.EstNow()).TotalDays;
+                    var heston = new HestonCalculator() {
+                        IntegrationMethod = HestonIntegrationMethod.Adaptive,
+                        StockPrice = underlyingContract.MarketPrice.Value,
+                        DaysLeft = daysLeft,
+                        Strike = position.Contract.Strike,
+                        CurrentVolatility = (float)realizedVol,
+                        LongTermVolatility = 0.15f,
+                        VolatilityMeanReversion = 10f,
+                        VolatilityOfVolatility = 0.95f,
+                        Correlation = -1f
+                    };
+                    heston.CalculateAll();
+
+                    var bls = new BlackNScholesCaculator() {
+                        StockPrice = underlyingContract.MarketPrice.Value,
+                        DaysLeft = (float)daysLeft,
+                        Strike = position.Contract.Strike,
+                    };
+
                     // Market implied vol
                     var marketIV = position.Contract.IsCall ? bls.GetCallIVBisections(position.Contract.MarketPrice.Value) : bls.GetPutIVBisections(position.Contract.MarketPrice.Value);
                     // Actual realized vol
@@ -251,7 +268,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
-                    greeks.Delta += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
+                    greeks.DeltaBLS += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
+                    greeks.DeltaHeston += (position.Contract.IsCall ? heston.DeltaCall : heston.DeltaPut) * position.Size;
+
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
                     greeks.Theta += theta * position.Size * position.Contract.Multiplier;

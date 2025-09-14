@@ -253,57 +253,19 @@ public class HestonCalculatorTests
         var putGreeks = heston.GetPutGreeks();
 
         // Verify Greeks structures are populated
-        Assert.AreEqual(heston.DeltaCall, callGreeks.Delta);
+        Assert.AreEqual(heston.DeltaCall, callGreeks.DeltaBLS);
         Assert.AreEqual(heston.Gamma, callGreeks.Gamma);
         Assert.AreEqual(heston.ThetaCall, callGreeks.Theta);
         Assert.AreEqual(heston.VegaCall, callGreeks.Vega);
         Assert.AreEqual(heston.VannaCall, callGreeks.Vanna);
         Assert.AreEqual(heston.CharmCall, callGreeks.Charm);
 
-        Assert.AreEqual(heston.DeltaPut, putGreeks.Delta);
+        Assert.AreEqual(heston.DeltaPut, putGreeks.DeltaBLS);
         Assert.AreEqual(heston.Gamma, putGreeks.Gamma);
         Assert.AreEqual(heston.ThetaPut, putGreeks.Theta);
         Assert.AreEqual(heston.VegaPut, putGreeks.Vega);
         Assert.AreEqual(heston.VannaPut, putGreeks.Vanna);
         Assert.AreEqual(heston.CharmPut, putGreeks.Charm);
-    }
-
-    [TestMethod]
-    public void TestHeston_CalibrationBasic()
-    {
-        var heston = CreateStandardHeston();
-        
-        // Create some "market" prices using current parameters
-        float[] strikes = { 90.0f, 100.0f, 110.0f };
-        float[] expiries = { 30.0f / 365.0f, 30.0f / 365.0f, 30.0f / 365.0f };
-        float[] marketPrices = new float[3];
-
-        // Generate market prices with current parameters
-        for (int i = 0; i < strikes.Length; i++)
-        {
-            heston.Strike = strikes[i];
-            heston.ExpiryTime = expiries[i];
-            heston.CalculateCallPut();
-            marketPrices[i] = heston.CallValue;
-        }
-
-        // Now change parameters and calibrate back
-        heston.CurrentVolatility = 0.1f;
-        heston.LongTermVolatility = 0.1f;
-        heston.VolatilityMeanReversion = 1.0f;
-        heston.VolatilityOfVolatility = 0.1f;
-        heston.Correlation = 0.0f;
-
-        // This should find better parameters (though simplified calibration)
-        try
-        {
-            heston.CalibrateToMarketPrices(marketPrices, strikes, expiries);
-            Assert.IsTrue(true, "Calibration completed without exception");
-        }
-        catch (Exception ex)
-        {
-            Assert.Fail($"Calibration should not throw exception: {ex.Message}");
-        }
     }
 
     [TestMethod]

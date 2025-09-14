@@ -890,7 +890,7 @@ public class HestonCalculator
         CalculateAll();
         return new Greeks
         {
-            Delta = DeltaCall,
+            DeltaBLS = DeltaCall,
             Gamma = Gamma,
             Theta = ThetaCall,
             Vega = VegaCall,
@@ -908,7 +908,7 @@ public class HestonCalculator
         CalculateAll();
         return new Greeks
         {
-            Delta = DeltaPut,
+            DeltaBLS = DeltaPut,
             Gamma = Gamma,
             Theta = ThetaPut,
             Vega = VegaPut,
