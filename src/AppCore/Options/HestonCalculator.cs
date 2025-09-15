@@ -881,42 +881,6 @@ public class HestonCalculator
         return PutValue;
     }
 
-    /// <summary>
-    /// Get Greeks for call option
-    /// </summary>
-    /// <returns>Greeks structure for call option</returns>
-    public Greeks GetCallGreeks()
-    {
-        CalculateAll();
-        return new Greeks
-        {
-            DeltaHeston = DeltaCall,
-            Gamma = Gamma,
-            ThetaHeston = ThetaCall,
-            Vega = VegaCall,
-            Vanna = VannaCall,
-            Charm = CharmCall
-        };
-    }
-
-    /// <summary>
-    /// Get Greeks for put option
-    /// </summary>
-    /// <returns>Greeks structure for put option</returns>
-    public Greeks GetPutGreeks()
-    {
-        CalculateAll();
-        return new Greeks
-        {
-            DeltaHeston = DeltaPut,
-            Gamma = Gamma,
-            ThetaHeston = ThetaPut,
-            Vega = VegaPut,
-            Vanna = VannaPut,
-            Charm = CharmPut
-        };
-    }
-
     #endregion
 
     #region Calibration Methods
