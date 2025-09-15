@@ -21,7 +21,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     private readonly TimeProvider _timeProvider;
     private readonly ExpirationCalendar _expirationCalendar;
     private readonly IContractFactory _contractFactory;
-    private readonly Lock _lock = new();
+    private readonly ReaderWriterLockSlim _rwLock = new();
 
     public static readonly TimeSpan RealizedVolPeriod = TimeSpan.FromMinutes(5);
     public const int RealizedVolSamples = 20;
@@ -75,7 +75,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     #region Methods
 
     public void Reconcile(Dictionary<int, IPosition> positions) {
-        lock (_lock) { 
+
+        _rwLock.EnterWriteLock();
+        try { 
             // Add or update positions from the new list
             foreach (var positionKV in positions) {
                 if (TryGetValue(positionKV.Key, out var existingPosition)) {
@@ -97,6 +99,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
             // Update the list of underlyings
             UpdateUnderlyings();
+        }
+        finally
+        {
+            _rwLock.ExitWriteLock();
         }
     }
 
@@ -196,7 +202,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
 
         var greeks = new Greeks();
-        lock (_lock) {
+        _rwLock.EnterReadLock();
+        try {
             foreach (var position in Values) {
                 // Skip any positions that are not in the same underlying, 0 size
                 if (position.Contract.Symbol != underlyingPosition.Symbol || 
@@ -289,6 +296,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     continue;
                 }
             }
+        }
+        finally {
+            _rwLock.ExitReadLock();
         }
 
         return greeks;
@@ -425,7 +435,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     }
 
     public void ReconcileContracts(string symbol, AssetClass assetClass, List<Contract> contracts) {
-        lock (_lock) {
+        _rwLock.EnterWriteLock();
+        try {
             foreach (var underlying in Underlyings) {
                 if (underlying.Symbol == symbol && underlying.AssetClass == assetClass) {
                     underlying.AddContracts(contracts, _timeProvider);
@@ -438,13 +449,21 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 UpdateUnderlying(position);
             }
         }
+        finally {
+            _rwLock.ExitWriteLock();
+        }
     }
 
     public void UpdateMarketPrice(int contractId, float markPrice) {
-        lock (_lock) {
+        // Even though we updating price, we only need a read lock as we are not changing the collection
+        _rwLock.EnterReadLock();
+        try {
             foreach (var underlying in Underlyings) {
                 underlying.UpdateMarketPrice(contractId, markPrice);
             }
+        }
+        finally {
+            _rwLock.ExitReadLock();
         }
     }
 
