@@ -395,6 +395,18 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate option price.");
             return null;
         }
+        if (position.Underlying == null || position.UnderlyingContractId == null) {
+            _logger.LogWarning($"Position {position.Contract} has no underlying, unable to calculate P&L.");
+            return null;
+        }
+        if (!position.Underlying.ContractsById.TryGetValue(position.UnderlyingContractId.Value, out var underlyingContract)) {
+            _logger.LogWarning($"Position {position.Contract} has no underlying contract with ID {position.UnderlyingContractId}, unable to calculate P&L.");
+            return null;
+        }
+        if (!underlyingContract.MarketPrice.HasValue) {
+            _logger.LogWarning($"Position {position.Contract} has no underlying contract market price, unable to calculate P&L.");
+            return null;
+        }
         
         // Past expiration calculate realized value at mid price (market price)
         if (position.Contract.Expiration!.Value  < currentTime + lookaheadSpan) {
