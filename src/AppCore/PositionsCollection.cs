@@ -201,6 +201,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             realizedVol = minIV;
         }
 
+        var stopWatch = new Stopwatch();
+
+        stopWatch.Start();
         var greeks = new Greeks();
         _rwLock.EnterReadLock();
         try {
@@ -262,7 +265,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     };
 
                     // Market implied vol
-                    var marketIV = position.Contract.IsCall ? bls.GetCallIVBisections(position.Contract.MarketPrice.Value) : bls.GetPutIVBisections(position.Contract.MarketPrice.Value);
+                    // var marketIV = position.Contract.IsCall ? bls.GetCallIVBisections(position.Contract.MarketPrice.Value) : bls.GetPutIVBisections(position.Contract.MarketPrice.Value);
                     // Actual realized vol
                     bls.ImpliedVolatility = (float)realizedVol;
                     bls.CalculateAll();
@@ -306,6 +309,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         finally {
             _rwLock.ExitReadLock();
         }
+
+        stopWatch.Stop();
+        _logger.LogInformation($"Calculated Greeks for {underlyingPosition.Symbol} in {stopWatch.ElapsedMilliseconds} ms");
 
         return greeks;
     }
