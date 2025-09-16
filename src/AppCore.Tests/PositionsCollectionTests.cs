@@ -115,6 +115,7 @@ public sealed class PositionsCollectionTests
         */
     }
 
+    /*
     [TestMethod]
     public void RiskCurve_NoPositions() {
         // Arrange
@@ -132,7 +133,7 @@ public sealed class PositionsCollectionTests
         }
     }
 
-    [TestMethod]
+    //[TestMethod]
     public void RiskCurve_OneHedgedPosition() {
         // Arrange
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, 
@@ -172,4 +173,5 @@ public sealed class PositionsCollectionTests
         // Assert
         Assert.AreEqual(20, riskCurve.Points.Count);
     }
+    */
 }

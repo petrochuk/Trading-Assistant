@@ -316,59 +316,29 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         return greeks;
     }
 
-    public RiskCurve? CalculateRiskCurve(string underlyingSymbol, TimeSpan lookaheadSpan, float minPrice, float midPrice, float maxPrice, float priceIncrement)
+    public RiskCurve? CalculateRiskCurve(string underlyingSymbol, TimeSpan lookaheadSpan, float minMove, float maxMove, float moveIncrement)
     {
         var riskCurve = new RiskCurve();
         var currentTime = _timeProvider.EstNow();
 
-        var staticDelta = CalculateStaticDelta(underlyingSymbol, currentTime, lookaheadSpan, midPrice);
-
         // Go through the price range and calculate the P&L for each position
-        for (var currentPrice = minPrice; currentPrice < maxPrice; currentPrice += priceIncrement) {
-            var totalPL = CalculatePL(underlyingSymbol, currentTime, lookaheadSpan, staticDelta, midPrice, currentPrice);
+        for (var currentMove = minMove; currentMove < maxMove; currentMove += moveIncrement) {
+            var totalPL = CalculatePL(underlyingSymbol, currentTime, lookaheadSpan, currentMove);
 
             if (!totalPL.HasValue) {
-                _logger.LogWarning($"Unable to calculate RiskCurve for price {currentPrice} for underlying {underlyingSymbol}");
+                _logger.LogWarning($"Unable to calculate RiskCurve for {currentMove:P2} for underlying {underlyingSymbol}");
                 return null;
             }
-            riskCurve.Add(currentPrice, totalPL.Value);
+            riskCurve.Add(currentMove, totalPL.Value);
         }
 
         return riskCurve;
     }
 
-    /// <summary>
-    /// Calculate the static delta created from expired positions.
-    /// </summary>
-    private float CalculateStaticDelta(string underlyingSymbol, DateTimeOffset currentTime, TimeSpan lookaheadSpan, float midPrice) {
-        float staticDelta = 0f;
-        foreach (var position in Values) {
-            // Skip any positions that are not in the same underlying
-            if (position.Contract.Symbol != underlyingSymbol)
-                continue;
-            // Skip any positions that are not expired
-            if (position.Contract.Expiration != null && currentTime + lookaheadSpan < position.Contract.Expiration.Value)
-                continue;
-
-            if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
-                if (position.Contract.IsCall) {
-                    if (position.Contract.Strike < midPrice)
-                        staticDelta += position.Size * position.Contract.Multiplier;
-                }
-                else {
-                    if (midPrice < position.Contract.Strike)
-                        staticDelta -= position.Size * position.Contract.Multiplier;
-                }
-            }
-        }
-
-        return staticDelta;
-    }
-
-    private float? CalculatePL(string underlyingSymbol, DateTimeOffset currentTime, TimeSpan lookaheadSpan, float staticDelta, float midPrice, float currentPrice) {
+    private float? CalculatePL(string underlyingSymbol, DateTimeOffset currentTime, TimeSpan lookaheadSpan, float currentMove) {
 
         var bls = new BlackNScholesCaculator();
-        float totalPL = staticDelta * (currentPrice - midPrice);
+        float totalPL = 0;
         foreach (var position in Values) {
             // Skip any positions that are not in the same underlying
             if (position.Contract.Symbol != underlyingSymbol)
@@ -380,16 +350,35 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             }
 
             if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
-                totalPL += position.Size * (currentPrice - position.Contract.MarketPrice.Value) * position.Contract.Multiplier;
+                totalPL += position.Size * (currentMove - 1f) * position.Contract.MarketPrice.Value * position.Contract.Multiplier;
             } 
             else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
-                var optionPrice = CalculateOptionPrice(lookaheadSpan, midPrice, currentTime, currentPrice, bls, position);
-                if (!optionPrice.HasValue) {
-                    _logger.LogWarning($"Unable to calculate option price for position {position.Contract}");
+                if (!position.TryGetUnderlying(out var underlyingContract)) {
+                    _logger.LogWarning($"Position {position.Contract} has no underlying, unable to calculate P&L.");
                     return null;
                 }
 
-                totalPL += position.Size * (optionPrice.Value - position.Contract.MarketPrice.Value) * position.Contract.Multiplier;
+                // Assume expired options are assigned or worthless
+                var currentPrice = underlyingContract.MarketPrice!.Value * currentMove;
+                if (position.Contract.Expiration!.Value < currentTime + lookaheadSpan) {
+                    if (position.Contract.IsCall) {
+                        if (position.Contract.Strike < currentPrice)
+                            totalPL += (currentPrice - position.Contract.Strike) * position.Size * position.Contract.Multiplier;
+                    }
+                    else {
+                        if (currentPrice < position.Contract.Strike)
+                            totalPL += (position.Contract.Strike - currentPrice) * position.Size * position.Contract.Multiplier;
+                    }
+                }
+                else {
+                    var optionPrice = CalculateOptionPrice(lookaheadSpan, underlyingContract.MarketPrice!.Value, currentTime, currentPrice, bls, position);
+                    if (!optionPrice.HasValue) {
+                        _logger.LogWarning($"Unable to calculate option price for position {position.Contract}");
+                        return null;
+                    }
+
+                    totalPL += (optionPrice.Value - position.Contract.MarketPrice.Value) * position.Size * position.Contract.Multiplier;
+                }
             }
         }
 
@@ -399,18 +388,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
     private float? CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCaculator bls, Position position) {
         if (!position.Contract.MarketPrice.HasValue) {
             _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate option price.");
-            return null;
-        }
-        if (position.Underlying == null || position.UnderlyingContractId == null) {
-            _logger.LogWarning($"Position {position.Contract} has no underlying, unable to calculate P&L.");
-            return null;
-        }
-        if (!position.Underlying.ContractsById.TryGetValue(position.UnderlyingContractId.Value, out var underlyingContract)) {
-            _logger.LogWarning($"Position {position.Contract} has no underlying contract with ID {position.UnderlyingContractId}, unable to calculate P&L.");
-            return null;
-        }
-        if (!underlyingContract.MarketPrice.HasValue) {
-            _logger.LogWarning($"Position {position.Contract} has no underlying contract market price, unable to calculate P&L.");
             return null;
         }
         
@@ -431,7 +408,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
         
         float optionPrice = 0f;
-        bls.DaysLeft = (float)(position.Contract.Expiration!.Value - currentTime).TotalDays;
+        bls.DaysLeft = currentTime.BusinessDaysTo(position.Contract.Expiration!.Value);
         bls.StockPrice = midPrice;
         bls.Strike = position.Contract.Strike;
         if (position.Contract.IsCall) {

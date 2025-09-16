@@ -92,6 +92,26 @@ public class Position
 
     #endregion
 
+    public bool TryGetUnderlying([NotNullWhen(true)] out Contract? contract) {
+
+        contract = null;
+        
+        if (Underlying == null || UnderlyingContractId == null) {
+            return false;
+        }
+
+        if (!Underlying.ContractsById.TryGetValue(UnderlyingContractId.Value, out var underlyingContract)) {
+            return false;
+        }
+
+        if (!underlyingContract.MarketPrice.HasValue) {
+            return false;
+        }
+
+        contract = underlyingContract;
+        return true;
+    }
+
     public override string ToString() {
         return $"{Contract} {Size} @ {Contract.MarketPrice:C}";
     }

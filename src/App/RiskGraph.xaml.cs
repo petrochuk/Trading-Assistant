@@ -145,14 +145,13 @@ public sealed partial class RiskGraph : UserControl
         }
 
         var underlyingSymbol = Account.Positions.SelectedPosition.Symbol;
-        var minPrice = midPrice.Value * 0.95f;
-        var maxPrice = midPrice.Value * 1.05f;
-        var priceIncrement = (maxPrice - minPrice) / 100f;
+        var minMove = 0.95f;
+        var maxMove = 1.05f;
         var riskCurves = new Dictionary<TimeSpan, RiskCurve>();
         var maxPL = float.MinValue;
         var minPL = float.MaxValue;
         foreach (var interval in _riskIntervals) {
-            var riskCurve = Account.Positions.CalculateRiskCurve(underlyingSymbol, interval.Key, minPrice, midPrice.Value, maxPrice, priceIncrement);
+            var riskCurve = Account.Positions.CalculateRiskCurve(underlyingSymbol, interval.Key, minMove, maxMove, (maxMove - minMove) / 100f);
             if (riskCurve == null) {
                 _logger.LogWarning($"Risk curve for interval {interval.Key} is null");
                 continue;
@@ -187,7 +186,7 @@ public sealed partial class RiskGraph : UserControl
             };
 
             var pathFigure = new PathFigure() {
-                StartPoint = new Point(MapX(points.GetKeyAtIndex(0), minPrice, maxPrice), MapY(points.GetValueAtIndex(0), minPL, maxPL)),
+                StartPoint = new Point(MapX(points.GetKeyAtIndex(0), minMove, maxMove), MapY(points.GetValueAtIndex(0), minPL, maxPL)),
             };
             if (double.IsNaN(pathFigure.StartPoint.X) || double.IsNaN(pathFigure.StartPoint.Y)) {
                 _logger.LogWarning($"Invalid start point {points.GetKeyAtIndex(0)}, {points.GetValueAtIndex(0)}");
@@ -196,7 +195,7 @@ public sealed partial class RiskGraph : UserControl
             ((PathGeometry)path.Data).Figures.Add(pathFigure);
             for (var pointIdx = 1; pointIdx < points.Count; pointIdx++) {
                 var lineSegment = new LineSegment() {
-                    Point = new Point(MapX(points.GetKeyAtIndex(pointIdx), minPrice, maxPrice), MapY(points.GetValueAtIndex(pointIdx), minPL, maxPL)),
+                    Point = new Point(MapX(points.GetKeyAtIndex(pointIdx), minMove, maxMove), MapY(points.GetValueAtIndex(pointIdx), minPL, maxPL)),
                 };
                 if (double.IsNaN(lineSegment.Point.X) || double.IsNaN(lineSegment.Point.Y)) {
                     _logger.LogWarning($"Invalid line segment {points.GetKeyAtIndex(pointIdx)}, {points.GetValueAtIndex(pointIdx)}");
@@ -207,7 +206,7 @@ public sealed partial class RiskGraph : UserControl
             Canvas.Children.Add(path);
         }
 
-        DrawLabels(midPrice.Value, minPrice, maxPrice, maxPL, minPL);
+        DrawLabels(1, minMove, maxMove, maxPL, minPL);
     }
 
     private void DrawLabels(float midPrice, float minPrice, float maxPrice, float maxPL, float minPL) {
@@ -227,7 +226,7 @@ public sealed partial class RiskGraph : UserControl
 
         // Draw the mid
         var midText = new TextBlock() {
-            Text = midPrice.ToString("N2"),
+            Text = (midPrice - 1).ToString("N2"),
             Foreground = (Brush)App.Current.Resources["ControlStrongFillColorDefaultBrush"],
             FontSize = 12,
         };
