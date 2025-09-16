@@ -307,8 +307,6 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
                 }
                 App.Instance.IBClient.FindContracts(underlying.Symbol, underlying.AssetClass);
             }
-
-            RiskGraphControl.Redraw();
         });
     }
 
