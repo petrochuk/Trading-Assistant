@@ -35,6 +35,51 @@ public class HestonCalculatorLatestFeaturesTests
     }
 
     /// <summary>
+    /// Test that demonstrates the behavior with actual SPX-like parameters
+    /// Note: The original parameters violate the Feller condition and are automatically adjusted
+    /// </summary>
+    [TestMethod]
+    public void TestHeston_ActualSPX() {
+        var heston = new HestonCalculator {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            StockPrice = 6621.75f,
+            Strike = 6575f,
+            DaysLeft = 1f,
+            CurrentVolatility = 0.25f,
+            LongTermVolatility = 0.15f,
+            VolatilityMeanReversion = 10f,
+            VolatilityOfVolatility = 0.95f,
+            Correlation = -1f
+        };
+
+        heston.CalculateAll();
+        var deltaCall = heston.DeltaCall;
+        var deltaPut = heston.DeltaPut;
+
+        heston.DaysLeft += 0.01f;
+        heston.CalculateAll();
+
+        var deltaCall2 = heston.DeltaCall;
+        var deltaPut2 = heston.DeltaPut;
+
+        // Verify that deltas are within reasonable bounds
+        Assert.IsTrue(deltaCall >= 0.0f && deltaCall <= 1.0f, $"Initial call delta should be between 0 and 1, got {deltaCall}");
+        Assert.IsTrue(deltaPut >= -1.0f && deltaPut <= 0.0f, $"Initial put delta should be between -1 and 0, got {deltaPut}");
+        Assert.IsTrue(deltaCall2 >= 0.0f && deltaCall2 <= 1.0f, $"Second call delta should be between 0 and 1, got {deltaCall2}");
+        Assert.IsTrue(deltaPut2 >= -1.0f && deltaPut2 <= 0.0f, $"Second put delta should be between -1 and 0, got {deltaPut2}");
+
+        // Verify that changes are small and reasonable for very short-term options
+        float deltaCallChange = MathF.Abs(deltaCall2 - deltaCall);
+        float deltaPutChange = MathF.Abs(deltaPut2 - deltaPut);
+        
+        Assert.IsTrue(deltaCallChange < 0.01f, $"Call delta change should be small for short-term options, got {deltaCallChange}");
+        Assert.IsTrue(deltaPutChange < 0.01f, $"Put delta change should be small for short-term options, got {deltaPutChange}");
+        
+        // Verify that the delta calculation is stable (not jumping to extreme values)
+        Assert.IsFalse(deltaCall2 == 1.0f && deltaPut2 == 0.0f, "Delta calculation should not jump to extreme boundary values");
+    }
+
+    /// <summary>
     /// Test the new integration methods
     /// </summary>
     [TestMethod]

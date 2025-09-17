@@ -170,7 +170,7 @@ public class HestonCalculator
     /// </summary>
     private void CalculateHestonCharacteristicFunction()
     {
-        if (ExpiryTime <= 0)
+        if (ExpiryTime <= 1e-6f) // Use a very small threshold instead of zero
         {
             // At expiration
             CallValue = MathF.Max(StockPrice - Strike, 0);
@@ -618,51 +618,185 @@ public class HestonCalculator
     }
 
     /// <summary>
+    /// Calculate correlation adjustment for delta in very short-term options
+    /// </summary>
+    private float CalculateCorrelationDeltaAdjustment()
+    {
+        float rho = Correlation;
+        float xi = VolatilityOfVolatility;
+        float T = ExpiryTime;
+        
+        // Small adjustment that takes into account the correlation between stock and vol
+        // For negative correlation (typical), calls get slightly lower delta, puts get slightly higher delta
+        float adjustment = -rho * xi * T * 0.01f; // Very small adjustment
+        
+        // Limit the adjustment to prevent extreme values
+        return MathF.Max(-0.05f, MathF.Min(0.05f, adjustment));
+    }
+
+    /// <summary>
+    /// Calculate optimal bump size for finite difference based on option characteristics
+    /// </summary>
+    private float CalculateOptimalBumpSize()
+    {
+        float baseBump = 1.0f;
+        
+        // For very short-term options, use a smaller bump as a percentage of stock price
+        if (ExpiryTime < 7.0f / 365.0f) // Less than 7 days
+        {
+            // Use 0.01% of stock price, but at least 0.01
+            baseBump = MathF.Max(0.01f, StockPrice * 0.0001f);
+        }
+        else if (ExpiryTime < 30.0f / 365.0f) // Less than 30 days
+        {
+            // Use 0.05% of stock price, but at least 0.1
+            baseBump = MathF.Max(0.1f, StockPrice * 0.0005f);
+        }
+        
+        // For high-priced stocks, use a proportional bump
+        if (StockPrice > 1000.0f)
+        {
+            baseBump = MathF.Max(baseBump, StockPrice * 0.0001f);
+        }
+        
+        return baseBump;
+    }
+
+    /// <summary>
     /// Calculate delta using finite difference method
     /// </summary>
     private void CalculateDelta()
     {
-        const float bump = 1.0f; // Use $1 bump instead of 1% for more stable calculation
         float originalPrice = StockPrice;
 
-        // For extremely deep OTM options, use analytical bounds instead of finite difference
-        float moneyness = StockPrice / Strike;
-        if (moneyness > 50.0f) // Extremely deep OTM put, ITM call
+        // For extremely short-term options (less than 0.01 day = about 15 minutes), use analytical approximation
+        // to avoid numerical instability in finite difference calculation
+        if (ExpiryTime < 0.01f / 365.0f)
         {
-            DeltaCall = 1.0f; // Extremely deep ITM call delta approaches 1
-            DeltaPut = 0.0f;  // Extremely deep OTM put delta approaches 0
-            return;
-        }
-        else if (moneyness < 0.02f) // Extremely deep OTM call, ITM put  
-        {
-            DeltaCall = 0.0f;  // Extremely deep OTM call delta approaches 0
-            DeltaPut = -1.0f;  // Extremely deep ITM put delta approaches -1
+            CalculateDeltaAnalytical();
             return;
         }
 
+        // Debug: Log the moneyness for investigation
+        float moneyness = StockPrice / Strike;
+
+        // For extremely deep OTM options, use analytical bounds instead of finite difference
+        if (moneyness > 100.0f)
+        {
+            DeltaCall = 1.0f;
+            DeltaPut = 0.0f;
+            return;
+        }
+        else if (moneyness < 0.01f)
+        {
+            DeltaCall = 0.0f;
+            DeltaPut = -1.0f;
+            return;
+        }
+
+        // Use adaptive bump size that ensures we get meaningful price differences
+        // For very short-term options, we need to be more careful with the bump size
+        float deltaBump = CalculateOptimalBumpSize();
+
         // Bump stock price up
-        StockPrice = originalPrice + bump;
+        StockPrice = originalPrice + deltaBump;
         CalculateCallPut();
         float callUp = CallValue;
         float putUp = PutValue;
 
         // Bump stock price down
-        StockPrice = originalPrice - bump;
+        StockPrice = originalPrice - deltaBump;
         CalculateCallPut();
         float callDown = CallValue;
         float putDown = PutValue;
 
         // Calculate delta using central difference
-        DeltaCall = (callUp - callDown) / (2.0f * bump);
-        DeltaPut = (putUp - putDown) / (2.0f * bump);
+        DeltaCall = (callUp - callDown) / (2.0f * deltaBump);
+        DeltaPut = (putUp - putDown) / (2.0f * deltaBump);
 
-        // Apply bounds to ensure valid delta ranges
+        // Check for numerical issues
+        if (float.IsNaN(DeltaCall) || float.IsInfinity(DeltaCall) || 
+            float.IsNaN(DeltaPut) || float.IsInfinity(DeltaPut))
+        {
+            // Use Black-Scholes analytical approximation
+            CalculateDeltaAnalytical();
+            return;
+        }
+
+        // For very short-term options, validate that the price differences are meaningful
+        float callPriceDiff = MathF.Abs(callUp - callDown);
+        float putPriceDiff = MathF.Abs(putUp - putDown);
+        
+        if (callPriceDiff < 0.001f || putPriceDiff < 0.001f)
+        {
+            // Price differences are too small, use analytical method
+            CalculateDeltaAnalytical();
+            return;
+        }
+
+        // Check for unreasonable finite difference results and use analytical fallback
+        if (DeltaCall > 1.5f || DeltaCall < -0.5f || DeltaPut > 0.5f || DeltaPut < -1.5f)
+        {
+            CalculateDeltaAnalytical();
+            return;
+        }
+
+        // Apply reasonable bounds
         DeltaCall = MathF.Max(0.0f, MathF.Min(1.0f, DeltaCall));
         DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
 
         // Restore original price
         StockPrice = originalPrice;
         CalculateCallPut();
+    }
+
+    /// <summary>
+    /// Calculate delta using analytical approximation for cases where finite difference fails
+    /// </summary>
+    private void CalculateDeltaAnalytical()
+    {        
+        // Use Black-Scholes delta approximation with effective volatility
+        float effectiveVol = MathF.Sqrt(CalculateEffectiveVariance());
+        
+        if (ExpiryTime <= 0 || effectiveVol <= 0)
+        {
+            // At expiration or zero volatility, use intrinsic delta
+            if (StockPrice > Strike)
+            {
+                DeltaCall = 1.0f;
+                DeltaPut = 0.0f;
+            }
+            else if (StockPrice < Strike)
+            {
+                DeltaCall = 0.0f;
+                DeltaPut = -1.0f;
+            }
+            else
+            {
+                DeltaCall = 0.5f;
+                DeltaPut = -0.5f;
+            }
+            return;
+        }
+        
+        float d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + effectiveVol * effectiveVol / 2.0f) * ExpiryTime) /
+                   (effectiveVol * MathF.Sqrt(ExpiryTime));
+
+        DeltaCall = CumulativeNormalDistribution(d1);
+        DeltaPut = DeltaCall - 1.0f;
+        
+        // Apply Heston-specific adjustments for very short-term options
+        if (ExpiryTime < 7.0f / 365.0f) // Less than 7 days
+        {
+            // For very short-term options, apply a small correlation adjustment to delta
+            float correlationAdjustment = CalculateCorrelationDeltaAdjustment();
+            DeltaCall += correlationAdjustment;
+            DeltaPut += correlationAdjustment;
+        }
+        
+        // Apply reasonable bounds
+        DeltaCall = MathF.Max(0.0f, MathF.Min(1.0f, DeltaCall));
+        DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
     }
 
     /// <summary>
@@ -728,7 +862,8 @@ public class HestonCalculator
     /// </summary>
     private void CalculateTheta()
     {
-        const float bump = 1.0f / 365.0f; // 1 day
+        // Use adaptive bump size - should be much smaller than the remaining time
+        float bump = MathF.Min(1.0f / 365.0f, ExpiryTime * 0.1f); // Use 10% of remaining time or 1 day, whichever is smaller
         float originalTime = ExpiryTime;
 
         if (originalTime <= bump)
@@ -748,8 +883,9 @@ public class HestonCalculator
         CalculateCallPut();
 
         // Calculate theta (negative because time decay reduces option value)
-        ThetaCall = callDown - CallValue; // Per day
-        ThetaPut = putDown - PutValue; // Per day
+        // Scale the result to per-day basis
+        ThetaCall = (callDown - CallValue) / (bump * 365.0f); // Convert to per day
+        ThetaPut = (putDown - PutValue) / (bump * 365.0f); // Convert to per day
     }
 
     /// <summary>
@@ -785,7 +921,8 @@ public class HestonCalculator
     /// </summary>
     private void CalculateCharm()
     {
-        const float timeBump = 1.0f / 365.0f; // 1 day
+        // Use adaptive bump size - should be much smaller than the remaining time
+        float timeBump = MathF.Min(1.0f / 365.0f, ExpiryTime * 0.1f); // Use 10% of remaining time or 1 day, whichever is smaller
         float originalTime = ExpiryTime;
 
         if (originalTime <= timeBump)
@@ -806,8 +943,9 @@ public class HestonCalculator
         float deltaPutDown = DeltaPut;
 
         // Calculate charm (rate of change of delta with respect to time)
-        CharmCall = (deltaCallDown - deltaCallBase) / timeBump;
-        CharmPut = (deltaPutDown - deltaPutBase) / timeBump;
+        // Scale the result to per-day basis
+        CharmCall = (deltaCallDown - deltaCallBase) / (timeBump * 365.0f); // Convert to per day
+        CharmPut = (deltaPutDown - deltaPutBase) / (timeBump * 365.0f); // Convert to per day
 
         // Restore original time
         ExpiryTime = originalTime;
@@ -837,7 +975,7 @@ public class HestonCalculator
     /// </summary>
     public void CalculateCallPut()
     {
-        if (ExpiryTime <= 0)
+        if (ExpiryTime <= 1e-6f) // Use a very small threshold instead of zero
         {
             // At expiration
             CallValue = MathF.Max(StockPrice - Strike, 0);
