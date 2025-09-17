@@ -142,7 +142,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
         if (!string.IsNullOrEmpty(e.ErrorMessage)) {
             _logger.LogInformation($"Delta hedge order {_activeOrderId} failed to be placed. Delay hedging");
-            _hedgeDelay = _timeProvider.GetUtcNow().AddHours(1);
+            _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(5);
             _activeOrderId = null; // Reset active order ID
             return;
         }
