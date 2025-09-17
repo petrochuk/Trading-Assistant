@@ -363,11 +363,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 if (position.Contract.Expiration!.Value < currentTime + lookaheadSpan) {
                     if (position.Contract.IsCall) {
                         if (position.Contract.Strike < currentPrice)
-                            totalPL += (currentPrice - position.Contract.Strike) * position.Size * position.Contract.Multiplier;
+                            totalPL += (currentPrice - position.Contract.Strike - position.Contract.MarketPrice.Value) * position.Size * position.Contract.Multiplier;
                     }
                     else {
                         if (currentPrice < position.Contract.Strike)
-                            totalPL += (position.Contract.Strike - currentPrice) * position.Size * position.Contract.Multiplier;
+                            totalPL += (position.Contract.Strike - currentPrice - position.Contract.MarketPrice.Value) * position.Size * position.Contract.Multiplier;
                     }
                 }
                 else {
