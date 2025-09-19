@@ -22,8 +22,8 @@ public class RVwithSubsampling : IRealizedVolatility
         for (int i = 0; i < subsamplesCount; i++)
         {
             //_subsamples.Add(new RollingStandardDeviation());
-            // 6 hours
-            _subsamples.Add(EwmaVolatility.FromPeriod(72));
+            // 24 hours = 24 * 60 / 5min
+            _subsamples.Add(EwmaVolatility.FromPeriod(288));
         }
     }
 
