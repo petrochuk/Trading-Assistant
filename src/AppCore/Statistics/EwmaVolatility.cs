@@ -91,7 +91,7 @@ public sealed class EwmaVolatility
     /// </summary>
     public bool TryGetValue(out double value)
     {
-        if (_variance is null || _count == 0)
+        if (_variance is null || _count <= 0)
         {
             value = 0;
             return false;
