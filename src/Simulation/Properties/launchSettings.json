@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Simulation": {
+      "commandName": "Project",
+      "commandLineArgs": "--calibrate"
+    }
+  }
+}
