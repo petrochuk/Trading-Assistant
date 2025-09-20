@@ -69,6 +69,92 @@ public class HestonCalibrator
         var sw = Stopwatch.StartNew();
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Starting calibration for {modelType}...");
 
+        // Use appropriate calculator based on model type
+        if (modelType == SkewKurtosisModel.VarianceGamma)
+        {
+            return CalibrateVarianceGammaModel(sw);
+        }
+        else
+        {
+            return CalibrateHestonModel(modelType, sw);
+        }
+    }
+
+    private CalibrationResult CalibrateVarianceGammaModel(Stopwatch sw)
+    {
+        var vgCalculator = new VarianceGammaCalculator
+        {
+            StockPrice = _stockPrice,
+            RiskFreeInterestRate = 0.05f, // 5% risk-free rate
+            Volatility = 0.15f,
+            VarianceRate = 1.0f,
+            DriftParameter = -0.03f
+        };
+
+        float CalculateError()
+        {
+            float err = 0f;
+            foreach (var ob in _observations)
+            {
+                vgCalculator.Strike = ob.Strike;
+                vgCalculator.DaysLeft = ob.Days;
+                vgCalculator.CalculateCallPut();
+                
+                float percentageError = Math.Abs(vgCalculator.PutValue - ob.MarketPut) / ob.MarketPut * 100f;
+                err += percentageError * percentageError; // Square the percentage error for optimization
+            }
+            return err;
+        }
+
+        var baselineError = CalculateError();
+        float bestError = float.MaxValue;
+        string bestDescription = string.Empty;
+
+        void EvaluateCurrent(string desc)
+        {
+            try
+            {
+                float total = CalculateError();
+                if (total < bestError)
+                {
+                    bestError = total;
+                    bestDescription = desc;
+                    
+                    // Update global best and display in real-time with thread safety
+                    UpdateGlobalBest(new CalibrationResult
+                    {
+                        ModelType = SkewKurtosisModel.VarianceGamma,
+                        BaselineError = baselineError,
+                        BestError = bestError,
+                        BestDescription = bestDescription,
+                        ElapsedTime = sw.Elapsed
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Skip invalid parameter combinations
+                Debug.WriteLine($"Error in VarianceGamma with {desc}: {ex.Message}");
+            }
+        }
+
+        CalibrateVarianceGamma(vgCalculator, EvaluateCurrent);
+
+        sw.Stop();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Completed VarianceGamma in {sw.Elapsed.TotalSeconds:F1}s - Final best error: {bestError:F2} {bestDescription}");
+
+        return new CalibrationResult
+        {
+            ModelType = SkewKurtosisModel.VarianceGamma,
+            BaselineError = baselineError,
+            BestError = bestError,
+            BestDescription = bestDescription,
+            ElapsedTime = sw.Elapsed
+        };
+    }
+
+    private CalibrationResult CalibrateHestonModel(SkewKurtosisModel modelType, Stopwatch sw)
+    {
         var heston = new HestonCalculator 
         {
             IntegrationMethod = HestonIntegrationMethod.Adaptive,
@@ -137,9 +223,6 @@ public class HestonCalibrator
             case SkewKurtosisModel.JumpDiffusionHeston:
                 CalibrateJumpDiffusionHeston(heston, EvaluateCurrent);
                 break;
-//            case SkewKurtosisModel.VarianceGamma:
-//                CalibrateVarianceGamma(heston, EvaluateCurrent);
-//                break;
             case SkewKurtosisModel.AsymmetricLaplace:
                 CalibrateAsymmetricLaplace(heston, EvaluateCurrent);
                 break;
@@ -241,22 +324,21 @@ public class HestonCalibrator
         }
     }
 
-    private void CalibrateVarianceGamma(HestonCalculator heston, Action<string> evaluate)
+    private void CalibrateVarianceGamma(VarianceGammaCalculator vgCalculator, Action<string> evaluate)
     {
-        heston.EnableJumpDiffusion = false;
-        
-        var volOfVols = new float[] { 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 4.5f, 5f };
-        var meanJumpSizes = new float[] { -0.08f, -0.06f, -0.05f, -0.04f, -0.03f, -0.02f, -0.015f, -0.01f, -0.005f, 
+        var volatilities = new float[] { 0.06f, 0.07f, 0.08f, 0.10f, 0.12f, 0.15f, 0.18f, 0.20f, 0.25f, 0.30f, 0.35f };
+        var varianceRates = new float[] { 0.5f, 0.8f, 1.0f, 1.2f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 4.5f, 5.0f };
+        var driftParameters = new float[] { -0.08f, -0.06f, -0.05f, -0.04f, -0.03f, -0.02f, -0.015f, -0.01f, -0.005f, 
             0.0f, 0.005f, 0.01f, 0.02f, 0.03f, 0.04f, 0.05f, 0.1f, 0.2f, 0.3f };
 
-        for (var cv=0.05f; cv<0.40f; cv+=0.01f )
-        foreach (var vofvol in volOfVols)
-        foreach (var mj in meanJumpSizes)
+        foreach (var vol in volatilities)
+        foreach (var nu in varianceRates)
+        foreach (var theta in driftParameters)
         {
-            heston.CurrentVolatility = cv;
-            heston.VolatilityOfVolatility = vofvol;
-            heston.MeanJumpSize = mj;
-            evaluate($"cv={cv:F3} vofv={vofvol:F1} mj={mj:F3}");
+            vgCalculator.Volatility = vol;
+            vgCalculator.VarianceRate = nu;
+            vgCalculator.DriftParameter = theta;
+            evaluate($"vol={vol:F3} nu={nu:F1} theta={theta:F3}");
         }
     }
 

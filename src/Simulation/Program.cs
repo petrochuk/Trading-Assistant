@@ -12,11 +12,18 @@ namespace Simulation
             
             Console.WriteLine("Trading simulation!");
 
-            // Check for calibrate argument
-            if (args.Length > 0 && args[0] == "--calibrate")
+            // Check for command line arguments
+            if (args.Length > 0)
             {
-                await RunCalibrationAsync();
-                return;
+                switch (args[0])
+                {
+                    case "--calibrate":
+                        await RunCalibrationAsync();
+                        return;
+                    case "--help":
+                        ShowHelp();
+                        return;
+                }
             }
 
             // Default simulation
@@ -44,6 +51,15 @@ namespace Simulation
             Console.WriteLine();
             Console.WriteLine("Calibration completed. Press any key to exit...");
             Console.ReadKey();
+        }
+
+        private static void ShowHelp()
+        {
+            Console.WriteLine("Available command line options:");
+            Console.WriteLine("  --calibrate    Run Heston model calibration across different model types");
+            Console.WriteLine("  --help         Show this help message");
+            Console.WriteLine("  (no args)      Run default gamma scalping simulation");
+            Console.WriteLine();
         }
     }
 }
