@@ -22,10 +22,7 @@ public class HestonVarianceGamma
             StockPrice = 6720f,
             DaysLeft = 5.0f,
             CurrentVolatility = 0.10f,
-            LongTermVolatility = 0.10f,
-            VolatilityMeanReversion = 20f,
             VolatilityOfVolatility = initialVolOfVol,
-            Correlation = -1f
         };
 
         var bls = new BlackNScholesCaculator {
@@ -61,94 +58,6 @@ public class HestonVarianceGamma
                 var newPriceWithJump = heston.PutValue;
                 Assert.IsTrue(newPriceWithJump > currentPrice, $"Price with jump should increase with higher vol of vol for strike {strikes[idx]}: {newPriceWithJump} < {currentPrice}");
                 currentPrice = newPriceWithJump;
-            }
-        }
-    }
-
-    //[TestMethod]
-    public void VolatilityMeanReversion_Should_ImpactPutPrices() {
-        var strikes = new float[] {
-            6400f, 6450f, 6500f, 6550f, 6600f
-        };
-
-        var meanReversionSpeeds = new float[] {
-            0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 20.0f, 50.0f, 100.0f
-        };
-
-        var initialMeanReversion = 0.1f;
-        var heston = new HestonCalculator {
-            IntegrationMethod = HestonIntegrationMethod.Adaptive,
-            ModelType = SkewKurtosisModel.VarianceGamma,
-            StockPrice = 6720f,
-            DaysLeft = 5.0f,
-            CurrentVolatility = 0.15f, // Higher than long-term vol
-            LongTermVolatility = 0.10f, // Lower long-term vol
-            VolatilityMeanReversion = initialMeanReversion,
-            VolatilityOfVolatility = 2.0f,
-            MeanJumpSize = -0.05f,
-            Correlation = -0.5f
-        };
-
-        var bls = new BlackNScholesCaculator {
-            StockPrice = heston.StockPrice,
-            DaysLeft = heston.DaysLeft,
-            ImpliedVolatility = heston.CurrentVolatility,
-        };
-
-        for (var idx = 0; idx < strikes.Length; idx++) {
-            // Reset VolatilityMeanReversion to initial value for each strike
-            heston.VolatilityMeanReversion = initialMeanReversion;
-
-            bls.Strike = strikes[idx];
-            bls.CalculateAll();
-            var bsPrice = bls.PutValue;
-
-            heston.Strike = strikes[idx];
-            heston.CalculateAll();
-            var basePrice = heston.PutValue;
-
-            // Test increasing mean reversion speeds
-            var currentPrice = basePrice;
-            for (var mrIdx = 0; mrIdx < meanReversionSpeeds.Length; mrIdx++) {
-                heston.VolatilityMeanReversion = meanReversionSpeeds[mrIdx];
-                heston.CalculateAll();
-                var newPrice = heston.PutValue;
-
-                // With higher current vol than long-term vol, higher mean reversion should pull vol down faster,
-                // reducing put option value (since current vol > long-term vol)
-                if (mrIdx > 0) {
-                    Assert.IsTrue(newPrice < currentPrice, 
-                        $"Higher mean reversion should decrease put price when current vol > long-term vol for strike {strikes[idx]}: " +
-                        $"Mean reversion {meanReversionSpeeds[mrIdx]} gave price {newPrice}, previous {currentPrice}");
-                }
-                currentPrice = newPrice;
-            }
-        }
-
-        // Test opposite scenario: current vol < long-term vol
-        heston.CurrentVolatility = 0.08f; // Lower than long-term vol
-        heston.LongTermVolatility = 0.12f; // Higher long-term vol
-
-        for (var idx = 0; idx < strikes.Length; idx++) {
-            heston.Strike = strikes[idx];
-            heston.VolatilityMeanReversion = initialMeanReversion;
-            heston.CalculateAll();
-            var basePrice = heston.PutValue;
-
-            var currentPrice = basePrice;
-            for (var mrIdx = 0; mrIdx < meanReversionSpeeds.Length; mrIdx++) {
-                heston.VolatilityMeanReversion = meanReversionSpeeds[mrIdx];
-                heston.CalculateAll();
-                var newPrice = heston.PutValue;
-
-                // With lower current vol than long-term vol, higher mean reversion should pull vol up faster,
-                // increasing put option value (since current vol < long-term vol)
-                if (mrIdx > 0) {
-                    Assert.IsTrue(newPrice > currentPrice, 
-                        $"Higher mean reversion should increase put price when current vol < long-term vol for strike {strikes[idx]}: " +
-                        $"Mean reversion {meanReversionSpeeds[mrIdx]} gave price {newPrice}, previous {currentPrice}");
-                }
-                currentPrice = newPrice;
             }
         }
     }
@@ -191,6 +100,4 @@ public class HestonVarianceGamma
             var hestonPrice = heston.PutValue;
         }
     }
-
-
 }

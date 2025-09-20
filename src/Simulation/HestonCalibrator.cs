@@ -246,26 +246,17 @@ public class HestonCalibrator
         heston.EnableJumpDiffusion = false;
         
         var volOfVols = new float[] { 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 4.5f, 5f };
-        var longTermVols = new float[] { 0.08f, 0.10f, 0.12f, 0.15f, 0.20f };
-        var meanReversions = new float[] { 1f, 2f, 3f, 4f, 5f, 6f, 7f, 10f, 12f, 15f, 20f };
-        var correlations = new float[] { -1.0f, -0.8f, -0.6f, -0.5f, -0.4f };
         var meanJumpSizes = new float[] { -0.08f, -0.06f, -0.05f, -0.04f, -0.03f, -0.02f, -0.015f, -0.01f, -0.005f, 
             0.0f, 0.005f, 0.01f, 0.02f, 0.03f, 0.04f, 0.05f, 0.1f, 0.2f, 0.3f };
 
         for (var cv=0.05f; cv<0.40f; cv+=0.01f )
         foreach (var vofvol in volOfVols)
-        foreach (var lt in longTermVols)
-        foreach (var kappa in meanReversions)
-        foreach (var rho in correlations)
         foreach (var mj in meanJumpSizes)
         {
             heston.CurrentVolatility = cv;
             heston.VolatilityOfVolatility = vofvol;
-            heston.LongTermVolatility = lt;
-            heston.VolatilityMeanReversion = kappa;
-            heston.Correlation = rho;
             heston.MeanJumpSize = mj;
-            evaluate($"cv={cv:F3} vofv={vofvol:F1} lt={lt:F2} k={kappa:F0} rho={rho:F1} mj={mj:F3}");
+            evaluate($"cv={cv:F3} vofv={vofvol:F1} mj={mj:F3}");
         }
     }
 
