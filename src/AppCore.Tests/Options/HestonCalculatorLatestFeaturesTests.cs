@@ -561,4 +561,228 @@ public class HestonCalculatorLatestFeaturesTests
         Assert.IsTrue(crashScenarioPut >= emergingMarketPut * 0.8f, 
             "Crash scenario should generally produce higher or comparable put values");
     }
+
+    /// <summary>
+    /// Calibrate (simple grid) across model types for actual market prices from option chain images.
+    /// Uses put mid prices from attached images (strikes 6500-6750) at 10 point increments.
+    /// Updated with actual market data from option chain screenshots for different DTEs.
+    /// Ensures calibration improves error over a naive baseline Standard Heston configuration.
+    /// </summary>
+    [TestMethod]
+    public void TestHeston_ModelAndParameterSelection_Calibration()
+    {
+        // Market data from images - strikes at 10 point increments with bid/ask prices
+        float[] strikes = { 
+            6500f, 6510f, 6520f, 6530f, 6540f, 6550f, 6560f, 6570f, 6580f, 6590f,
+            6600f, 6610f, 6620f, 6630f, 6640f, 6650f, 6660f, 6670f, 6680f, 6690f,
+            6700f, 6710f, 6720f, 6730f, 6740f, 6750f
+        };
+
+        // Shorter DTE put bid/ask prices from first image
+        var shortDTEBidAsk = new (float Bid, float Ask)[] {
+            (2.70f, 3.15f),   // 6500
+            (2.90f, 3.40f),   // 6510
+            (3.15f, 3.65f),   // 6520
+            (3.40f, 3.90f),   // 6530
+            (3.65f, 4.20f),   // 6540
+            (4.00f, 4.55f),   // 6550
+            (4.35f, 4.95f),   // 6560
+            (4.80f, 5.45f),   // 6570
+            (5.30f, 5.95f),   // 6580
+            (5.90f, 6.55f),   // 6590
+            (6.55f, 7.20f),   // 6600
+            (7.30f, 8.00f),   // 6610
+            (8.25f, 8.75f),   // 6620
+            (9.25f, 9.80f),   // 6630
+            (10.25f, 11.00f), // 6640
+            (11.75f, 12.00f), // 6650
+            (13.25f, 14.00f), // 6660
+            (15.00f, 15.75f), // 6670
+            (17.25f, 18.00f), // 6680
+            (19.50f, 20.50f), // 6690
+            (22.50f, 23.25f), // 6700
+            (25.75f, 26.75f), // 6710
+            (29.75f, 30.75f), // 6720
+            (34.25f, 35.50f), // 6730
+            (39.00f, 40.75f), // 6740
+            (44.50f, 47.00f)  // 6750
+        };
+
+        // Longer DTE put bid/ask prices from second image  
+        var longDTEBidAsk = new (float Bid, float Ask)[] {
+            (3.95f, 4.20f),   // 6500
+            (4.25f, 4.50f),   // 6510
+            (4.60f, 4.80f),   // 6520
+            (4.95f, 5.25f),   // 6530
+            (5.35f, 5.65f),   // 6540
+            (5.80f, 6.15f),   // 6550
+            (6.30f, 6.65f),   // 6560
+            (6.90f, 7.25f),   // 6570
+            (7.55f, 7.90f),   // 6580
+            (8.25f, 8.60f),   // 6590
+            (9.15f, 9.50f),   // 6600
+            (10.00f, 10.75f), // 6610
+            (11.00f, 11.75f), // 6620
+            (12.25f, 13.00f), // 6630
+            (13.75f, 14.50f), // 6640
+            (15.50f, 16.00f), // 6650
+            (17.00f, 18.00f), // 6660
+            (19.25f, 20.00f), // 6670
+            (21.50f, 22.25f), // 6680
+            (24.25f, 25.00f), // 6690
+            (27.25f, 28.25f), // 6700
+            (30.75f, 31.75f), // 6710
+            (34.75f, 35.75f), // 6720
+            (39.25f, 40.50f), // 6730
+            (44.25f, 45.50f), // 6740
+            (49.25f, 51.25f)  // 6750
+        };
+
+        // Calculate mid prices from bid/ask
+        float[] pricesShortDTE = new float[strikes.Length];
+        float[] pricesLongDTE = new float[strikes.Length];
+        
+        for (int i = 0; i < strikes.Length; i++)
+        {
+            pricesShortDTE[i] = (shortDTEBidAsk[i].Bid + shortDTEBidAsk[i].Ask) / 2.0f;
+            pricesLongDTE[i] = (longDTEBidAsk[i].Bid + longDTEBidAsk[i].Ask) / 2.0f;
+        }
+
+        var observations = new List<(float Strike, float Days, float MarketPut)>();
+        
+        // Add shorter DTE observations (assuming ~4 DTE based on previous test pattern)
+        for (int i = 0; i < strikes.Length; i++) 
+        {
+            observations.Add((strikes[i], 4f, pricesShortDTE[i]));
+        }
+        
+        // Add longer DTE observations (assuming ~5 DTE based on previous test pattern)
+        for (int i = 0; i < strikes.Length; i++) 
+        {
+            observations.Add((strikes[i], 5f, pricesLongDTE[i]));
+        }
+
+        var heston = new HestonCalculator {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            StockPrice = 6720f,
+            CurrentVolatility = 0.082f,
+            LongTermVolatility = 0.08f,
+            VolatilityMeanReversion = 10f,
+            VolatilityOfVolatility = 0.95f,
+            Correlation = -1f
+        };
+
+        float BaselineError() {
+            float err = 0f;
+            foreach (var ob in observations) {
+                heston.Strike = ob.Strike;
+                heston.DaysLeft = ob.Days;
+                heston.CalculateCallPut();
+                float diff = heston.PutValue - ob.MarketPut;
+                err += diff * diff;
+            }
+            return err;
+        }
+
+        var baselineError = BaselineError();
+        Assert.IsTrue(baselineError > 0, "Baseline error should be positive");
+
+        // Parameter grids (moderate to keep test fast)
+        var longTermVols = new float[] { 0.07f, 0.08f, 0.09f, 0.10f, 0.11f, 0.12f, 0.13f, 0.14f, 0.15f, 0.16f, 0.17f, 0.18f, 0.19f, 0.20f };
+        var volOfVols = new float[] { 0.75f, 0.85f, 0.95f, 1.05f, 1.15f, 1.20f, 1.25f };
+        var meanReversions = new float[] { 5f, 10f, 15f, 20f };
+        var correlations = new float[] { -1.0f, -0.9f, -0.7f, -0.5f };
+        var jumpIntensities = new float[] { 0.5f, 1.0f };
+        var meanJumpSizes = new float[] { -0.02f, -0.04f };
+        var tailAsyms = new float[] { -0.3f, -0.5f };
+        var kurtosisEnhancements = new float[] { 0.05f, 0.10f };
+
+        float bestError = float.MaxValue;
+        string bestDescription = string.Empty;
+        SkewKurtosisModel bestModel = SkewKurtosisModel.StandardHeston;
+
+        void EvaluateCurrent(string desc) {
+            float total = 0f;
+            foreach (var ob in observations) {
+                heston.Strike = ob.Strike;
+                heston.DaysLeft = ob.Days;
+                heston.CalculateCallPut();
+                float diff = heston.PutValue - ob.MarketPut;
+                total += diff * diff;
+            }
+            if (total < bestError) { bestError = total; bestDescription = desc; bestModel = heston.ModelType; }
+        }
+
+        // Standard Heston
+        heston.EnableJumpDiffusion = false;
+        heston.ModelType = SkewKurtosisModel.StandardHeston;
+        heston.VolatilityOfVolatility = 0.95f;
+        foreach (var vofvol in volOfVols)
+        foreach (var lt in longTermVols)
+        foreach (var kappa in meanReversions)
+        foreach (var rho in correlations) {
+            heston.VolatilityOfVolatility = vofvol;
+            heston.LongTermVolatility = lt;
+            heston.VolatilityMeanReversion = kappa;
+            heston.Correlation = rho;
+            EvaluateCurrent($"Standard vofv={vofvol} lt={lt} k={kappa} rho={rho}");
+        }
+
+        // Jump Diffusion
+        heston.ModelType = SkewKurtosisModel.JumpDiffusionHeston;
+        heston.EnableJumpDiffusion = true;
+        foreach (var vofvol in volOfVols)
+        foreach (var lt in longTermVols)
+        foreach (var kappa in meanReversions)
+        foreach (var rho in correlations)
+        foreach (var ji in jumpIntensities)
+        foreach (var mj in meanJumpSizes)
+        foreach (var ta in tailAsyms)
+        foreach (var ke in kurtosisEnhancements) {
+            heston.VolatilityOfVolatility = vofvol;
+            heston.LongTermVolatility = lt;
+            heston.VolatilityMeanReversion = kappa;
+            heston.Correlation = rho;
+            heston.JumpIntensity = ji;
+            heston.MeanJumpSize = mj;
+            heston.JumpVolatility = 0.20f;
+            heston.TailAsymmetry = ta;
+            heston.KurtosisEnhancement = ke;
+            EvaluateCurrent($"Jump vofv={vofvol} lt={lt} k={kappa} rho={rho} ji={ji} mj={mj} ta={ta} ke={ke}");
+        }
+
+        // Variance Gamma
+        heston.ModelType = SkewKurtosisModel.VarianceGamma;
+        heston.EnableJumpDiffusion = false;
+        foreach (var vofvol in volOfVols)
+        foreach (var lt in longTermVols)
+        foreach (var kappa in meanReversions)
+        foreach (var rho in correlations)
+        foreach (var mj in meanJumpSizes) {
+            heston.VolatilityOfVolatility = vofvol;
+            heston.LongTermVolatility = lt;
+            heston.VolatilityMeanReversion = kappa;
+            heston.Correlation = rho;
+            heston.MeanJumpSize = mj;
+            EvaluateCurrent($"VG vofv={vofvol} lt={lt} k={kappa} rho={rho} mj={mj}");
+        }
+
+        // Asymmetric Laplace
+        heston.ModelType = SkewKurtosisModel.AsymmetricLaplace;
+        foreach (var vofvol in volOfVols)
+        foreach (var lt in longTermVols)
+        foreach (var kappa in meanReversions)
+        foreach (var rho in correlations)
+        foreach (var ta in tailAsyms) {
+            heston.VolatilityOfVolatility = vofvol;
+            heston.LongTermVolatility = lt;
+            heston.VolatilityMeanReversion = kappa;
+            heston.Correlation = rho;
+            heston.TailAsymmetry = ta;
+            EvaluateCurrent($"AL vofv={vofvol} lt={lt} k={kappa} rho={rho} ta={ta}");
+        }
+
+        Assert.IsTrue(bestError < baselineError, $"Calibration should improve error. Baseline={baselineError:F2}, Best={bestError:F2}, BestDesc={bestDescription}, BestModel={bestModel}");
+        Assert.IsTrue(Enum.IsDefined(typeof(SkewKurtosisModel), bestModel), "Best model should be defined enum value");
+    }
 }
