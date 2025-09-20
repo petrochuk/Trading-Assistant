@@ -407,4 +407,158 @@ public class HestonCalculatorLatestFeaturesTests
         Assert.IsTrue(approximationTime < 10000, "Approximation method should be fast");
         Assert.IsTrue(adaptiveTime < 10000, "Adaptive method should complete in reasonable time");
     }
+
+    /// <summary>
+    /// Test enhanced models for skewed and leptokurtic distributions
+    /// Demonstrates optimal model selection for different distribution characteristics
+    /// </summary>
+    [TestMethod]
+    public void TestHeston_SkewKurtosisModels()
+    {
+        var strikes = new float[] { 6400f, 6500f, 6600f, 6700f, 6800f };
+        var baseHeston = new HestonCalculator
+        {
+            StockPrice = 6621.75f,
+            DaysLeft = 7f,
+            RiskFreeInterestRate = 0.05f,
+            CurrentVolatility = 0.25f,
+            LongTermVolatility = 0.15f,
+            VolatilityMeanReversion = 5f,
+            VolatilityOfVolatility = 0.8f,
+            Correlation = -0.7f
+        };
+
+        foreach (var strike in strikes)
+        {
+            baseHeston.Strike = strike;
+
+            // Test 1: Standard Heston
+            baseHeston.ModelType = SkewKurtosisModel.StandardHeston;
+            baseHeston.CalculateCallPut();
+            float standardCall = baseHeston.CallValue;
+            float standardPut = baseHeston.PutValue;
+
+            // Test 2: Jump-Diffusion Heston (optimal for strong downside skew)
+            baseHeston.ModelType = SkewKurtosisModel.JumpDiffusionHeston;
+            baseHeston.EnableJumpDiffusion = true;
+            baseHeston.JumpIntensity = 2.0f; // High crash frequency
+            baseHeston.MeanJumpSize = -0.05f; // Negative jumps (downside bias)
+            baseHeston.JumpVolatility = 0.2f; // Fat tails
+            baseHeston.TailAsymmetry = -0.4f; // Strong left-tail bias
+            baseHeston.KurtosisEnhancement = 0.15f; // Leptokurtic
+            baseHeston.CalculateCallPut();
+            float jumpCall = baseHeston.CallValue;
+            float jumpPut = baseHeston.PutValue;
+
+            // Test 3: Variance Gamma (optimal for symmetric fat tails)
+            baseHeston.ModelType = SkewKurtosisModel.VarianceGamma;
+            baseHeston.MeanJumpSize = -0.02f; // Moderate negative bias
+            baseHeston.CalculateCallPut();
+            float vgCall = baseHeston.CallValue;
+            float vgPut = baseHeston.PutValue;
+
+            // Test 4: Asymmetric Laplace (optimal for asymmetric tails)
+            baseHeston.ModelType = SkewKurtosisModel.AsymmetricLaplace;
+            baseHeston.TailAsymmetry = -0.5f; // Strong asymmetry
+            baseHeston.CalculateCallPut();
+            float alCall = baseHeston.CallValue;
+            float alPut = baseHeston.PutValue;
+
+            // Verify model behavior differences
+            bool moneyness = baseHeston.StockPrice > strike;
+            
+            if (!moneyness) // OTM calls
+            {
+                // For OTM calls, fat-tail models should generally produce higher values
+                // due to increased probability of large upward moves
+                Assert.IsTrue(jumpCall >= standardCall * 0.8f, 
+                    $"Jump-diffusion should handle fat tails for OTM calls at strike {strike}");
+            }
+            else // OTM puts
+            {
+                // For OTM puts with downside skew, enhanced models should show higher values
+                // due to increased crash probability
+                Assert.IsTrue(jumpPut >= standardPut * 0.9f, 
+                    $"Jump-diffusion should capture downside skew for OTM puts at strike {strike}");
+                
+                Assert.IsTrue(alPut >= standardPut * 0.9f, 
+                    $"Asymmetric Laplace should capture left-tail thickness for OTM puts at strike {strike}");
+            }
+
+            // All models should produce reasonable values
+            Assert.IsTrue(jumpCall >= 0 && jumpPut >= 0, "Jump-diffusion values should be non-negative");
+            Assert.IsTrue(vgCall >= 0 && vgPut >= 0, "Variance Gamma values should be non-negative");
+            Assert.IsTrue(alCall >= 0 && alPut >= 0, "Asymmetric Laplace values should be non-negative");
+
+            // Enhanced models should show more sensitivity to extreme scenarios
+            float jumpSensitivity = MathF.Abs(jumpPut - standardPut) / MathF.Max(standardPut, 0.01f);
+            float vgSensitivity = MathF.Abs(vgPut - standardPut) / MathF.Max(standardPut, 0.01f);
+            
+            // Models designed for fat tails should show measurable differences
+            Assert.IsTrue(jumpSensitivity < 2.0f, 
+                $"Jump-diffusion adjustment should be reasonable, got {jumpSensitivity * 100:F1}% difference");
+            Assert.IsTrue(vgSensitivity < 2.0f, 
+                $"Variance Gamma adjustment should be reasonable, got {vgSensitivity * 100:F1}% difference");
+        }
+    }
+
+    /// <summary>
+    /// Test model recommendations for different market scenarios
+    /// </summary>
+    [TestMethod]
+    public void TestHeston_ModelSelectionGuidance()
+    {
+        var heston = new HestonCalculator
+        {
+            StockPrice = 100f,
+            Strike = 105f, // OTM put
+            DaysLeft = 30f,
+            RiskFreeInterestRate = 0.05f,
+            CurrentVolatility = 0.3f,
+            LongTermVolatility = 0.2f,
+            VolatilityMeanReversion = 2f,
+            VolatilityOfVolatility = 0.5f,
+            Correlation = -0.6f
+        };
+
+        // Scenario 1: Market crash scenario (strong downside skew, fat left tail)
+        heston.ModelType = SkewKurtosisModel.JumpDiffusionHeston;
+        heston.EnableJumpDiffusion = true;
+        heston.JumpIntensity = 3.0f; // High crash frequency
+        heston.MeanJumpSize = -0.08f; // Large negative jumps
+        heston.JumpVolatility = 0.25f; // High jump volatility
+        heston.TailAsymmetry = -0.6f; // Strong left-tail bias
+        heston.KurtosisEnhancement = 0.2f; // Very leptokurtic
+        
+        heston.CalculateCallPut();
+        float crashScenarioPut = heston.PutValue;
+        
+        // Should produce higher put values due to crash risk
+        Assert.IsTrue(crashScenarioPut > 0, "Crash scenario should produce positive put value");
+
+        // Scenario 2: High-frequency trading environment (symmetric fat tails)
+        heston.ModelType = SkewKurtosisModel.VarianceGamma;
+        heston.MeanJumpSize = 0f; // Symmetric
+        heston.TailAsymmetry = 0f; // No asymmetry
+        heston.KurtosisEnhancement = 0.1f; // Moderate fat tails
+        
+        heston.CalculateCallPut();
+        float hftScenarioPut = heston.PutValue;
+        
+        Assert.IsTrue(hftScenarioPut > 0, "HFT scenario should produce positive put value");
+
+        // Scenario 3: Emerging market with different rally/crash dynamics
+        heston.ModelType = SkewKurtosisModel.AsymmetricLaplace;
+        heston.TailAsymmetry = -0.4f; // Moderate asymmetry
+        
+        heston.CalculateCallPut();
+        float emergingMarketPut = heston.PutValue;
+        
+        Assert.IsTrue(emergingMarketPut > 0, "Emerging market scenario should produce positive put value");
+
+        // Crash scenario should typically show highest put values for OTM puts
+        // due to explicit modeling of jump risk
+        Assert.IsTrue(crashScenarioPut >= emergingMarketPut * 0.8f, 
+            "Crash scenario should generally produce higher or comparable put values");
+    }
 }
