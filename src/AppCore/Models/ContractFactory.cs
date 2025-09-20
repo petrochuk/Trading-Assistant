@@ -67,6 +67,7 @@ public class ContractFactory : IContractFactory
             contract.Correlation = config.Correlation;
             contract.VolatilityOfVolatility = config.VolatilityOfVolatility;
             contract.VolatilityMeanReversion = config.VolatilityMeanReversion;
+            contract.VarianceGammaDrift = config.VarianceGammaDrift;
         }
     }
 }

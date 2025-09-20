@@ -38,6 +38,7 @@ public class Contract
     public float Correlation { get; internal set; }
     public float VolatilityOfVolatility { get; internal set; }
     public float VolatilityMeanReversion { get; internal set; }
+    public float VarianceGammaDrift { get; internal set; }
 
     public override string ToString() {
         var sb = new System.Text.StringBuilder();
