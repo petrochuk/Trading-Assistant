@@ -1,10 +1,7 @@
-﻿using AppCore.Statistics;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace AppCore.Models;
 
-[DebuggerDisplay("{Contract} {Size}")]
 public class Position
 {
     #region Immutable Properties

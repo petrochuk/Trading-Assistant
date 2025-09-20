@@ -43,6 +43,17 @@ public class Contract
         var sb = new System.Text.StringBuilder();
 
         sb.Append(Symbol);
+
+        if (AssetClass == AssetClass.FutureOption || AssetClass == AssetClass.Option) {
+            sb.Append($" {Strike}");
+            if (IsCall) {
+                sb.Append(" C");
+            }
+            else {
+                sb.Append(" P");
+            }
+        }
+
         if (Expiration.HasValue) {
             sb.Append($" {Expiration.Value:d}");
         }

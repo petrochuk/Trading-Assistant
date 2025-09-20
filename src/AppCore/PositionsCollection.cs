@@ -270,6 +270,28 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     bls.ImpliedVolatility = (float)realizedVol;
                     bls.CalculateAll();
 
+                    // Calculate cheapness/richness
+                    if (position.Contract.IsCall) {
+                        if (position.Size > 0) {
+                            if (heston.CallValue < position.Contract.MarketPrice.Value)
+                                _logger.LogWarning($"Long call position {position.Contract} is overpriced: market {position.Contract.MarketPrice.Value} > model {heston.CallValue}");
+                        }
+                        else {
+                            if (heston.CallValue > position.Contract.MarketPrice.Value)
+                                _logger.LogWarning($"Short call position {position.Contract} is underpriced: market {position.Contract.MarketPrice.Value} < model {heston.CallValue}");
+                        }
+                    }
+                    else {
+                        if (position.Size > 0) {
+                            if (heston.PutValue < position.Contract.MarketPrice.Value)
+                                _logger.LogWarning($"Long put position {position.Contract} is overpriced: market {position.Contract.MarketPrice.Value} > model {heston.PutValue}");
+                        }
+                        else {
+                            if (heston.PutValue > position.Contract.MarketPrice.Value)
+                                _logger.LogWarning($"Short put position {position.Contract} is underpriced: market {position.Contract.MarketPrice.Value} < model {heston.PutValue}");
+                        }
+                    }
+
                     var charm = (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut);
                     var thetaBLS = (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut);
                     var thetaHeston = (position.Contract.IsCall ? heston.ThetaCall : heston.ThetaPut);
