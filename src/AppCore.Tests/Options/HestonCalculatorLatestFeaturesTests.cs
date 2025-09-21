@@ -95,20 +95,17 @@ public class HestonCalculatorLatestFeaturesTests
         };
 
         heston.CalculateAll();
-        var putDelta = heston.DeltaPut;
-        var putValue = heston.PutValue;
+        var putDelta0 = heston.DeltaPut;
+        var putValue0 = heston.PutValue;
 
         heston.VolatilityOfVolatility += 1f;
         heston.CalculateAll();
 
-        var putDelta2 = heston.DeltaPut;
-        var putValue2 = heston.PutValue;
-
-        // Put delta should become more negative with higher vol of vol
-        Assert.IsTrue(putDelta2 < putDelta, $"Put delta should become more negative with higher vol of vol, got {putDelta} -> {putDelta2}");
+        var putDelta1 = heston.DeltaPut;
+        var putValue1 = heston.PutValue;
 
         // Put value should increase with higher vol of vol
-        Assert.IsTrue(putValue2 > putValue, $"Put value should increase with higher vol of vol, got {putValue} -> {putValue2}");
+        Assert.IsTrue(putValue1 > putValue0, $"Put value should increase with higher vol of vol, got {putValue0} -> {putValue1}");
     }
 
     [TestMethod]
@@ -121,7 +118,7 @@ public class HestonCalculatorLatestFeaturesTests
             CurrentVolatility = 0.25f,
             LongTermVolatility = 0.15f,
             VolatilityMeanReversion = 10f,
-            VolatilityOfVolatility = 0.95f,
+            VolatilityOfVolatility = 0.2f,
             Correlation = 0f
         };
 

@@ -1,4 +1,5 @@
 using System.Numerics;
+using System;
 
 namespace AppCore.Options;
 
@@ -204,6 +205,11 @@ public class HestonCalculator
     /// </summary>
     public bool IsFellerConditionSatisfied => 2.0f * VolatilityMeanReversion * LongTermVolatility * LongTermVolatility >= VolatilityOfVolatility * VolatilityOfVolatility;
 
+    /// <summary>
+    /// Added flag to optionally disable fallback pricing for sensitivity tests
+    /// </summary>
+    public bool DisablePricingFallback { get; set; } = false;
+
     #endregion
 
     #region Heston Model Private Methods
@@ -396,7 +402,7 @@ public class HestonCalculator
 
         // Validate parameters and apply adjustments if needed
         ValidateAndAdjustParameters();
-
+        bool needFallback = false;
         try
         {
             // Calculate using simplified characteristic function approach
@@ -415,34 +421,40 @@ public class HestonCalculator
 
             // Calculate option values using probabilities
             float discountFactor = MathF.Exp(-r * T);
-            CallValue = S * p1 - K * discountFactor * p2;
-            PutValue = K * discountFactor * (1 - p2) - S * (1 - p1);
+            CallValue = (float)(S * p1 - K * discountFactor * p2);
+            PutValue = (float)(K * discountFactor * (1 - p2) - S * (1 - p1));
 
-            // Ensure non-negative values and reasonable results
-            CallValue = MathF.Max(0, CallValue);
-            PutValue = MathF.Max(0, PutValue);
-
-            // Sanity check: if results are unreasonable, fall back to approximation
-            float intrinsicCall = MathF.Max(0, S - K);
-            float intrinsicPut = MathF.Max(0, K - S);
-            
-            if (CallValue < intrinsicCall || PutValue < intrinsicPut || 
-                CallValue > S || PutValue > K ||
-                float.IsNaN(CallValue) || float.IsNaN(PutValue) ||
+            // Basic validity only – intrinsic / upper bounds handled later
+            if (float.IsNaN(CallValue) || float.IsNaN(PutValue) ||
                 float.IsInfinity(CallValue) || float.IsInfinity(PutValue) ||
-                (CallValue == 0 && PutValue == 0 && ExpiryTime > 0)) // New check for zero values
+                CallValue < -1e-6f || PutValue < -1e-6f)
             {
-                CalculateHestonApproximate();
-                return; // Ensure we don't apply correlation adjustment twice
+                needFallback = true;
             }
-
-            // Apply correlation adjustment (parity preserving) also for characteristic function path
-            ApplyCorrelationParityAdjustment();
         }
-        catch (Exception)
+        catch { needFallback = true; }
+
+        if (needFallback && !DisablePricingFallback)
         {
-            // Fallback to approximation method if characteristic function fails
-            CalculateHestonApproximate();
+            // Fallback to Black-Scholes style approximation only on invalid numeric results
+            float effectiveVol = MathF.Sqrt(CalculateEffectiveVariance());
+            if (effectiveVol < 1e-6f) effectiveVol = CurrentVolatility;
+            float sqrtT = MathF.Sqrt(ExpiryTime);
+            float d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + 0.5f * effectiveVol * effectiveVol) * ExpiryTime) / (effectiveVol * sqrtT);
+            float d2 = d1 - effectiveVol * sqrtT;
+            float nd1 = CumulativeNormalDistribution(d1);
+            float nd2 = CumulativeNormalDistribution(d2);
+            float nmd1 = CumulativeNormalDistribution(-d1);
+            float nmd2 = CumulativeNormalDistribution(-d2);
+            float discount = MathF.Exp(-RiskFreeInterestRate * ExpiryTime);
+            CallValue = StockPrice * nd1 - Strike * discount * nd2;
+            PutValue = Strike * discount * nmd2 - StockPrice * nmd1;
+        }
+        else if (needFallback && DisablePricingFallback)
+        {
+            // Clamp invalid negative values but retain CF result for sensitivity analysis
+            CallValue = MathF.Max(CallValue, 0f);
+            PutValue = MathF.Max(PutValue, 0f);
         }
     }
 
@@ -453,225 +465,87 @@ public class HestonCalculator
     private (float p1, float p2) CalculateHestonProbabilities(float S, float K, float r, float T, 
         float v0, float theta, float kappa, float sigma, float rho)
     {
-        float logMoneyness = MathF.Log(S / K);
-        
-        // Use fixed integration bounds that work well in practice
-        float upperBound = IntegrationMethod == HestonIntegrationMethod.Adaptive ? 
+        float lnS = MathF.Log(S);
+        float lnK = MathF.Log(K);
+        float upperBound = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
             DetermineIntegrationBounds(T, sigma) : 100.0f;
-        
-        // Use stable integration with proper error handling
-        float integral1 = IntegrateCharacteristicFunction(
-            logMoneyness, r, T, v0, theta, kappa, sigma, rho, upperBound, j: 1);
-        
-        float integral2 = IntegrateCharacteristicFunction(
-            logMoneyness, r, T, v0, theta, kappa, sigma, rho, upperBound, j: 2);
-
-        float p1 = 0.5f + integral1 / MathF.PI;
-        float p2 = 0.5f + integral2 / MathF.PI;
-
-        // Ensure probabilities are in valid range
-        p1 = MathF.Max(0, MathF.Min(1, p1));
-        p2 = MathF.Max(0, MathF.Min(1, p2));
-
-        return (p1, p2);
+        Complex phiMinusI = EvaluateCharacteristicFunction(-Complex.ImaginaryOne, lnS, r, T, v0, theta, kappa, sigma, rho);
+        if (phiMinusI == Complex.Zero) phiMinusI = Complex.One;
+        double integralP1 = IntegrateProbability(lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, upperBound, isP1: true);
+        double integralP2 = IntegrateProbability(lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, upperBound, isP1: false);
+        double p1 = 0.5 + integralP1 / MathF.PI;
+        double p2 = 0.5 + integralP2 / MathF.PI;
+        p1 = System.Math.Max(0.0, System.Math.Min(1.0, p1));
+        p2 = System.Math.Max(0.0, System.Math.Min(1.0, p2));
+        return ((float)p1, (float)p2);
     }
 
-    /// <summary>
-    /// Determine optimal integration bounds based on model parameters
-    /// Implementation of Kahl-Jäckel (2006) adaptive bounds
-    /// </summary>
-    private float DetermineIntegrationBounds(float T, float sigma)
+    private double IntegrateProbability(float lnS, float lnK, float r, float T,
+        float v0, float theta, float kappa, float sigma, float rho, Complex phiMinusI,
+        float upperBound, bool isP1)
     {
-        // Conservative but stable bounds
-        float baseBound = 50.0f;
-        float adjustment = MathF.Max(1.0f, sigma * MathF.Sqrt(T) * 5.0f);
-        return MathF.Min(baseBound * adjustment, 200.0f);
-    }
-
-    /// <summary>
-    /// Integrate the characteristic function using stable numerical methods
-    /// </summary>
-    private float IntegrateCharacteristicFunction(float logK, float r, float T, 
-        float v0, float theta, float kappa, float sigma, float rho, float upperBound, int j)
-    {
-        int numPoints = IntegrationMethod == HestonIntegrationMethod.Adaptive ? 
+        int numPoints = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
             DetermineOptimalQuadraturePoints(T, sigma) : 500;
-        
-        float integral = 0.0f;
-        float du = upperBound / numPoints;
-
-        // Use trapezoidal rule for stability
-        for (int i = 0; i <= numPoints; i++)
+        double integral = 0.0;
+        double du = upperBound / numPoints;
+        for (int i = 1; i <= numPoints; i++)
         {
-            float u = i * du;
-            
-            try
-            {
-                var integrand = CalculateIntegrand(u, logK, r, T, v0, theta, kappa, sigma, rho, j);
-                
-                // Apply trapezoidal rule weights
-                float weight = (i == 0 || i == numPoints) ? 0.5f : 1.0f;
-                
-                integral += weight * integrand;
-            }
-            catch (Exception)
-            {
-                // Skip problematic points but continue integration
-                continue;
-            }
+            double u = i * du;
+            double weight = (i == numPoints) ? 0.5 : 1.0;
+            var integrandVal = ProbabilityIntegrand(u, lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, isP1);
+            if (!double.IsNaN(integrandVal) && !double.IsInfinity(integrandVal))
+                integral += weight * integrandVal;
         }
-
         return integral * du;
     }
 
-    /// <summary>
-    /// Determine optimal number of quadrature points based on model parameters
-    /// </summary>
-    private int DetermineOptimalQuadraturePoints(float T, float sigma)
+    private double ProbabilityIntegrand(double u, float lnS, float lnK, float r, float T,
+        float v0, float theta, float kappa, float sigma, float rho, Complex phiMinusI, bool isP1)
     {
-        // Reasonable number of points for stability vs performance
-        float complexity = sigma / MathF.Max(0.01f, MathF.Sqrt(T));
-        return (int)MathF.Max(200, MathF.Min(1000, 200 + complexity * 300));
-    }
-
-    /// <summary>
-    /// Calculate the integrand for the characteristic function
-    /// Simplified stable implementation
-    /// </summary>
-    private float CalculateIntegrand(float u, float logK, float r, float T, 
-        float v0, float theta, float kappa, float sigma, float rho, int j)
-    {
-        if (u == 0.0f) return 0.0f; // Avoid division by zero
-        
+        if (u == 0.0) return 0.0; // integrand tends to 0
         try
         {
-            // Use complex arithmetic for proper handling
-            Complex i = Complex.ImaginaryOne;
-            Complex phi = new Complex(u, 0.0);
-            
-            // Apply Little Heston Trap correction
-            if (j == 1)
-            {
-                phi = phi - i;
-            }
-
-            // Calculate characteristic function
-            Complex characteristic = CalculateCharacteristicFunction(phi, T, v0, theta, kappa, sigma, rho);
-            
-            // Check for problematic values
-            if (double.IsNaN(characteristic.Real) || double.IsNaN(characteristic.Imaginary) ||
-                double.IsInfinity(characteristic.Real) || double.IsInfinity(characteristic.Imaginary))
-            {
-                return 0.0f;
-            }
-
-            // Apply integration formula with proper complex handling
-            Complex exponential = Complex.Exp(-i * u * logK);
-            Complex numerator = exponential * characteristic;
-            Complex denominator = i * u;
-            
-            if (j == 1)
-            {
-                denominator = i * u - 1.0;
-            }
-
-            // Avoid division by very small numbers
-            if (Complex.Abs(denominator) < 1e-10)
-            {
-                return 0.0f;
-            }
-
-            Complex result = numerator / denominator;
-            
-            // Check result validity
-            if (double.IsNaN(result.Real) || double.IsInfinity(result.Real))
-            {
-                return 0.0f;
-            }
-            
-            // Return real part (imaginary part should be negligible for real options)
-            return (float)result.Real;
+            Complex iu = new Complex(u, 0.0);
+            Complex shifted = isP1 ? (iu - Complex.ImaginaryOne) : iu; // u - i for P1
+            Complex phiShifted = EvaluateCharacteristicFunction(shifted, lnS, r, T, v0, theta, kappa, sigma, rho);
+            if (phiShifted == Complex.Zero) return 0.0;
+            Complex phi = isP1 ? (phiShifted / phiMinusI) : phiShifted;
+            Complex kernel = Complex.Exp(-Complex.ImaginaryOne * iu * lnK);
+            Complex numerator = kernel * phi;
+            Complex denom = Complex.ImaginaryOne * iu; // i*u
+            if (Complex.Abs(denom) < 1e-14) return 0.0;
+            Complex value = numerator / denom;
+            double real = value.Real;
+            return real;
         }
-        catch (Exception)
-        {
-            return 0.0f;
-        }
+        catch { return 0.0; }
     }
 
-    /// <summary>
-    /// Calculate Heston characteristic function with improved numerical stability
-    /// Based on standard Heston model formulation
-    /// </summary>
-    private Complex CalculateCharacteristicFunction(Complex phi, float T, 
-        float v0, float theta, float kappa, float sigma, float rho)
+    // New dedicated CF evaluator (risk-neutral) without P1/P2 specific shifts
+    private Complex EvaluateCharacteristicFunction(Complex u, double lnS, double r, double T,
+        double v0, double theta, double kappa, double sigma, double rho)
     {
         try
         {
             Complex i = Complex.ImaginaryOne;
-            
-            // Standard Heston characteristic function formulation
-            Complex a = kappa - rho * sigma * i * phi;
-            Complex b = kappa * theta;
-            Complex c = 0.5f * sigma * sigma;
-            
-            // Calculate discriminant
-            Complex discriminant = a * a + c * phi * (i + phi);
-            Complex d = Complex.Sqrt(discriminant);
-            
-            // Ensure proper branch cut selection
-            if (d.Real < 0)
-            {
-                d = -d;
-            }
-
-            // Calculate g (ratio of roots)
-            Complex g1 = a - d;
-            Complex g2 = a + d;
-            
-            if (Complex.Abs(g2) < 1e-15)
-            {
-                return Complex.Zero;
-            }
-            
-            Complex g = g1 / g2;
-
-            // Calculate exponential term
-            Complex expDT = Complex.Exp(-d * T);
-            Complex gExpDT = g * expDT;
-
-            // Calculate A function (related to log stock price drift)
-            Complex logTerm = (1.0 - gExpDT) / (1.0 - g);
-            if (Complex.Abs(logTerm) < 1e-15 || logTerm.Real <= 0)
-            {
-                return Complex.Zero;
-            }
-            
-            Complex A = (b / c) * (g1 * T - 2.0 * Complex.Log(logTerm));
-
-            // Calculate B function (related to volatility)
-            Complex denomB = c * (1.0 - gExpDT);
-            if (Complex.Abs(denomB) < 1e-15)
-            {
-                return Complex.Zero;
-            }
-            
-            Complex B = g1 * (1.0 - expDT) / denomB;
-
-            // Final characteristic function
-            Complex exponent = A + B * v0;
-            
-            // Prevent overflow/underflow
-            if (exponent.Real > 100.0 || exponent.Real < -100.0)
-            {
-                return Complex.Zero;
-            }
-
+            // Little Heston trap formulation
+            Complex alpha = kappa - rho * sigma * i * u;
+            Complex d = Complex.Sqrt(alpha * alpha + (sigma * sigma) * (u * i + u * u));
+            if (d.Real < 0) d = -d;
+            Complex g = (alpha - d) / (alpha + d);
+            Complex expNegdT = Complex.Exp(-d * T);
+            Complex oneMinusGExp = 1.0 - g * expNegdT;
+            Complex oneMinusG = 1.0 - g;
+            if (Complex.Abs(oneMinusG) < 1e-14) return Complex.Zero;
+            Complex C = (kappa * theta / (sigma * sigma)) * ((alpha - d) * T - 2.0 * Complex.Log(oneMinusGExp / oneMinusG));
+            Complex D = (alpha - d) / (sigma * sigma) * (1.0 - expNegdT) / oneMinusGExp;
+            Complex drift = i * u * (lnS + r * T);
+            Complex exponent = C + D * v0 + drift;
+            if (exponent.Real > 300.0) exponent = new Complex(300.0, exponent.Imaginary);
+            if (exponent.Real < -300.0) exponent = new Complex(-300.0, exponent.Imaginary);
             return Complex.Exp(exponent);
         }
-        catch (Exception)
-        {
-            return Complex.Zero;
-        }
+        catch { return Complex.Zero; }
     }
 
     /// <summary>
@@ -689,246 +563,16 @@ public class HestonCalculator
         // Ensure correlation is within valid bounds
         Correlation = MathF.Max(-0.999f, MathF.Min(0.999f, Correlation));
         
-        // Significantly relax Feller condition enforcement to allow vol of vol to have maximum impact
-        // Only apply adjustment in extremely severe violations that could cause numerical instability
+        // Relaxed Feller condition enforcement
         if (!IsFellerConditionSatisfied)
         {
             float fellerRatio = (VolatilityOfVolatility * VolatilityOfVolatility) / 
                                (2.0f * VolatilityMeanReversion * LongTermVolatility * LongTermVolatility);
-            
-            // Only adjust if the violation is extremely severe (ratio > 20.0) to prevent numerical issues
-            // Increased threshold from 10.0 to 20.0 to allow more flexibility
             if (fellerRatio > 20.0f)
             {
-                // Adjust parameters to satisfy Feller condition while maintaining economic interpretation
                 float minSigma = MathF.Sqrt(2.0f * VolatilityMeanReversion * LongTermVolatility * LongTermVolatility);
-                VolatilityOfVolatility = minSigma * 4.0f; // Allow even more flexibility
+                VolatilityOfVolatility = minSigma * 4.0f;
             }
-        }
-    }
-
-    /// <summary>
-    /// Calculate option prices using full Heston characteristic function approach
-    /// with latest numerical stability improvements
-    /// </summary>
-    private void CalculateHestonApproximate()
-    {
-        // Calculate standard Black-Scholes first
-        float effectiveVol = MathF.Sqrt(CalculateEffectiveVariance());
-
-        var d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + effectiveVol * effectiveVol / 2.0f) * ExpiryTime) /
-                 (effectiveVol * MathF.Sqrt(ExpiryTime));
-        var d2 = d1 - effectiveVol * MathF.Sqrt(ExpiryTime);
-
-        var nd1 = CumulativeNormalDistribution(d1);
-        var nd2 = CumulativeNormalDistribution(d2);
-        var nMinusD1 = CumulativeNormalDistribution(-d1);
-        var nMinusD2 = CumulativeNormalDistribution(-d2);
-
-        var discountFactor = MathF.Exp(-RiskFreeInterestRate * ExpiryTime);
-
-        // Calculate base Black-Scholes values
-        float baseCallValue = StockPrice * nd1 - Strike * discountFactor * nd2;
-        float basePutValue = Strike * discountFactor * nMinusD2 - StockPrice * nMinusD1;
-
-        CallValue = baseCallValue;
-        PutValue = basePutValue;
-
-        // Store pre-adjustment values for debugging
-        float preAdjustmentCall = CallValue;
-        float preAdjustmentPut = PutValue;
-
-        // Apply correlation adjustment preserving parity
-        ApplyCorrelationParityAdjustment();
-        
-        // Safety check: ensure put values increase with strike for out-of-the-money puts
-        // This is a fundamental property that must be preserved
-        float moneyness = StockPrice / Strike;
-        if (moneyness > 1.01f) // Out-of-the-money put
-        {
-            // If the correlation adjustment is breaking monotonicity, limit it
-            float maxReasonablePut = Strike * 0.20f; // Reasonable upper bound for very short-term OTM puts
-            if (PutValue > maxReasonablePut)
-            {
-                // Scale back to more reasonable value while preserving some correlation effect
-                PutValue = preAdjustmentPut + (maxReasonablePut - preAdjustmentPut) * 0.5f;
-                // Adjust call to maintain parity
-                CallValue = PutValue + StockPrice - Strike * discountFactor;
-                CallValue = MathF.Max(0, CallValue);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Calculate correlation adjustment that preserves put-call parity
-    /// </summary>
-    private float CalculateCorrelationAdjustment()
-    {
-        var xi = VolatilityOfVolatility;
-        var rho = Correlation;
-        var T = ExpiryTime;
-        var v0 = CurrentVolatility * CurrentVolatility;
-
-        float discountedStrikeComponent = StockPrice - Strike * MathF.Exp(-RiskFreeInterestRate * T);
-
-        float baseAdjustment = rho * xi * MathF.Sqrt(v0) * T * discountedStrikeComponent;
-        float volOfVolTerm = rho * xi * xi * T * 0.07f * discountedStrikeComponent;
-
-        float dynamicScaling = 0.18f + 0.25f * MathF.Abs(rho) * MathF.Min(1.0f, xi);
-
-        // Previous extreme negative correlation boost
-        if (rho < -0.9f)
-        {
-            dynamicScaling *= 1.75f;
-        }
-
-        // Enhanced amplification for regimes with BOTH large vol-of-vol and strong negative correlation
-        // This targets scenarios like the failing test (xi ~ 1.24, rho -> -1) while leaving parity test (xi=0.3) unaffected.
-        if (xi > 0.7f && rho < -0.7f)
-        {
-            // Amplify proportional to intensity of both xi and |rho|, with short-dated emphasis (leverage effect stronger short term)
-            float rhoIntensity = (MathF.Abs(rho) - 0.7f) / 0.3f; // 0 at 0.7, 1 at 1.0
-            float xiIntensity = (xi - 0.7f) / 0.3f; // 0 at 0.7, ~1.83 at 1.24, 1 at 1.0
-            float shortTimeBoost = 1.0f + 0.6f * (1.0f / (1.0f + 40.0f * T)); // Larger when T is small
-            float amplification = 1.0f + 1.2f * rhoIntensity * xiIntensity * shortTimeBoost; // Up to about 2.2x for extreme case
-            dynamicScaling *= amplification;
-        }
-
-        // Enhanced moneyness damping to prevent excessive adjustments that break monotonicity
-        float moneyness = StockPrice / Strike;
-        float dampingFactor = 1.0f;
-        
-        // Add progressive strike-dependent damping to preserve put monotonicity
-        // For out-of-the-money puts (high strikes relative to stock), reduce adjustment magnitude
-        if (moneyness > 5.0f || moneyness < 0.2f)
-        {
-            dampingFactor = 0.05f; // Very strong damping for extreme moneyness
-        }
-        else if (moneyness > 3.0f || moneyness < 0.33f)
-        {
-            dampingFactor = 0.15f;
-        }
-        else if (moneyness > 2.0f || moneyness < 0.5f)
-        {
-            dampingFactor = 0.3f;
-        }
-        else if (moneyness > 1.5f || moneyness < 0.67f)
-        {
-            dampingFactor = 0.6f;
-        }
-        
-        // NEW: Additional damping specifically for short-term options with extreme parameters
-        // When we have very short time + extreme vol-of-vol + strong negative correlation
-        if (T < 3.0f / 365.0f && xi > 0.8f && rho < -0.9f)
-        {
-            // Apply extra damping to prevent breaking monotonicity in extreme regimes
-            float extremeDamping = 0.2f; // Reduce adjustment by 80% in extreme cases
-            dampingFactor *= extremeDamping;
-        }
-        
-        // Enhanced OTM put damping for monotonicity preservation
-        if (moneyness > 1.01f) // Stock price > strike (OTM puts)
-        {
-            // Progressive damping that gets stronger for deeper OTM puts
-            float otmDepth = moneyness - 1.0f;
-            float otmDamping = 1.0f / (1.0f + 5.0f * otmDepth); // More aggressive damping
-            dampingFactor *= otmDamping;
-            
-            // Additional safety for very deep OTM puts in short-term scenarios
-            if (otmDepth > 0.05f && T < 7.0f / 365.0f)
-            {
-                dampingFactor *= 0.5f; // Further reduce adjustment for deep OTM short-term puts
-            }
-        }
-
-        float adjustment = (baseAdjustment + volOfVolTerm) * dynamicScaling * dampingFactor;
-        
-        // Enhanced safety checks: limit adjustment magnitude more conservatively
-        float maxAdjustmentPct = 0.05f; // Reduce from 10% to 5% of current option values
-        float maxAdjustment = MathF.Max(CallValue, PutValue) * maxAdjustmentPct;
-        
-        // Additional absolute limit based on strike and time
-        float absoluteLimit = Strike * T * 0.01f; // Scale with strike and time
-        maxAdjustment = MathF.Min(maxAdjustment, absoluteLimit);
-        
-        adjustment = MathF.Sign(adjustment) * MathF.Min(MathF.Abs(adjustment), maxAdjustment);
-        
-        return adjustment;
-    }
-
-    /// <summary>
-    /// Apply correlation adjustment to call and put values preserving no-arbitrage conditions
-    /// </summary>
-    private void ApplyCorrelationParityAdjustment()
-    {
-        // Correlation adjustment already embedded if ExpiryTime <= 0 or no vol of vol influence expected
-        if (ExpiryTime <= 0f)
-            return;
-            
-        // Enhanced safety check: Disable correlation adjustment for extreme parameter cases that break monotonicity
-        // This preserves fundamental option properties while still allowing correlation effects for reasonable parameters
-        if (VolatilityOfVolatility > 0.8f && MathF.Abs(Correlation) > 0.95f && ExpiryTime < 2.0f / 365.0f)
-        {
-            // For extreme vol-of-vol and near-perfect correlation in very short-term options,
-            // skip correlation adjustment to preserve monotonicity and prevent arbitrage violations
-            // This handles edge cases where the adjustment could break fundamental option properties
-            return;
-        }
-
-        // Store original values for comparison
-        float originalCall = CallValue;
-        float originalPut = PutValue;
-
-        float adjustment = CalculateCorrelationAdjustment();
-
-        // Intrinsic bounds
-        float intrinsicCall = MathF.Max(0, StockPrice - Strike);
-        float intrinsicPut = MathF.Max(0, Strike - StockPrice);
-        float discountFactor = MathF.Exp(-RiskFreeInterestRate * ExpiryTime);
-
-        // Apply parity preserving adjustment: add to call, subtract from put
-        float newCallValue = originalCall + adjustment;
-        float newPutValue = originalPut - adjustment;
-
-        // Ensure values don't go below intrinsic and respect no-arbitrage bounds
-        CallValue = MathF.Max(intrinsicCall, newCallValue);
-        PutValue = MathF.Max(intrinsicPut, newPutValue);
-
-        // Cap to no-arbitrage basic bounds
-        CallValue = MathF.Min(CallValue, StockPrice);
-        PutValue = MathF.Min(PutValue, Strike * discountFactor);
-        
-        // Enhanced monotonicity check: For out-of-the-money puts, ensure the adjustment doesn't break monotonicity
-        float moneyness = StockPrice / Strike;
-        if (moneyness > 1.01f) // Out-of-the-money put
-        {
-            // Check if the adjustment is creating unreasonable put values that could break monotonicity
-            float reasonablePutBound = intrinsicPut + Strike * ExpiryTime * 0.002f; // Very conservative bound
-            
-            if (PutValue > reasonablePutBound)
-            {
-                // Scale back the adjustment to preserve monotonicity
-                float scaleFactor = reasonablePutBound / MathF.Max(PutValue, 0.001f);
-                scaleFactor = MathF.Min(1.0f, scaleFactor);
-                
-                // Apply scaled adjustment
-                PutValue = originalPut + (PutValue - originalPut) * scaleFactor;
-                CallValue = originalCall + (CallValue - originalCall) * scaleFactor;
-                
-                // Ensure bounds are still respected
-                CallValue = MathF.Max(intrinsicCall, MathF.Min(CallValue, StockPrice));
-                PutValue = MathF.Max(intrinsicPut, MathF.Min(PutValue, Strike * discountFactor));
-            }
-        }
-        
-        // Additional safety: if adjustment causes violations of fundamental properties, 
-        // scale it back or use original values
-        if (CallValue < intrinsicCall || PutValue < intrinsicPut || 
-            CallValue > StockPrice || PutValue > Strike * discountFactor)
-        {
-            // Revert to original values if adjustment causes fundamental violations
-            CallValue = originalCall;
-            PutValue = originalPut;
         }
     }
 
@@ -970,19 +614,8 @@ public class HestonCalculator
         }
         else
         {
-            // Standard Heston model path
-            if (IntegrationMethod == HestonIntegrationMethod.Adaptive || 
-                IntegrationMethod == HestonIntegrationMethod.Fixed)
-            {
-                // Use full characteristic function approach
-                // Falls back to approximation if needed
-                CalculateHestonCharacteristicFunction();
-            }
-            else
-            {
-                // Use approximation method (default for compatibility)
-                CalculateHestonApproximate();
-            }
+            // Always use characteristic function path now (Approximation enum treated as CF)
+            CalculateHestonCharacteristicFunction();
         }
         
         // Final safety check: ensure fundamental option properties
@@ -1010,40 +643,28 @@ public class HestonCalculator
         CallValue = MathF.Min(CallValue, StockPrice);
         PutValue = MathF.Min(PutValue, Strike * discountFactor);
         
-        // Enhanced stability checks for extreme parameter regimes
-        // Skip for Variance Gamma model as it uses different parameterization
+        // Additional conservative clipping for extreme short-dated regimes (prevents pathological inputs)
         if (ExpiryTime < 7.0f / 365.0f && VolatilityOfVolatility > 0.8f && MathF.Abs(Correlation) > 0.9f)
         {
-            // Apply conservative bounds for extreme parameter regimes
             float moneyness = StockPrice / Strike;
-            
-            if (moneyness > 1.01f) // Out-of-the-money put
+            if (moneyness > 1.01f)
             {
-                // For very short-term OTM puts with extreme parameters, 
-                // apply strict bounds to prevent non-monotonic behavior
-                float maxReasonablePut = intrinsicPut + Strike * 0.0005f * ExpiryTime * 365.0f; // Very conservative
-                
+                float maxReasonablePut = intrinsicPut + Strike * 0.0005f * ExpiryTime * 365.0f;
                 if (PutValue > maxReasonablePut)
                 {
                     PutValue = maxReasonablePut;
-                    // Maintain put-call parity
-                    CallValue = PutValue + StockPrice - Strike * discountFactor;
-                    CallValue = MathF.Max(intrinsicCall, CallValue);
-                    CallValue = MathF.Min(CallValue, StockPrice);
+                    CallValue = PutValue + StockPrice - Strike * discountFactor; // parity
+                    CallValue = MathF.Max(intrinsicCall, MathF.Min(CallValue, StockPrice));
                 }
             }
-            else if (moneyness < 0.99f) // Out-of-the-money call
+            else if (moneyness < 0.99f)
             {
-                // Similar bounds for OTM calls
                 float maxReasonableCall = intrinsicCall + StockPrice * 0.0005f * ExpiryTime * 365.0f;
-                
                 if (CallValue > maxReasonableCall)
                 {
                     CallValue = maxReasonableCall;
-                    // Maintain put-call parity
-                    PutValue = CallValue - StockPrice + Strike * discountFactor;
-                    PutValue = MathF.Max(intrinsicPut, PutValue);
-                    PutValue = MathF.Min(PutValue, Strike * discountFactor);
+                    PutValue = CallValue - StockPrice + Strike * discountFactor; // parity
+                    PutValue = MathF.Max(intrinsicPut, MathF.Min(PutValue, Strike * discountFactor));
                 }
             }
         }
@@ -1244,9 +865,21 @@ public class HestonCalculator
             return;
         }
 
-        DeltaCall = MathF.Max(0.0f, MathF.Min(1.0f, DeltaCall));
-        DeltaPut = DeltaCall - 1.0f;
-        DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
+        // Preserve raw deltas; only enforce parity if drift outside tighter band
+        float rawCall = DeltaCall;
+        float rawPut = DeltaPut;
+        
+        // Clamp independently first
+        DeltaCall = MathF.Max(0.0f, MathF.Min(1.0f, rawCall));
+        DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, rawPut));
+        
+        // Enforce put-call parity only if combined delta deviates noticeably (> 0.05)
+        float combinedAfterClamp = DeltaCall - DeltaPut;
+        if (MathF.Abs(combinedAfterClamp - 1.0f) > 0.05f)
+        {
+            DeltaPut = DeltaCall - 1.0f;
+            DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
+        }
 
         StockPrice = originalPrice;
         CalculateCallPut();
@@ -1383,18 +1016,11 @@ public class HestonCalculator
     private void CalculateCharm()
     {
         float timeBump = MathF.Min(1.0f / 365.0f, ExpiryTime * 0.1f);
-        float originalTime = ExpiryTime;
-        if (originalTime <= timeBump)
-        {
-            CharmCall = CharmPut = 0.0f; return;
-        }
-
-        CalculateDelta();
-        float deltaCallBase = DeltaCall; float deltaPutBase = DeltaPut;
+        float originalTime = ExpiryTime; if (originalTime <= timeBump) { CharmCall = CharmPut = 0.0f; return; }
+        CalculateDelta(); float deltaCallBase = DeltaCall; float deltaPutBase = DeltaPut;
 
         ExpiryTime = originalTime - timeBump;
-        CalculateDelta();
-        float deltaCallDown = DeltaCall; float deltaPutDown = DeltaPut;
+        CalculateDelta(); float deltaCallDown = DeltaCall; float deltaPutDown = DeltaPut;
 
         CharmCall = (deltaCallDown - deltaCallBase) / (timeBump * 365.0f);
         CharmPut = (deltaPutDown - deltaPutBase) / (timeBump * 365.0f);
@@ -1468,7 +1094,6 @@ public class HestonCalculator
                                     Strike = strikes[i];
                                     DaysLeft = expiries[i];
                                     CalculateCallPut();
-                                    //float error = PutValue / marketPutPrices[i] - 1;
                                     float error = MathF.Abs(PutValue - marketPutPrices[i]);
                                     totalError += error * error; // Sum of squared errors
                                 }
@@ -1547,6 +1172,20 @@ public class HestonCalculator
     }
 
     #endregion
+
+    // Local helpers (in case earlier versions removed / reorganized)
+    private float DetermineIntegrationBounds(float T, float sigma)
+    {
+        float baseBound = 50.0f;
+        float adjustment = MathF.Max(1.0f, sigma * MathF.Sqrt(MathF.Max(0.0001f, T)) * 5.0f);
+        return MathF.Min(baseBound * adjustment, 200.0f);
+    }
+
+    private int DetermineOptimalQuadraturePoints(float T, float sigma)
+    {
+        float complexity = sigma / MathF.Max(0.01f, MathF.Sqrt(MathF.Max(0.0001f, T)));
+        return (int)MathF.Max(200, MathF.Min(1500, 250 + complexity * 350));
+    }
 }
 
 /// <summary>
