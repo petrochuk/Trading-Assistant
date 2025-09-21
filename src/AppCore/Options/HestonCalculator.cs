@@ -218,9 +218,6 @@ public class HestonCalculator
             case SkewKurtosisModel.JumpDiffusionHeston:
                 CalculateJumpDiffusionHeston();
                 break;
-            case SkewKurtosisModel.VarianceGamma:
-                CalculateVarianceGammaApproximation();
-                break;
             case SkewKurtosisModel.AsymmetricLaplace:
                 CalculateAsymmetricLaplace();
                 break;
@@ -355,88 +352,6 @@ public class HestonCalculator
         float otmFactor = MathF.Abs(moneyness - 1.0f) + 0.1f;
         
         return kurtosisContribution * otmFactor;
-    }
-
-    /// <summary>
-    /// Variance Gamma approximation for pure jump processes
-    /// Excellent for symmetric fat tails with controllable skewness
-    /// </summary>
-    private void CalculateVarianceGammaApproximation()
-    {
-        // For VG model, VolatilityOfVolatility represents the variance rate parameter (nu)
-        // and MeanJumpSize represents the drift parameter (theta)
-        float nu = VolatilityOfVolatility; // Variance rate parameter (controls kurtosis and option values)
-        float theta = MeanJumpSize; // Drift parameter (controls skewness)
-        float sigma = CurrentVolatility; // Base volatility
-        float T = ExpiryTime;
-        
-        // Enhanced volatility calculation that increases with nu
-        // Higher nu should lead to higher option values due to increased uncertainty
-        float volMultiplier = 1.0f + nu * 0.4f; // Stronger scaling with nu
-        float baseVol = sigma * volMultiplier;
-        
-        // VG variance adjustment - this should increase significantly with nu
-        float varianceAdjustment = nu * T * (sigma * sigma + theta * theta * 25.0f); // Enhanced theta impact
-        
-        // Combined volatility that increases with nu
-        float totalVariance = baseVol * baseVol + varianceAdjustment;
-        float effectiveVol = MathF.Sqrt(MathF.Max(0.0001f, totalVariance));
-        
-        // Drift adjustment for skewness - enhanced impact of negative theta on puts
-        float driftAdjustment = 0.0f;
-        if (theta < 0) // Negative jump bias increases put values
-        {
-            driftAdjustment = theta * nu * 2.0f; // Scale by nu for stronger impact
-        }
-        
-        float adjustedRate = RiskFreeInterestRate + driftAdjustment;
-        
-        // Calculate d1 and d2 for Black-Scholes formula with VG adjustments
-        float logMoneyness = MathF.Log(StockPrice / Strike);
-        float d1 = (logMoneyness + (adjustedRate + effectiveVol * effectiveVol / 2.0f) * T) / 
-                   (effectiveVol * MathF.Sqrt(T));
-        float d2 = d1 - effectiveVol * MathF.Sqrt(T);
-
-        var nd1 = CumulativeNormalDistribution(d1);
-        var nd2 = CumulativeNormalDistribution(d2);
-        var nMinusD1 = CumulativeNormalDistribution(-d1);
-        var nMinusD2 = CumulativeNormalDistribution(-d2);
-
-        var discountFactor = MathF.Exp(-RiskFreeInterestRate * T);
-
-        // Calculate option values with VG adjustments
-        CallValue = StockPrice * nd1 - Strike * discountFactor * nd2;
-        PutValue = Strike * discountFactor * nMinusD2 - StockPrice * nMinusD1;
-                  
-        // Add jump-specific premium that scales strongly with nu and theta
-        float jumpPremium = CalculateVGJumpPremium(nu, theta, T);
-        
-        // Apply directional bias based on theta (negative theta increases put values)
-        if (theta < 0) // Downward jump bias
-        {
-            PutValue += jumpPremium * MathF.Abs(theta) * nu * 3.0f; // Strong scaling
-        }
-        else if (theta > 0) // Upward jump bias  
-        {
-            CallValue += jumpPremium * theta * nu * 3.0f;
-        }
-        
-        // Both options benefit from increased uncertainty (higher nu) 
-        // This is the key: as nu increases, all option values should increase
-        float uncertaintyPremium = nu * nu * T * StockPrice * 0.008f; // Quadratic in nu
-        CallValue += uncertaintyPremium;
-        PutValue += uncertaintyPremium;
-        
-        // Additional premium for put options when we have negative theta and high nu
-        if (theta < 0 && nu > 0.5f)
-        {
-            float additionalPutPremium = MathF.Abs(theta) * (nu - 0.5f) * StockPrice * T * 0.05f;
-            PutValue += additionalPutPremium;
-        }
-        
-        // Final bounds check
-        CallValue = MathF.Max(0, CallValue);
-        PutValue = MathF.Max(0, PutValue);
     }
     
     /// <summary>
@@ -815,13 +730,6 @@ public class HestonCalculator
         // Ensure correlation is within valid bounds
         Correlation = MathF.Max(-0.999f, MathF.Min(0.999f, Correlation));
         
-        // For Variance Gamma model, allow much higher vol-of-vol as it's used differently
-        if (ModelType == SkewKurtosisModel.VarianceGamma)
-        {
-            // No Feller condition restrictions for VG model as it's a different parameterization
-            return;
-        }
-        
         // Significantly relax Feller condition enforcement to allow vol of vol to have maximum impact
         // Only apply adjustment in extremely severe violations that could cause numerical instability
         if (!IsFellerConditionSatisfied)
@@ -1145,8 +1053,7 @@ public class HestonCalculator
         
         // Enhanced stability checks for extreme parameter regimes
         // Skip for Variance Gamma model as it uses different parameterization
-        if (ModelType != SkewKurtosisModel.VarianceGamma && 
-            ExpiryTime < 7.0f / 365.0f && VolatilityOfVolatility > 0.8f && MathF.Abs(Correlation) > 0.9f)
+        if (ExpiryTime < 7.0f / 365.0f && VolatilityOfVolatility > 0.8f && MathF.Abs(Correlation) > 0.9f)
         {
             // Apply conservative bounds for extreme parameter regimes
             float moneyness = StockPrice / Strike;
@@ -1721,13 +1628,6 @@ public enum SkewKurtosisModel
     /// Handles discrete jumps and crash scenarios
     /// </summary>
     JumpDiffusionHeston,
-    
-    /// <summary>
-    /// Variance Gamma approximation
-    /// Excellent for pure jump processes with symmetric fat tails
-    /// Good for leptokurtic distributions with controllable skewness
-    /// </summary>
-    VarianceGamma,
     
     /// <summary>
     /// Asymmetric Laplace distribution
