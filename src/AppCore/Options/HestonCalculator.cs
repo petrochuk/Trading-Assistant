@@ -218,9 +218,6 @@ public class HestonCalculator
             case SkewKurtosisModel.JumpDiffusionHeston:
                 CalculateJumpDiffusionHeston();
                 break;
-            case SkewKurtosisModel.AsymmetricLaplace:
-                CalculateAsymmetricLaplace();
-                break;
             case SkewKurtosisModel.StandardHeston:
             default:
                 CalculateHestonCharacteristicFunction();
@@ -367,44 +364,6 @@ public class HestonCalculator
         float thetaScale = 1.0f + MathF.Abs(theta) * 10.0f;
         
         return basePremium * thetaScale;
-    }
-
-    /// <summary>
-    /// Asymmetric Laplace distribution approximation
-    /// Optimal for strong asymmetric distributions with different left/right tail behavior
-    /// </summary>
-    private void CalculateAsymmetricLaplace()
-    {
-        // Base calculation
-        CalculateHestonApproximate();
-        
-        float baseCall = CallValue;
-        float basePut = PutValue;
-        
-        // Asymmetric Laplace parameters
-        float kappa1 = 1.0f / (1.0f - TailAsymmetry); // Right tail parameter
-        float kappa2 = 1.0f / (1.0f + TailAsymmetry); // Left tail parameter
-        
-        float T = ExpiryTime;
-        float moneyness = StockPrice / Strike;
-        
-        // Different adjustments for calls vs puts based on tail parameters
-        float callAdjustment = 0f;
-        float putAdjustment = 0f;
-        
-        if (moneyness > 1.0f) // OTM puts - affected by left tail
-        {
-            putAdjustment = (kappa2 - 1.0f) * basePut * 0.2f * T;
-        }
-        else if (moneyness < 1.0f) // OTM calls - affected by right tail
-        {
-            callAdjustment = (kappa1 - 1.0f) * baseCall * 0.2f * T;
-        }
-        
-        CallValue = MathF.Max(0, baseCall + callAdjustment);
-        PutValue = MathF.Max(0, basePut + putAdjustment);
-        
-        EnsurePutCallParity();
     }
 
     /// <summary>
@@ -1627,12 +1586,5 @@ public enum SkewKurtosisModel
     /// Optimal for distributions with fat tails and strong skewness
     /// Handles discrete jumps and crash scenarios
     /// </summary>
-    JumpDiffusionHeston,
-    
-    /// <summary>
-    /// Asymmetric Laplace distribution
-    /// Optimal for strong asymmetric distributions
-    /// Different left/right tail behavior (e.g., crash vs rally dynamics)
-    /// </summary>
-    AsymmetricLaplace
+    JumpDiffusionHeston
 }

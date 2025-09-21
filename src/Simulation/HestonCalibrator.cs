@@ -146,9 +146,6 @@ public class HestonCalibrator
             case SkewKurtosisModel.JumpDiffusionHeston:
                 CalibrateJumpDiffusionHeston(heston, EvaluateCurrent);
                 break;
-            case SkewKurtosisModel.AsymmetricLaplace:
-                CalibrateAsymmetricLaplace(heston, EvaluateCurrent);
-                break;
         }
 
         sw.Stop();
@@ -262,31 +259,6 @@ public class HestonCalibrator
             vgCalculator.VarianceRate = nu;
             vgCalculator.DriftParameter = theta;
             evaluate($"vol={vol:F3} nu={nu:F1} theta={theta:F3}");
-        }
-    }
-
-    private void CalibrateAsymmetricLaplace(HestonCalculator heston, Action<string> evaluate)
-    {
-        var volOfVols = new float[] { 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 4.5f, 5f };
-        var longTermVols = new float[] { 0.08f, 0.10f, 0.12f, 0.15f, 0.20f };
-        var meanReversions = new float[] { 7f, 10f, 12f, 15f, 20f };
-        var correlations = new float[] { -1.0f, -0.8f, -0.6f };
-        var tailAsyms = new float[] { -1.6f, -1.5f, -1.4f, -1.30f, -1.20f, -1.10f, -1.00f, -0.9f, -0.8f, -0.7f, -0.6f, -0.5f, -0.4f, -0.35f, -0.3f, -0.25f, -0.2f, -0.1f, 0.0f };
-
-        for (var cv =0.05f; cv<0.40f; cv+=0.01f )
-        foreach (var vofvol in volOfVols)
-        foreach (var lt in longTermVols)
-        foreach (var kappa in meanReversions)
-        foreach (var rho in correlations)
-        foreach (var ta in tailAsyms)
-        {
-            heston.CurrentVolatility = cv;
-            heston.VolatilityOfVolatility = vofvol;
-            heston.LongTermVolatility = lt;
-            heston.VolatilityMeanReversion = kappa;
-            heston.Correlation = rho;
-            heston.TailAsymmetry = ta;
-            evaluate($"cv={cv:F3} vofv={vofvol:F1} lt={lt:F2} k={kappa:F0} rho={rho:F1} ta={ta:F1}");
         }
     }
 
