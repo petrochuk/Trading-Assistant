@@ -160,8 +160,12 @@ public class HestonCalculator
 
     /// <summary>
     /// Check if Feller condition is satisfied (ensures volatility stays positive)
+    /// Standard form: 2 kappa theta >= sigma^2, where theta is the long-run variance.
+    /// Here LongTermVolatility represents the long-run volatility, so theta = LongTermVolatility^2.
     /// </summary>
-    public bool IsFellerConditionSatisfied => 2.0f * VolatilityMeanReversion * LongTermVolatility * LongTermVolatility >= VolatilityOfVolatility * VolatilityOfVolatility;
+    public bool IsFellerConditionSatisfied =>
+        2.0f * VolatilityMeanReversion * (LongTermVolatility * LongTermVolatility) >=
+        (VolatilityOfVolatility * VolatilityOfVolatility);
 
     /// <summary>
     /// Added flag to optionally disable fallback pricing for sensitivity tests
@@ -241,6 +245,49 @@ public class HestonCalculator
             // Clamp invalid negative values but retain CF result for sensitivity analysis
             CallValue = MathF.Max(CallValue, 0f);
             PutValue = MathF.Max(PutValue, 0f);
+        }
+
+        // Enforce arbitrage bounds (non-negativity + intrinsic lower bounds + mild parity correction)
+        ApplyArbitrageBounds();
+    }
+
+    /// <summary>
+    /// Apply standard European option arbitrage lower bounds and correct tiny numerical negatives.
+    /// Ensures: C >= max(S - K e^{-rT}, 0), P >= max(K e^{-rT} - S, 0), and put-call parity within tolerance.
+    /// </summary>
+    private void ApplyArbitrageBounds()
+    {
+        if (ExpiryTime <= 0f) return; // Already intrinsic handled upstream
+        float T = ExpiryTime;
+        float discount = MathF.Exp(-RiskFreeInterestRate * T);
+        float intrinsicCall = MathF.Max(StockPrice - Strike * discount, 0f);
+        float intrinsicPut = MathF.Max(Strike * discount - StockPrice, 0f);
+
+        if (CallValue < intrinsicCall) CallValue = intrinsicCall;
+        if (PutValue < intrinsicPut) PutValue = intrinsicPut;
+
+        if (CallValue < 0f) CallValue = 0f;
+        if (PutValue < 0f) PutValue = 0f;
+
+        // Mild put-call parity enforcement if drifted due to clamping; adjust smaller magnitude side
+        float parityTarget = StockPrice - Strike * discount; // C - P should equal this
+        float diff = (CallValue - PutValue) - parityTarget;
+        const float parityTolerance = 1e-3f; // Tight tolerance; we only saw very small negatives
+        if (MathF.Abs(diff) > parityTolerance)
+        {
+            // Adjust the leg with smaller absolute value change needed while keeping non-negativity
+            if (CallValue > PutValue)
+            {
+                float proposed = CallValue - diff;
+                if (proposed >= intrinsicCall)
+                    CallValue = proposed;
+            }
+            else
+            {
+                float proposed = PutValue + diff;
+                if (proposed >= intrinsicPut)
+                    PutValue = proposed;
+            }
         }
     }
 
@@ -336,7 +383,8 @@ public class HestonCalculator
 
     /// <summary>
     /// Validate and adjust parameters to ensure numerical stability
-    /// Applies latest best practices for parameter bounds
+    /// Applies standard bounds and enforces the classic Feller condition (2 kappa theta >= sigma^2)
+    /// by capping sigma if necessary.
     /// </summary>
     private void ValidateAndAdjustParameters()
     {
@@ -349,16 +397,12 @@ public class HestonCalculator
         // Ensure correlation is within valid bounds
         Correlation = MathF.Max(-0.999f, MathF.Min(0.999f, Correlation));
         
-        // Relaxed Feller condition enforcement
-        if (!IsFellerConditionSatisfied)
+        // Enforce Feller condition strictly by reducing sigma if violated
+        float thetaVar = LongTermVolatility * LongTermVolatility; // theta (variance)
+        float fellerBoundSigma = MathF.Sqrt(2.0f * VolatilityMeanReversion * thetaVar); // sqrt(2 kappa theta)
+        if (VolatilityOfVolatility > fellerBoundSigma)
         {
-            float fellerRatio = (VolatilityOfVolatility * VolatilityOfVolatility) / 
-                               (2.0f * VolatilityMeanReversion * LongTermVolatility * LongTermVolatility);
-            if (fellerRatio > 20.0f)
-            {
-                float minSigma = MathF.Sqrt(2.0f * VolatilityMeanReversion * LongTermVolatility * LongTermVolatility);
-                VolatilityOfVolatility = minSigma * 4.0f;
-            }
+            VolatilityOfVolatility = fellerBoundSigma * 0.999f; // slight margin inside boundary
         }
     }
 
