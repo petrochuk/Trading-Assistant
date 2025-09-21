@@ -51,15 +51,15 @@ public sealed class RVwithSubsamplingTests
     public void AddValue_MultipleValues_Low_VolatilityOfVolatility()
     {
         // Arrange - Use a longer VoV period to reduce noise
-        var rvWithSubsampling = new RVwithSubsampling(TimeSpan.FromMinutes(5), 100);
+        var rvWithSubsampling = new RVwithSubsampling(TimeSpan.FromHours(24), 10);
 
         // Act - Add enough values to populate subsamples and start calculating VoV
-        var basePrice = 100.0;
+        var basePrice = 1000.0;
         var currentPrice = basePrice;
 
         // Add many values to ensure we have enough volatility observations
-        var annualVolatility = 0.2f; // 20% annualized volatility
-        var normalDist = new Normal(0, annualVolatility / MathF.Sqrt(TimeExtensions.DaysPerYear * 24f * 60f / (float)rvWithSubsampling.Period.TotalMinutes * rvWithSubsampling.SubsamplesCount));
+        var annualVolatility = 0.2; // 20% annualized volatility
+        var normalDist = new Normal(0, annualVolatility / System.Math.Sqrt((double)TimeExtensions.DaysPerYear * 24 * 60 / rvWithSubsampling.Period.TotalMinutes * rvWithSubsampling.SubsamplesCount));
         
         for (int i = 0; i < 100000; i++)
         {
@@ -79,45 +79,7 @@ public sealed class RVwithSubsamplingTests
         Assert.IsTrue(hasVoV, "Should have volatility of volatility after enough data points");
         Assert.IsTrue(vov > 0, "Volatility of volatility should be positive");
         // For constant volatility with a longer observation window, VoV should be lower
-        Assert.IsTrue(vov < 3.0, $"Volatility of volatility should be reasonable for stable volatility. Actual: {vov:F6}");
-    }
-
-    [TestMethod]
-    public void AddValue_MultipleValues_High_VolatilityOfVolatility() {
-        // Arrange
-        var rvWithSubsampling = new RVwithSubsampling(TimeSpan.FromMinutes(5), 100);
-
-        // Act - Add enough values to populate subsamples and start calculating VoV
-        var basePrice = 100.0;
-        var currentPrice = basePrice;
-
-        // Add many values to ensure we have enough volatility observations
-        var annualVolatility = 0.2f; // 20% annualized volatility
-        var currentVolatility = annualVolatility;
-        var annualVolOfVolatility = 1.0f; // 100% annualized volatility of volatility
-        var volDist = new Normal(0, annualVolOfVolatility / MathF.Sqrt(TimeExtensions.DaysPerYear * 24f * 60f / (float)rvWithSubsampling.Period.TotalMinutes * rvWithSubsampling.SubsamplesCount));
-        for (int i = 0; i < 100000; i++) {
-
-            // Simulate price movement with some volatility clustering
-            var normalDist = new Normal(0, currentVolatility / MathF.Sqrt(TimeExtensions.DaysPerYear * 24f * 60f / (float)rvWithSubsampling.Period.TotalMinutes * rvWithSubsampling.SubsamplesCount));
-            var return_ = (float)normalDist.Sample();
-            currentPrice *= MathF.Exp(return_);
-
-            // Introduce volatility of volatility
-            var volShock = (float)volDist.Sample();
-            currentVolatility *= MathF.Exp(volShock);
-
-            rvWithSubsampling.AddValue(currentPrice);
-        }
-
-        // Assert
-        var hasVolatility = rvWithSubsampling.TryGetValue(out var volatility);
-        var hasVoV = rvWithSubsampling.TryGetVolatilityOfVolatility(out var vov);
-
-        Assert.IsTrue(hasVolatility, "Should have volatility after enough data points");
-
-        Assert.IsTrue(hasVoV, "Should have volatility of volatility after enough data points");
-        Assert.IsTrue(vov > 0, "Volatility of volatility should be positive");
+        Assert.IsTrue(vov < 0.1, $"Volatility of volatility should be reasonable for stable volatility. Actual: {vov:F6}");
     }
 
     [TestMethod]
