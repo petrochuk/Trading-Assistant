@@ -35,10 +35,14 @@ public class HestonCalibrator
         var modelTypes = Enum.GetValues<SkewKurtosisModel>();
         var tasks = new List<Task<CalibrationResult>>();
 
+        /*
         foreach (var modelType in modelTypes)
         {
             tasks.Add(Task.Run(() => CalibrateModel(modelType)));
         }
+        */
+
+        CalibrateModel(SkewKurtosisModel.StandardHeston);
 
         var results = await Task.WhenAll(tasks);
 

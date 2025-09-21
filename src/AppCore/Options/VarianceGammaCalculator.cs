@@ -1,11 +1,16 @@
 using AppCore.Extenstions;
+using System; // Added for Math
+using System.Numerics;
 
 namespace AppCore.Options;
 
 /// <summary>
-/// Variance Gamma model for option pricing.
-/// The Variance Gamma model is a pure jump Lévy model that provides excellent modeling 
-/// of symmetric fat tails with controllable skewness. It's ideal for leptokurtic distributions.
+/// Variance Gamma model for option pricing (canonical implementation).
+/// Implements pricing of European options using the Lewis (1991) Fourier integral
+/// with the VG characteristic function:  ?_X(u) = (1 - i ? ? u + 0.5 ?² ? u²)^(-T/?)
+/// Risk–neutral drift ? = (1/?) ln(1 - ? ? - 0.5 ?² ?) so that S_T = S_0 exp(r T + X_T + ? T).
+/// Call price: C = S0 * P1 - K e^{-rT} * P2 where P1, P2 computed by integrals of characteristic function.
+/// Put price via put–call parity. Greeks via adaptive finite differences.
 /// </summary>
 public class VarianceGammaCalculator
 {
@@ -57,22 +62,17 @@ public class VarianceGammaCalculator
     public float ExpiryTime { get; set; }
 
     /// <summary>
-    /// Base volatility parameter (sigma in VG model)
+    /// Base volatility parameter (? in VG model)
     /// </summary>
     public float Volatility { get; set; }
 
     /// <summary>
-    /// Variance rate parameter (nu in VG model)
-    /// Controls kurtosis and the rate of time change in the subordinated Brownian motion.
-    /// Higher values increase option values due to increased uncertainty and fat tails.
+    /// Variance rate parameter (? in VG model)
     /// </summary>
     public float VarianceRate { get; set; }
 
     /// <summary>
-    /// Drift parameter (theta in VG model)
-    /// Controls skewness of the distribution.
-    /// Negative values create downward skew (higher put values relative to calls).
-    /// Positive values create upward skew (higher call values relative to puts).
+    /// Drift parameter (? in VG model)
     /// </summary>
     public float DriftParameter { get; set; }
 
@@ -92,7 +92,7 @@ public class VarianceGammaCalculator
     public float Gamma { get; set; }
 
     /// <summary>
-    /// Vega for Call options
+    /// Vega for Call options (with respect to ?)
     /// </summary>
     public float VegaCall { get; set; }
 
@@ -132,7 +132,7 @@ public class VarianceGammaCalculator
     public float VannaPut { get; set; }
 
     /// <summary>
-    /// The number of days left until the option expired!
+    /// The number of days left until the option expired.
     /// </summary>
     public float DaysLeft
     {
@@ -147,298 +147,234 @@ public class VarianceGammaCalculator
 
     #endregion
 
-    #region VG Model Private Methods
+    #region VG Characteristic Function Pricing
 
     /// <summary>
-    /// Calculate effective variance for the VG model
+    /// Risk-neutral drift ? ensuring martingale condition E[S_T] = S0 e^{rT}.
+    /// ? = (1/?) ln(1 - ? ? - 0.5 ?² ?)
     /// </summary>
-    private float CalculateEffectiveVariance()
+    private float RiskNeutralDrift()
     {
+        var nu = VarianceRate;
+        var theta = DriftParameter;
+        var sigma = Volatility;
+        return (1.0f / nu) * MathF.Log(1.0f - theta * nu - 0.5f * sigma * sigma * nu);
+    }
+
+    /// <summary>
+    /// Characteristic function of log-price ln S_T under risk-neutral measure.
+    /// ?_log(u) = exp(i u (ln S0 + r T + ? T)) * (1 - i ? ? u + 0.5 ?² ? u²)^(-T/?)
+    /// </summary>
+    private Complex CharacteristicFunctionLog(float u)
+    {
+        float S0 = StockPrice;
+        float r = RiskFreeInterestRate;
+        float T = ExpiryTime;
+        float sigma = Volatility;
         float nu = VarianceRate;
         float theta = DriftParameter;
-        float sigma = Volatility;
-        float T = ExpiryTime;
+        float omega = RiskNeutralDrift();
 
-        // Enhanced volatility calculation that increases with nu
-        float volMultiplier = 1.0f + nu * 0.4f;
-        float baseVol = sigma * volMultiplier;
+        if (T <= 0f) return Complex.Exp(Complex.ImaginaryOne * u * MathF.Log(S0));
 
-        // VG variance adjustment - increases significantly with nu
-        float varianceAdjustment = nu * T * (sigma * sigma + theta * theta * 25.0f);
-
-        // Combined volatility that increases with nu
-        float totalVariance = baseVol * baseVol + varianceAdjustment;
-        float effectiveVol = MathF.Sqrt(MathF.Max(0.0001f, totalVariance));
-
-        return effectiveVol;
+        var iu = Complex.ImaginaryOne * u;
+        var a = 1.0f - iu * theta * nu + 0.5f * sigma * sigma * nu * u * u;
+        var power = -T / nu;
+        var logSComponent = Complex.Exp(Complex.ImaginaryOne * u * (MathF.Log(S0) + (r + omega) * T));
+        var cfX = Complex.Pow(a, power);
+        return logSComponent * cfX;
     }
 
     /// <summary>
-    /// Calculate VG-specific jump premium based on nu and theta parameters
+    /// Compute probabilities P1, P2 using Lewis integrals.
+    /// P1 = 1/2 + 1/? ?_0^? Re[ e^{-i u ln K} * ?_log(u - i) / (i u * ?_log(-i)) ] du
+    /// P2 = 1/2 + 1/? ?_0^? Re[ e^{-i u ln K} * ?_log(u) / (i u) ] du
     /// </summary>
-    private float CalculateVGJumpPremium(float nu, float theta, float T)
+    private (double P1, double P2) ComputeP1P2()
     {
-        // VG jump premium scales with variance rate and time
-        float basePremium = nu * nu * T * StockPrice * 0.01f;
+        double K = Strike;
+        double T = ExpiryTime;
+        if (T <= 0.0 || K <= 0.0 || StockPrice <= 0.0) // Handle immediate expiry/payoff
+        {
+            double intrinsicCall = System.Math.Max(StockPrice - Strike, 0f);
+            double parityP2 = intrinsicCall > 0 ? 1.0 : 0.0; // fallback
+            return (intrinsicCall > 0 ? 1.0 : 0.0, parityP2);
+        }
 
-        // Scale by absolute theta for jump direction effect
-        float thetaScale = 1.0f + MathF.Abs(theta) * 10.0f;
+        // Numerical integration (adaptive Simpson on fixed grid)
+        // Upper limit chosen for convergence; can be parameterized.
+        const double upper = 200.0; // typical enough for VG; adjust as needed.
+        const int N = 4096; // even number for Simpson.
+        double du = upper / N;
+        double logK = System.Math.Log(K);
+        var phiMinusI = CharacteristicFunctionLogComplex(-Complex.ImaginaryOne);
 
-        return basePremium * thetaScale;
+        double sumP1 = 0.0;
+        double sumP2 = 0.0;
+        for (int j = 1; j < N; j++)
+        {
+            double u = j * du;
+            float uf = (float)u;
+            var eMinusIuLogK = Complex.Exp(-Complex.ImaginaryOne * u * logK);
+            var phi_u = CharacteristicFunctionLog(uf);
+            var phi_u_minus_i = CharacteristicFunctionLogComplex(new Complex(u, -1.0));
+            var termP2 = eMinusIuLogK * phi_u / (Complex.ImaginaryOne * u);
+            var termP1 = eMinusIuLogK * phi_u_minus_i / (Complex.ImaginaryOne * u * phiMinusI);
+            double weight = (j % 2 == 0) ? 2.0 : 4.0;
+            sumP1 += weight * termP1.Real;
+            sumP2 += weight * termP2.Real;
+        }
+
+        double uN = upper;
+        var eMinusIuNLogK = Complex.Exp(-Complex.ImaginaryOne * uN * logK);
+        var phi_uN = CharacteristicFunctionLog((float)uN);
+        var phi_uN_minus_i_end = CharacteristicFunctionLogComplex(new Complex(uN, -1.0));
+        var termP2_end = eMinusIuNLogK * phi_uN / (Complex.ImaginaryOne * uN);
+        var termP1_end = eMinusIuNLogK * phi_uN_minus_i_end / (Complex.ImaginaryOne * uN * phiMinusI);
+        sumP1 = (sumP1 + termP1_end.Real);
+        sumP2 = (sumP2 + termP2_end.Real);
+
+        double integralP1 = (du / 3.0) * sumP1;
+        double integralP2 = (du / 3.0) * sumP2;
+        double P1 = 0.5 + (1.0 / System.Math.PI) * integralP1;
+        double P2 = 0.5 + (1.0 / System.Math.PI) * integralP2;
+        return (P1, P2);
     }
 
     /// <summary>
-    /// Calculate the Variance Gamma option prices
+    /// Complex characteristic function evaluation allowing complex argument (for shift u - i).
+    /// log S_T characteristic; only used internally for u with imaginary part 0 or -1.
+    /// </summary>
+    private Complex CharacteristicFunctionLogComplex(Complex u)
+    {
+        float S0 = StockPrice;
+        float r = RiskFreeInterestRate;
+        float T = ExpiryTime;
+        float sigma = Volatility;
+        float nu = VarianceRate;
+        float theta = DriftParameter;
+        float omega = RiskNeutralDrift();
+
+        if (T <= 0f) return Complex.Exp(Complex.ImaginaryOne * u * MathF.Log(S0));
+
+        Complex one = Complex.One;
+        Complex a = one - Complex.ImaginaryOne * theta * nu * u + 0.5 * sigma * sigma * nu * u * u;
+        double power = -T / nu;
+        var cfX = Complex.Pow(a, power);
+        var drift = Complex.Exp(Complex.ImaginaryOne * u * (System.Math.Log(S0) + (r + omega) * T));
+        return drift * cfX;
+    }
+
+    /// <summary>
+    /// Main pricing routine: computes CallValue and PutValue via CF integrals enforcing put–call parity.
     /// </summary>
     private void CalculateVarianceGamma()
     {
-        float nu = VarianceRate;
-        float theta = DriftParameter;
-        float sigma = Volatility;
+        ValidateInputs();
         float T = ExpiryTime;
-
-        // Calculate effective volatility
-        float effectiveVol = CalculateEffectiveVariance();
-
-        // Drift adjustment for skewness
-        float driftAdjustment = 0.0f;
-        if (theta < 0) // Negative jump bias increases put values
+        if (T <= 0f)
         {
-            driftAdjustment = theta * nu * 2.0f;
+            CallValue = MathF.Max(0f, StockPrice - Strike);
+            PutValue = MathF.Max(0f, Strike - StockPrice);
+            return;
         }
 
-        float adjustedRate = RiskFreeInterestRate + driftAdjustment;
-
-        // Calculate d1 and d2 for Black-Scholes formula with VG adjustments
-        float logMoneyness = MathF.Log(StockPrice / Strike);
-        float d1 = (logMoneyness + (adjustedRate + effectiveVol * effectiveVol / 2.0f) * T) /
-                   (effectiveVol * MathF.Sqrt(T));
-        float d2 = d1 - effectiveVol * MathF.Sqrt(T);
-
-        var nd1 = CumulativeNormalDistribution(d1);
-        var nd2 = CumulativeNormalDistribution(d2);
-        var nMinusD1 = CumulativeNormalDistribution(-d1);
-        var nMinusD2 = CumulativeNormalDistribution(-d2);
-
-        var discountFactor = MathF.Exp(-RiskFreeInterestRate * T);
-
-        // Calculate option values with VG adjustments
-        CallValue = StockPrice * nd1 - Strike * discountFactor * nd2;
-        PutValue = Strike * discountFactor * nMinusD2 - StockPrice * nMinusD1;
-
-        // Add jump-specific premium that scales strongly with nu and theta
-        float jumpPremium = CalculateVGJumpPremium(nu, theta, T);
-
-        // Apply directional bias based on theta
-        if (theta < 0) // Downward jump bias
-        {
-            PutValue += jumpPremium * MathF.Abs(theta) * nu * 3.0f;
-        }
-        else if (theta > 0) // Upward jump bias  
-        {
-            CallValue += jumpPremium * theta * nu * 3.0f;
-        }
-
-        // Both options benefit from increased uncertainty (higher nu) 
-        float uncertaintyPremium = nu * nu * T * StockPrice * 0.008f;
-        CallValue += uncertaintyPremium;
-        PutValue += uncertaintyPremium;
-
-        // Additional premium for put options when we have negative theta and high nu
-        if (theta < 0 && nu > 0.5f)
-        {
-            float additionalPutPremium = MathF.Abs(theta) * (nu - 0.5f) * StockPrice * T * 0.05f;
-            PutValue += additionalPutPremium;
-        }
-
-        // Final bounds check
-        CallValue = MathF.Max(0, CallValue);
-        PutValue = MathF.Max(0, PutValue);
+        var (P1, P2) = ComputeP1P2();
+        double S0 = StockPrice;
+        double K = Strike;
+        double r = RiskFreeInterestRate;
+        double discount = System.Math.Exp(-r * T);
+        double call = S0 * P1 - K * discount * P2;
+        double put = call - S0 + K * discount;
+        CallValue = (float)System.Math.Max(0.0, call);
+        PutValue = (float)System.Math.Max(0.0, put);
     }
 
-    /// <summary>
-    /// Calculate delta using finite difference method
-    /// </summary>
+    private void ValidateInputs()
+    {
+        if (StockPrice <= 0f) throw new ArgumentOutOfRangeException(nameof(StockPrice));
+        if (Strike <= 0f) throw new ArgumentOutOfRangeException(nameof(Strike));
+        if (Volatility <= 0f) throw new ArgumentOutOfRangeException(nameof(Volatility));
+        if (VarianceRate <= 0f) throw new ArgumentOutOfRangeException(nameof(VarianceRate));
+        // Ensure parameter domain 1 - ? ? - 0.5 ?² ? > 0 for martingale condition
+        float cond = 1f - DriftParameter * VarianceRate - 0.5f * Volatility * Volatility * VarianceRate;
+        if (cond <= 0f) throw new ArgumentException("Invalid parameters: 1 - ? ? - 0.5 ?² ? must be > 0.");
+    }
+
+    #endregion
+
+    #region Greeks
+
     private void CalculateDelta()
     {
-        const float bump = 1.0f;
-        float originalPrice = StockPrice;
-
-        StockPrice = originalPrice + bump;
-        CalculateVarianceGamma();
-        float callUp = CallValue;
-        float putUp = PutValue;
-
-        StockPrice = originalPrice - bump;
-        CalculateVarianceGamma();
-        float callDown = CallValue;
-        float putDown = PutValue;
-
-        DeltaCall = (callUp - callDown) / (2.0f * bump);
-        DeltaPut = (putUp - putDown) / (2.0f * bump);
-
-        // Restore original values
-        StockPrice = originalPrice;
-        CalculateVarianceGamma();
+        float epsRel = 1e-4f;
+        float bump = MathF.Max(0.01f, StockPrice * epsRel);
+        float originalS = StockPrice;
+        StockPrice = originalS + bump; CalculateVarianceGamma(); float callUp = CallValue; float putUp = PutValue;
+        StockPrice = originalS - bump; CalculateVarianceGamma(); float callDown = CallValue; float putDown = PutValue;
+        DeltaCall = (callUp - callDown) / (2f * bump);
+        DeltaPut = (putUp - putDown) / (2f * bump);
+        StockPrice = originalS; CalculateVarianceGamma();
     }
 
-    /// <summary>
-    /// Calculate gamma using finite difference method
-    /// </summary>
     private void CalculateGamma()
     {
-        const float bump = 1.0f;
-        float originalPrice = StockPrice;
-
-        StockPrice = originalPrice + bump;
-        CalculateVarianceGamma();
-        float callUp = CallValue;
-
-        StockPrice = originalPrice - bump;
-        CalculateVarianceGamma();
-        float callDown = CallValue;
-
-        StockPrice = originalPrice;
-        CalculateVarianceGamma();
-        float callMid = CallValue;
-
-        Gamma = (callUp - 2.0f * callMid + callDown) / (bump * bump);
-
-        // Restore original values
-        StockPrice = originalPrice;
+        float epsRel = 1e-4f;
+        float bump = MathF.Max(0.01f, StockPrice * epsRel);
+        float originalS = StockPrice;
+        StockPrice = originalS + bump; CalculateVarianceGamma(); float callUp = CallValue;
+        StockPrice = originalS; CalculateVarianceGamma(); float callMid = CallValue;
+        StockPrice = originalS - bump; CalculateVarianceGamma(); float callDown = CallValue;
+        Gamma = (callUp - 2f * callMid + callDown) / (bump * bump);
+        StockPrice = originalS; CalculateVarianceGamma();
     }
 
-    /// <summary>
-    /// Calculate vega using finite difference method
-    /// </summary>
     private void CalculateVega()
     {
-        const float bump = 0.01f;
-        float originalVol = Volatility;
-
-        Volatility = originalVol + bump;
-        CalculateVarianceGamma();
-        float callUp = CallValue;
-        float putUp = PutValue;
-
-        Volatility = originalVol - bump;
-        CalculateVarianceGamma();
-        float callDown = CallValue;
-        float putDown = PutValue;
-
-        VegaCall = (callUp - callDown) / (2.0f * bump * 100.0f);
-        VegaPut = (putUp - putDown) / (2.0f * bump * 100.0f);
-
-        // Restore original values
-        Volatility = originalVol;
-        CalculateVarianceGamma();
+        float epsRel = 5e-3f;
+        float originalSigma = Volatility;
+        float bump = MathF.Max(1e-4f, originalSigma * epsRel);
+        Volatility = originalSigma + bump; CalculateVarianceGamma(); float callUp = CallValue; float putUp = PutValue;
+        Volatility = originalSigma - bump; CalculateVarianceGamma(); float callDown = CallValue; float putDown = PutValue;
+        VegaCall = (callUp - callDown) / (2f * bump);
+        VegaPut = (putUp - putDown) / (2f * bump);
+        Volatility = originalSigma; CalculateVarianceGamma();
     }
 
-    /// <summary>
-    /// Calculate theta using finite difference method
-    /// </summary>
     private void CalculateTheta()
     {
-        float bump = MathF.Min(1.0f / 365.0f, ExpiryTime * 0.1f);
-        float originalTime = ExpiryTime;
-
-        if (originalTime <= bump)
-        {
-            ThetaCall = ThetaPut = 0.0f;
-            return;
-        }
-
-        ExpiryTime = originalTime - bump;
-        CalculateVarianceGamma();
-        float callDown = CallValue;
-        float putDown = PutValue;
-
-        ExpiryTime = originalTime;
-        CalculateVarianceGamma();
-
-        ThetaCall = (callDown - CallValue) / (bump * TimeExtensions.DaysPerYear);
-        ThetaPut = (putDown - PutValue) / (bump * TimeExtensions.DaysPerYear);
+        float originalT = ExpiryTime;
+        if (originalT <= 0f) { ThetaCall = ThetaPut = 0f; return; }
+        float bump = MathF.Min(originalT * 0.01f, 1f / 365f);
+        if (originalT - bump <= 0f) { ThetaCall = ThetaPut = 0f; return; }
+        ExpiryTime = originalT - bump; CalculateVarianceGamma(); float callDown = CallValue; float putDown = PutValue;
+        ExpiryTime = originalT; CalculateVarianceGamma(); float callBase = CallValue; float putBase = PutValue;
+        ThetaCall = (callDown - callBase) / (bump * TimeExtensions.DaysPerYear);
+        ThetaPut = (putDown - putBase) / (bump * TimeExtensions.DaysPerYear);
     }
 
-    /// <summary>
-    /// Calculate vanna using finite difference method
-    /// </summary>
     private void CalculateVanna()
     {
-        const float volBump = 0.01f;
-        float originalVol = Volatility;
-
-        CalculateDelta();
-        float deltaCallBase = DeltaCall;
-        float deltaPutBase = DeltaPut;
-
-        Volatility = originalVol + volBump;
-        CalculateDelta();
-        float deltaCallUp = DeltaCall;
-        float deltaPutUp = DeltaPut;
-
-        VannaCall = (deltaCallUp - deltaCallBase) / volBump;
-        VannaPut = (deltaPutUp - deltaPutBase) / volBump;
-
-        // Restore original values
-        Volatility = originalVol;
-        CalculateVarianceGamma();
+        float originalSigma = Volatility;
+        float bumpSigma = MathF.Max(1e-4f, originalSigma * 0.01f);
+        CalculateDelta(); float deltaCallBase = DeltaCall; float deltaPutBase = DeltaPut;
+        Volatility = originalSigma + bumpSigma; CalculateDelta(); float deltaCallUp = DeltaCall; float deltaPutUp = DeltaPut;
+        VannaCall = (deltaCallUp - deltaCallBase) / bumpSigma;
+        VannaPut = (deltaPutUp - deltaPutBase) / bumpSigma;
+        Volatility = originalSigma; CalculateVarianceGamma();
     }
 
-    /// <summary>
-    /// Calculate charm using finite difference method
-    /// </summary>
     private void CalculateCharm()
     {
-        float timeBump = MathF.Min(1.0f / 365.0f, ExpiryTime * 0.1f);
-        float originalTime = ExpiryTime;
-
-        if (originalTime <= timeBump)
-        {
-            CharmCall = CharmPut = 0.0f;
-            return;
-        }
-
-        CalculateDelta();
-        float deltaCallBase = DeltaCall;
-        float deltaPutBase = DeltaPut;
-
-        ExpiryTime = originalTime - timeBump;
-        CalculateDelta();
-        float deltaCallDown = DeltaCall;
-        float deltaPutDown = DeltaPut;
-
-        CharmCall = (deltaCallDown - deltaCallBase) / (timeBump * TimeExtensions.DaysPerYear);
-        CharmPut = (deltaPutDown - deltaPutBase) / (timeBump * TimeExtensions.DaysPerYear);
-
-        // Restore original values
-        ExpiryTime = originalTime;
-        CalculateVarianceGamma();
-    }
-
-    /// <summary>
-    /// Cumulative normal distribution approximation
-    /// </summary>
-    private static float CumulativeNormalDistribution(float z)
-    {
-        if (z > 6.0f) return 1.0f;
-        if (z < -6.0f) return 0.0f;
-
-        const float b1 = 0.31938153f;
-        const float b2 = -0.356563782f;
-        const float b3 = 1.781477937f;
-        const float b4 = -1.821255978f;
-        const float b5 = 1.330274429f;
-        const float p = 0.2316419f;
-        const float c2 = 0.3989423f;
-
-        float a = MathF.Abs(z);
-        float t = 1.0f / (1.0f + a * p);
-        float b = c2 * MathF.Exp(-z * z / 2.0f);
-        float n = ((((b5 * t + b4) * t + b3) * t + b2) * t + b1) * t;
-        n = 1.0f - b * n;
-
-        return z < 0.0f ? 1.0f - n : n;
+        float originalT = ExpiryTime;
+        if (originalT <= 0f) { CharmCall = CharmPut = 0f; return; }
+        float bumpT = MathF.Min(originalT * 0.01f, 1f / 365f);
+        if (originalT - bumpT <= 0f) { CharmCall = CharmPut = 0f; return; }
+        CalculateDelta(); float deltaCallBase = DeltaCall; float deltaPutBase = DeltaPut;
+        ExpiryTime = originalT - bumpT; CalculateDelta(); float deltaCallDown = DeltaCall; float deltaPutDown = DeltaPut;
+        CharmCall = (deltaCallDown - deltaCallBase) / (bumpT * TimeExtensions.DaysPerYear);
+        CharmPut = (deltaPutDown - deltaPutBase) / (bumpT * TimeExtensions.DaysPerYear);
+        ExpiryTime = originalT; CalculateVarianceGamma();
     }
 
     #endregion
@@ -470,7 +406,6 @@ public class VarianceGammaCalculator
     /// <summary>
     /// Calculate call option value only
     /// </summary>
-    /// <returns>Call option value</returns>
     public float CalculateCall()
     {
         CalculateVarianceGamma();
@@ -480,7 +415,6 @@ public class VarianceGammaCalculator
     /// <summary>
     /// Calculate put option value only
     /// </summary>
-    /// <returns>Put option value</returns>
     public float CalculatePut()
     {
         CalculateVarianceGamma();
@@ -489,14 +423,12 @@ public class VarianceGammaCalculator
 
     #endregion
 
-    #region Calibration Methods
+    #region Calibration (Vega-weighted Grid Search)
 
     /// <summary>
-    /// Simple calibration method to fit VG parameters to market option prices
+    /// Basic parameter calibration to market put prices using vega-weighted least squares.
+    /// NOTE: Inefficient (grid search). For production use, replace with nonlinear optimizer.
     /// </summary>
-    /// <param name="marketPutPrices">Array of market put option prices</param>
-    /// <param name="strikes">Array of corresponding strike prices</param>
-    /// <param name="expiries">Array of corresponding expiry times in days</param>
     public void CalibrateToMarketPrices(float[] marketPutPrices, float[] strikes, float[] expiries)
     {
         if (marketPutPrices.Length != strikes.Length || strikes.Length != expiries.Length)
@@ -505,57 +437,48 @@ public class VarianceGammaCalculator
         float bestSigma = Volatility;
         float bestNu = VarianceRate;
         float bestTheta = DriftParameter;
-        float bestError = float.MaxValue;
+        double bestError = double.MaxValue;
 
-        // Grid search ranges for VG parameters
-        var sigmaStart = 0.05f;
-        var sigmaEnd = 0.40f;
-        var sigmaStep = 0.01f;
+        var sigmaStart = 0.05f; var sigmaEnd = 0.6f; var sigmaStep = 0.02f;
+        var nuStart = 0.05f; var nuEnd = 5.0f; var nuStep = 0.15f;
+        var thetaStart = -0.2f; var thetaEnd = 0.3f; var thetaStep = 0.02f;
 
-        var nuStart = 0.1f;
-        var nuEnd = 5.0f;
-        var nuStep = 0.1f;
+        float savedS = StockPrice; float savedR = RiskFreeInterestRate;
 
-        var thetaStart = -0.08f;
-        var thetaEnd = 0.3f;
-        var thetaStep = 0.01f;
-
-        // Grid search calibration
-        for (float sigma = sigmaStart; sigma <= sigmaEnd; sigma += sigmaStep)
+        for (float sigma = sigmaStart; sigma <= sigmaEnd + 1e-6; sigma += sigmaStep)
         {
-            for (float nu = nuStart; nu <= nuEnd; nu += nuStep)
+            for (float nu = nuStart; nu <= nuEnd + 1e-6; nu += nuStep)
             {
-                for (float theta = thetaStart; theta <= thetaEnd; theta += thetaStep)
+                for (float theta = thetaStart; theta <= thetaEnd + 1e-6; theta += thetaStep)
                 {
-                    Volatility = sigma;
-                    VarianceRate = nu;
-                    DriftParameter = theta;
-
-                    float totalError = 0;
+                    if (1f - theta * nu - 0.5f * sigma * sigma * nu <= 0f) continue;
+                    Volatility = sigma; VarianceRate = nu; DriftParameter = theta;
+                    double totalErr = 0.0;
                     for (int i = 0; i < marketPutPrices.Length; i++)
                     {
                         Strike = strikes[i];
                         DaysLeft = expiries[i];
                         CalculateCallPut();
-                        float error = MathF.Abs(PutValue - marketPutPrices[i]);
-                        totalError += error * error; // Sum of squared errors
+                        float baseSigma = Volatility;
+                        float bump = baseSigma * 0.01f;
+                        Volatility = baseSigma + bump; CalculateCallPut(); float putUp = PutValue;
+                        Volatility = baseSigma - bump; CalculateCallPut(); float putDown = PutValue;
+                        float vega = (putUp - putDown) / (2f * bump);
+                        Volatility = baseSigma; CalculateCallPut();
+                        double weight = 1.0 / (1e-6 + System.Math.Abs(vega));
+                        double diff = PutValue - marketPutPrices[i];
+                        totalErr += weight * diff * diff;
                     }
-
-                    if (totalError < bestError)
+                    if (totalErr < bestError)
                     {
-                        bestError = totalError;
-                        bestSigma = sigma;
-                        bestNu = nu;
-                        bestTheta = theta;
+                        bestError = totalErr; bestSigma = sigma; bestNu = nu; bestTheta = theta;
                     }
                 }
             }
         }
 
-        // Set best parameters
-        Volatility = bestSigma;
-        VarianceRate = bestNu;
-        DriftParameter = bestTheta;
+        Volatility = bestSigma; VarianceRate = bestNu; DriftParameter = bestTheta;
+        StockPrice = savedS; RiskFreeInterestRate = savedR; CalculateCallPut();
     }
 
     #endregion

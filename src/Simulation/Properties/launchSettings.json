@@ -3,6 +3,10 @@
     "Simulation": {
       "commandName": "Project",
       "commandLineArgs": "--gamma-fit"
+    },
+    "calibrate": {
+      "commandName": "Project",
+      "commandLineArgs": "--calibrate"
     }
   }
 }

@@ -270,39 +270,29 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     bls.ImpliedVolatility = (float)realizedVol;
                     bls.CalculateAll();
 
-                    var vg = new VarianceGammaCalculator() {
-                        StockPrice = underlyingContract.MarketPrice.Value,
-                        DaysLeft = (float)daysLeft,
-                        Strike = position.Contract.Strike,
-                        Volatility = (float)realizedVol,
-                        VarianceRate = underlyingContract.VolatilityOfVolatility,
-                        DriftParameter = underlyingContract.VarianceGammaDrift,
-                    };
-                    vg.CalculateAll();
-
                     // Calculate cheapness/richness
                     if (addOvervaluedOptions) { 
                         if (position.Contract.IsCall) {
                             if (position.Size > 0) {
-                                if (vg.CallValue < position.Contract.MarketPrice.Value) {
-                                    greeks.OvervaluedPositions.Add(position.Contract.MarketPrice.Value - vg.CallValue, position);
+                                if (heston.CallValue < position.Contract.MarketPrice.Value) {
+                                    greeks.OvervaluedPositions.Add(position.Contract.MarketPrice.Value - heston.CallValue, position);
                                 }
                             }
                             else {
-                                if (vg.CallValue > position.Contract.MarketPrice.Value) {
-                                    greeks.OvervaluedPositions.Add(vg.CallValue - position.Contract.MarketPrice.Value, position);
+                                if (heston.CallValue > position.Contract.MarketPrice.Value) {
+                                    greeks.OvervaluedPositions.Add(heston.CallValue - position.Contract.MarketPrice.Value, position);
                                 }
                             }
                         }
                         else {
                             if (position.Size > 0) {
-                                if (vg.PutValue < position.Contract.MarketPrice.Value) {
-                                    greeks.OvervaluedPositions.Add(position.Contract.MarketPrice.Value - vg.PutValue, position);
+                                if (heston.PutValue < position.Contract.MarketPrice.Value) {
+                                    greeks.OvervaluedPositions.Add(position.Contract.MarketPrice.Value - heston.PutValue, position);
                                 }
                             }
                             else {
-                                if (vg.PutValue > position.Contract.MarketPrice.Value) {
-                                    greeks.OvervaluedPositions.Add(vg.PutValue - position.Contract.MarketPrice.Value, position);
+                                if (heston.PutValue > position.Contract.MarketPrice.Value) {
+                                    greeks.OvervaluedPositions.Add(heston.PutValue - position.Contract.MarketPrice.Value, position);
                                 }
                             }
                         }                    
@@ -327,7 +317,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
                     greeks.DeltaBLS += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
-                    greeks.DeltaHeston += (position.Contract.IsCall ? vg.DeltaCall : vg.DeltaPut) * position.Size;
+                    greeks.DeltaHeston += (position.Contract.IsCall ? heston.DeltaCall : heston.DeltaPut) * position.Size;
 
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
