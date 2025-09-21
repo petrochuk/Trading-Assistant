@@ -182,51 +182,33 @@ public class HestonCalculator
     /// </summary>
     private void CalculateHestonCharacteristicFunction()
     {
-        if (ExpiryTime <= 1e-6f) // Use a very small threshold instead of zero
+        if (ExpiryTime <= 1e-6f)
         {
-            // At expiration
             CallValue = MathF.Max(StockPrice - Strike, 0);
             PutValue = MathF.Max(Strike - StockPrice, 0);
             return;
         }
-
-        // Validate parameters and apply adjustments if needed
         ValidateAndAdjustParameters();
         bool needFallback = false;
         try
         {
-            // Calculate using simplified characteristic function approach
-            double S = StockPrice;
-            double K = Strike;
-            double r = RiskFreeInterestRate;
-            double T = ExpiryTime;
+            double S = StockPrice, K = Strike, r = RiskFreeInterestRate, T = ExpiryTime;
             double v0 = CurrentVolatility * CurrentVolatility;
             double theta = LongTermVolatility * LongTermVolatility;
             double kappa = VolatilityMeanReversion;
             double sigma = VolatilityOfVolatility;
             double rho = Correlation;
-
-            // Use improved integration method
             var (p1, p2) = CalculateHestonProbabilities(S, K, r, T, v0, theta, kappa, sigma, rho);
-
-            // Calculate option values using probabilities
             var discountFactor = System.Math.Exp(-r * T);
             CallValue = (float)(S * p1 - K * discountFactor * p2);
             PutValue = (float)(K * discountFactor * (1 - p2) - S * (1 - p1));
-
-            // Basic validity only – intrinsic / upper bounds handled later
-            if (float.IsNaN(CallValue) || float.IsNaN(PutValue) ||
-                float.IsInfinity(CallValue) || float.IsInfinity(PutValue) ||
-                CallValue < -1e-6f || PutValue < -1e-6f)
-            {
+            if (float.IsNaN(CallValue) || float.IsNaN(PutValue) || float.IsInfinity(CallValue) || float.IsInfinity(PutValue) || CallValue < -1e-6f || PutValue < -1e-6f)
                 needFallback = true;
-            }
         }
         catch { needFallback = true; }
 
         if (needFallback && !DisablePricingFallback)
         {
-            // Fallback to Black-Scholes style approximation only on invalid numeric results
             float effectiveVol = MathF.Sqrt(CalculateEffectiveVariance());
             if (effectiveVol < 1e-6f) effectiveVol = CurrentVolatility;
             float sqrtT = MathF.Sqrt(ExpiryTime);
@@ -242,53 +224,20 @@ public class HestonCalculator
         }
         else if (needFallback && DisablePricingFallback)
         {
-            // Clamp invalid negative values but retain CF result for sensitivity analysis
             CallValue = MathF.Max(CallValue, 0f);
             PutValue = MathF.Max(PutValue, 0f);
         }
 
-        // Enforce arbitrage bounds (non-negativity + intrinsic lower bounds + mild parity correction)
-        ApplyArbitrageBounds();
-    }
+        // European option no-arbitrage bounds
+        float discountFactorFinal = MathF.Exp(-RiskFreeInterestRate * MathF.Max(ExpiryTime, 0f));
+        float callLower = MathF.Max(StockPrice - Strike * discountFactorFinal, 0f); // (S - K e^{-rT})+
+        float callUpper = StockPrice;
+        float putLower = MathF.Max(Strike * discountFactorFinal - StockPrice, 0f); // (K e^{-rT} - S)+
+        float putUpper = Strike * discountFactorFinal;
+        CallValue = MathF.Min(MathF.Max(CallValue, callLower), callUpper);
+        PutValue = MathF.Min(MathF.Max(PutValue, putLower), putUpper);
 
-    /// <summary>
-    /// Apply standard European option arbitrage lower bounds and correct tiny numerical negatives.
-    /// Ensures: C >= max(S - K e^{-rT}, 0), P >= max(K e^{-rT} - S, 0), and put-call parity within tolerance.
-    /// </summary>
-    private void ApplyArbitrageBounds()
-    {
-        if (ExpiryTime <= 0f) return; // Already intrinsic handled upstream
-        float T = ExpiryTime;
-        float discount = MathF.Exp(-RiskFreeInterestRate * T);
-        float intrinsicCall = MathF.Max(StockPrice - Strike * discount, 0f);
-        float intrinsicPut = MathF.Max(Strike * discount - StockPrice, 0f);
-
-        if (CallValue < intrinsicCall) CallValue = intrinsicCall;
-        if (PutValue < intrinsicPut) PutValue = intrinsicPut;
-
-        if (CallValue < 0f) CallValue = 0f;
-        if (PutValue < 0f) PutValue = 0f;
-
-        // Mild put-call parity enforcement if drifted due to clamping; adjust smaller magnitude side
-        float parityTarget = StockPrice - Strike * discount; // C - P should equal this
-        float diff = (CallValue - PutValue) - parityTarget;
-        const float parityTolerance = 1e-3f; // Tight tolerance; we only saw very small negatives
-        if (MathF.Abs(diff) > parityTolerance)
-        {
-            // Adjust the leg with smaller absolute value change needed while keeping non-negativity
-            if (CallValue > PutValue)
-            {
-                float proposed = CallValue - diff;
-                if (proposed >= intrinsicCall)
-                    CallValue = proposed;
-            }
-            else
-            {
-                float proposed = PutValue + diff;
-                if (proposed >= intrinsicPut)
-                    PutValue = proposed;
-            }
-        }
+        EnforcePutCallParity();
     }
 
     /// <summary>
@@ -429,9 +378,8 @@ public class HestonCalculator
     /// </summary>
     public void CalculateCallPut()
     {
-        if (ExpiryTime <= 1e-6f) // Use a very small threshold instead of zero
+        if (ExpiryTime <= 1e-6f)
         {
-            // At expiration
             CallValue = MathF.Max(StockPrice - Strike, 0);
             PutValue = MathF.Max(Strike - StockPrice, 0);
             return;
@@ -928,23 +876,67 @@ public class HestonCalculator
         var complexity = sigma / System.Math.Max(0.01, System.Math.Sqrt(System.Math.Max(0.0001, T)));
         return (int)System.Math.Max(200, System.Math.Min(1500, 250 + complexity * 350));
     }
+
+    private void EnforcePutCallParity()
+    {
+        if (ExpiryTime <= 1e-6f) return;
+        float r = RiskFreeInterestRate;
+        float T = ExpiryTime;
+        float discount = MathF.Exp(-r * T);
+        float targetDiff = StockPrice - Strike * discount; // C - P
+        float diff = CallValue - PutValue;
+        if (MathF.Abs(diff - targetDiff) <= 1e-4f) return;
+
+        // Updated European bounds
+        float callLower = MathF.Max(StockPrice - Strike * discount, 0f);
+        float callUpper = StockPrice;
+        float putLower = MathF.Max(Strike * discount - StockPrice, 0f);
+        float putUpper = Strike * discount;
+
+        // Favor reducing put instead of inflating deep OTM call
+        float desiredPut = CallValue - targetDiff; // from parity
+        if (desiredPut >= putLower - 1e-5f && desiredPut <= putUpper + 1e-5f)
+        {
+            PutValue = MathF.Min(putUpper, MathF.Max(putLower, desiredPut));
+            return;
+        }
+        float desiredCall = PutValue + targetDiff;
+        if (desiredCall >= callLower - 1e-5f && desiredCall <= callUpper + 1e-5f)
+        {
+            CallValue = MathF.Min(callUpper, MathF.Max(callLower, desiredCall));
+            return;
+        }
+        float minDiff = callLower - putUpper;
+        float maxDiff = callUpper - putLower;
+        float feasibleDiff = MathF.Max(minDiff, MathF.Min(maxDiff, targetDiff));
+        // Keep put within bounds first (helps deep OTM calls stay tiny)
+        PutValue = MathF.Min(putUpper, MathF.Max(putLower, PutValue));
+        CallValue = PutValue + feasibleDiff;
+        if (CallValue < callLower)
+        {
+            CallValue = callLower;
+            PutValue = CallValue - feasibleDiff;
+        }
+        else if (CallValue > callUpper)
+        {
+            CallValue = callUpper;
+            PutValue = CallValue - feasibleDiff;
+        }
+        PutValue = MathF.Min(putUpper, MathF.Max(putLower, PutValue));
+    }
 }
 
-/// <summary>
-/// Integration methods for Heston characteristic function evaluation
-/// </summary>
+// Move enum inside namespace so using AppCore.Options resolves it
 public enum HestonIntegrationMethod
 {
     /// <summary>
     /// Adaptive integration with optimal quadrature points
     /// </summary>
     Adaptive,
-    
     /// <summary>
     /// Fixed integration with standard number of points
     /// </summary>
     Fixed,
-    
     /// <summary>
     /// Fallback to approximation method
     /// </summary>
