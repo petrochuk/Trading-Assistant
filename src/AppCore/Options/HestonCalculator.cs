@@ -88,48 +88,6 @@ public class HestonCalculator
     /// </summary>
     public HestonIntegrationMethod IntegrationMethod { get; set; } = HestonIntegrationMethod.Approximation;
 
-    // Enhanced properties for jump-diffusion and skewness modeling
-
-    /// <summary>
-    /// Enable jump-diffusion component for better modeling of fat tails and skewness
-    /// </summary>
-    public bool EnableJumpDiffusion { get; set; } = false;
-
-    /// <summary>
-    /// Jump intensity (lambda) - frequency of jumps per year
-    /// Higher values model more frequent extreme moves
-    /// </summary>
-    public float JumpIntensity { get; set; } = 0.5f;
-
-    /// <summary>
-    /// Mean jump size (typically negative for downside skew)
-    /// Negative values create downside skew, positive for upside bias
-    /// </summary>
-    public float MeanJumpSize { get; set; } = -0.03f;
-
-    /// <summary>
-    /// Jump size volatility - controls fat-tail thickness
-    /// Higher values create fatter tails and more leptokurtic distributions
-    /// </summary>
-    public float JumpVolatility { get; set; } = 0.15f;
-
-    /// <summary>
-    /// Asymmetry parameter for modeling left/right tail differences
-    /// Negative values enhance left-tail thickness (downside crashes)
-    /// </summary>
-    public float TailAsymmetry { get; set; } = -0.3f;
-
-    /// <summary>
-    /// Kurtosis enhancement factor for modeling leptokurtic distributions
-    /// Values > 0 increase tail thickness beyond normal jump-diffusion
-    /// </summary>
-    public float KurtosisEnhancement { get; set; } = 0.1f;
-
-    /// <summary>
-    /// Model type selection for different distribution characteristics
-    /// </summary>
-    public SkewKurtosisModel ModelType { get; set; } = SkewKurtosisModel.StandardHeston;
-
     // Existing properties
     /// <summary>
     /// Delta for Call options
@@ -215,178 +173,6 @@ public class HestonCalculator
     #region Heston Model Private Methods
 
     /// <summary>
-    /// Calculate option prices using enhanced model based on distribution characteristics
-    /// </summary>
-    private void CalculateEnhancedModel()
-    {
-        switch (ModelType)
-        {
-            case SkewKurtosisModel.JumpDiffusionHeston:
-                CalculateJumpDiffusionHeston();
-                break;
-            case SkewKurtosisModel.StandardHeston:
-            default:
-                CalculateHestonCharacteristicFunction();
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Jump-Diffusion Heston (Bates model) for fat tails and skewness
-    /// Optimal for distributions with strong downside skew and excess kurtosis
-    /// </summary>
-    private void CalculateJumpDiffusionHeston()
-    {
-        if (ExpiryTime <= 1e-6f)
-        {
-            CallValue = MathF.Max(StockPrice - Strike, 0);
-            PutValue = MathF.Max(Strike - StockPrice, 0);
-            return;
-        }
-
-        // Start with base Heston calculation
-        CalculateHestonCharacteristicFunction();
-        
-        float baseCall = CallValue;
-        float basePut = PutValue;
-
-        if (!EnableJumpDiffusion || JumpIntensity <= 0)
-        {
-            return; // Use pure Heston if jumps disabled
-        }
-
-        // Add jump component using Poisson-compound process
-        float jumpAdjustment = CalculateJumpComponent();
-        
-        // Apply asymmetric adjustment for skewness
-        float skewAdjustment = CalculateSkewnessAdjustment();
-        
-        // Apply kurtosis enhancement for fat tails
-        float kurtosisAdjustment = CalculateKurtosisAdjustment();
-        
-        // Combine adjustments with proper risk-neutral conditions
-        float totalCallAdjustment = jumpAdjustment + skewAdjustment + kurtosisAdjustment;
-        float totalPutAdjustment = jumpAdjustment - skewAdjustment + kurtosisAdjustment;
-        
-        CallValue = MathF.Max(0, baseCall + totalCallAdjustment);
-        PutValue = MathF.Max(0, basePut + totalPutAdjustment);
-        
-        // Maintain put-call parity
-        EnsurePutCallParity();
-    }
-
-    /// <summary>
-    /// Calculate jump component contribution to option prices
-    /// </summary>
-    private float CalculateJumpComponent()
-    {
-        float lambda = JumpIntensity;
-        float muJ = MeanJumpSize;
-        float sigmaJ = JumpVolatility;
-        float T = ExpiryTime;
-        
-        // Expected number of jumps
-        float expectedJumps = lambda * T;
-        
-        if (expectedJumps < 0.001f) return 0f;
-        
-        // Jump impact on option value (simplified approximation)
-        float jumpVariance = expectedJumps * (muJ * muJ + sigmaJ * sigmaJ);
-        float jumpSkew = expectedJumps * muJ * (muJ * muJ + 3 * sigmaJ * sigmaJ);
-        
-        // Distance from strike
-        float moneyness = MathF.Log(StockPrice / Strike);
-        
-        // Jump contribution scales with expected jumps and proximity to strike
-        float jumpContribution = expectedJumps * muJ * StockPrice * 0.1f;
-        
-        // Add variance impact
-        jumpContribution += jumpVariance * StockPrice * 0.05f;
-        
-        // Scale by time and volatility environment
-        jumpContribution *= MathF.Sqrt(T) * CurrentVolatility;
-        
-        return jumpContribution;
-    }
-
-    /// <summary>
-    /// Calculate skewness adjustment for asymmetric distributions
-    /// </summary>
-    private float CalculateSkewnessAdjustment()
-    {
-        if (MathF.Abs(TailAsymmetry) < 0.001f) return 0f;
-        
-        float S = StockPrice;
-        float K = Strike;
-        float T = ExpiryTime;
-        
-        // Skewness effect stronger for out-of-the-money options
-        float moneyness = S / K;
-        float skewEffect = TailAsymmetry * T * S * 0.02f;
-        
-        // Asymmetric impact based on moneyness
-        if (moneyness > 1.0f) // OTM puts benefit from negative skew
-        {
-            skewEffect *= -(moneyness - 1.0f) * 2.0f;
-        }
-        else if (moneyness < 1.0f) // OTM calls affected differently
-        {
-            skewEffect *= (1.0f - moneyness) * 1.5f;
-        }
-        
-        return skewEffect;
-    }
-
-    /// <summary>
-    /// Calculate kurtosis adjustment for fat-tailed distributions
-    /// </summary>
-    private float CalculateKurtosisAdjustment()
-    {
-        if (KurtosisEnhancement <= 0) return 0f;
-        
-        float T = ExpiryTime;
-        float vol = CurrentVolatility;
-        
-        // Kurtosis increases option values due to higher probability of extreme moves
-        float kurtosisContribution = KurtosisEnhancement * T * vol * StockPrice * 0.01f;
-        
-        // Scale by distance from ATM (fat tails most important for OTM options)
-        float moneyness = StockPrice / Strike;
-        float otmFactor = MathF.Abs(moneyness - 1.0f) + 0.1f;
-        
-        return kurtosisContribution * otmFactor;
-    }
-    
-    /// <summary>
-    /// Calculate VG-specific jump premium based on nu and theta parameters
-    /// </summary>
-    private float CalculateVGJumpPremium(float nu, float theta, float T)
-    {
-        // VG jump premium scales with variance rate and time
-        // Higher nu should lead to much higher premiums
-        float basePremium = nu * nu * T * StockPrice * 0.01f; // Quadratic scaling with nu
-        
-        // Scale by absolute theta for jump direction effect
-        float thetaScale = 1.0f + MathF.Abs(theta) * 10.0f;
-        
-        return basePremium * thetaScale;
-    }
-
-    /// <summary>
-    /// Ensure put-call parity is maintained after adjustments
-    /// </summary>
-    private void EnsurePutCallParity()
-    {
-        float discountFactor = MathF.Exp(-RiskFreeInterestRate * ExpiryTime);
-        float parityCall = PutValue + StockPrice - Strike * discountFactor;
-        float parityPut = CallValue - StockPrice + Strike * discountFactor;
-        
-        // Take average to maintain parity
-        CallValue = (CallValue + MathF.Max(0, parityCall)) * 0.5f;
-        PutValue = (PutValue + MathF.Max(0, parityPut)) * 0.5f;
-    }
-
-    /// <summary>
     /// Calculate option prices using full Heston characteristic function approach
     /// with latest numerical stability improvements
     /// </summary>
@@ -406,21 +192,21 @@ public class HestonCalculator
         try
         {
             // Calculate using simplified characteristic function approach
-            float S = StockPrice;
-            float K = Strike;
-            float r = RiskFreeInterestRate;
-            float T = ExpiryTime;
-            float v0 = CurrentVolatility * CurrentVolatility;
-            float theta = LongTermVolatility * LongTermVolatility;
-            float kappa = VolatilityMeanReversion;
-            float sigma = VolatilityOfVolatility;
-            float rho = Correlation;
+            double S = StockPrice;
+            double K = Strike;
+            double r = RiskFreeInterestRate;
+            double T = ExpiryTime;
+            double v0 = CurrentVolatility * CurrentVolatility;
+            double theta = LongTermVolatility * LongTermVolatility;
+            double kappa = VolatilityMeanReversion;
+            double sigma = VolatilityOfVolatility;
+            double rho = Correlation;
 
             // Use improved integration method
             var (p1, p2) = CalculateHestonProbabilities(S, K, r, T, v0, theta, kappa, sigma, rho);
 
             // Calculate option values using probabilities
-            float discountFactor = MathF.Exp(-r * T);
+            var discountFactor = System.Math.Exp(-r * T);
             CallValue = (float)(S * p1 - K * discountFactor * p2);
             PutValue = (float)(K * discountFactor * (1 - p2) - S * (1 - p1));
 
@@ -462,13 +248,13 @@ public class HestonCalculator
     /// Calculate the two probabilities P1 and P2 needed for Heston option pricing
     /// Using simplified but stable integration approach
     /// </summary>
-    private (float p1, float p2) CalculateHestonProbabilities(float S, float K, float r, float T, 
-        float v0, float theta, float kappa, float sigma, float rho)
+    private (double p1, double p2) CalculateHestonProbabilities(double S, double K, double r, double T,
+        double v0, double theta, double kappa, double sigma, double rho)
     {
-        float lnS = MathF.Log(S);
-        float lnK = MathF.Log(K);
-        float upperBound = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
-            DetermineIntegrationBounds(T, sigma) : 100.0f;
+        var lnS = System.Math.Log(S);
+        var lnK = System.Math.Log(K);
+        var upperBound = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
+            DetermineIntegrationBounds(T, sigma) : 100.0;
         Complex phiMinusI = EvaluateCharacteristicFunction(-Complex.ImaginaryOne, lnS, r, T, v0, theta, kappa, sigma, rho);
         if (phiMinusI == Complex.Zero) phiMinusI = Complex.One;
         double integralP1 = IntegrateProbability(lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, upperBound, isP1: true);
@@ -480,9 +266,9 @@ public class HestonCalculator
         return ((float)p1, (float)p2);
     }
 
-    private double IntegrateProbability(float lnS, float lnK, float r, float T,
-        float v0, float theta, float kappa, float sigma, float rho, Complex phiMinusI,
-        float upperBound, bool isP1)
+    private double IntegrateProbability(double lnS, double lnK, double r, double T,
+        double v0, double theta, double kappa, double sigma, double rho, Complex phiMinusI,
+        double upperBound, bool isP1)
     {
         int numPoints = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
             DetermineOptimalQuadraturePoints(T, sigma) : 500;
@@ -499,8 +285,8 @@ public class HestonCalculator
         return integral * du;
     }
 
-    private double ProbabilityIntegrand(double u, float lnS, float lnK, float r, float T,
-        float v0, float theta, float kappa, float sigma, float rho, Complex phiMinusI, bool isP1)
+    private double ProbabilityIntegrand(double u, double lnS, double lnK, double r, double T,
+        double v0, double theta, double kappa, double sigma, double rho, Complex phiMinusI, bool isP1)
     {
         if (u == 0.0) return 0.0; // integrand tends to 0
         try
@@ -607,67 +393,7 @@ public class HestonCalculator
             return;
         }
 
-        // Enhanced model selection for different distribution characteristics
-        if (ModelType != SkewKurtosisModel.StandardHeston || EnableJumpDiffusion)
-        {
-            CalculateEnhancedModel();
-        }
-        else
-        {
-            // Always use characteristic function path now (Approximation enum treated as CF)
-            CalculateHestonCharacteristicFunction();
-        }
-        
-        // Final safety check: ensure fundamental option properties
-        EnsureFundamentalOptionProperties();
-    }
-    
-    /// <summary>
-    /// Ensure fundamental option properties are preserved
-    /// </summary>
-    private void EnsureFundamentalOptionProperties()
-    {
-        // Ensure non-negative values
-        CallValue = MathF.Max(0, CallValue);
-        PutValue = MathF.Max(0, PutValue);
-        
-        // Ensure intrinsic value bounds
-        float intrinsicCall = MathF.Max(0, StockPrice - Strike);
-        float intrinsicPut = MathF.Max(0, Strike - StockPrice);
-        
-        CallValue = MathF.Max(CallValue, intrinsicCall);
-        PutValue = MathF.Max(PutValue, intrinsicPut);
-        
-        // Ensure no-arbitrage upper bounds
-        float discountFactor = MathF.Exp(-RiskFreeInterestRate * ExpiryTime);
-        CallValue = MathF.Min(CallValue, StockPrice);
-        PutValue = MathF.Min(PutValue, Strike * discountFactor);
-        
-        // Additional conservative clipping for extreme short-dated regimes (prevents pathological inputs)
-        if (ExpiryTime < 7.0f / 365.0f && VolatilityOfVolatility > 0.8f && MathF.Abs(Correlation) > 0.9f)
-        {
-            float moneyness = StockPrice / Strike;
-            if (moneyness > 1.01f)
-            {
-                float maxReasonablePut = intrinsicPut + Strike * 0.0005f * ExpiryTime * 365.0f;
-                if (PutValue > maxReasonablePut)
-                {
-                    PutValue = maxReasonablePut;
-                    CallValue = PutValue + StockPrice - Strike * discountFactor; // parity
-                    CallValue = MathF.Max(intrinsicCall, MathF.Min(CallValue, StockPrice));
-                }
-            }
-            else if (moneyness < 0.99f)
-            {
-                float maxReasonableCall = intrinsicCall + StockPrice * 0.0005f * ExpiryTime * 365.0f;
-                if (CallValue > maxReasonableCall)
-                {
-                    CallValue = maxReasonableCall;
-                    PutValue = CallValue - StockPrice + Strike * discountFactor; // parity
-                    PutValue = MathF.Max(intrinsicPut, MathF.Min(PutValue, Strike * discountFactor));
-                }
-            }
-        }
+        CalculateHestonCharacteristicFunction();
     }
 
     /// <summary>
@@ -1174,17 +900,17 @@ public class HestonCalculator
     #endregion
 
     // Local helpers (in case earlier versions removed / reorganized)
-    private float DetermineIntegrationBounds(float T, float sigma)
+    private double DetermineIntegrationBounds(double T, double sigma)
     {
-        float baseBound = 50.0f;
-        float adjustment = MathF.Max(1.0f, sigma * MathF.Sqrt(MathF.Max(0.0001f, T)) * 5.0f);
-        return MathF.Min(baseBound * adjustment, 200.0f);
+        var baseBound = 50.0f;
+        var adjustment = System.Math.Max(1.0, sigma * System.Math.Sqrt(System.Math.Max(0.0001, T)) * 5.0);
+        return System.Math.Min(baseBound * adjustment, 200.0);
     }
 
-    private int DetermineOptimalQuadraturePoints(float T, float sigma)
+    private int DetermineOptimalQuadraturePoints(double T, double sigma)
     {
-        float complexity = sigma / MathF.Max(0.01f, MathF.Sqrt(MathF.Max(0.0001f, T)));
-        return (int)MathF.Max(200, MathF.Min(1500, 250 + complexity * 350));
+        var complexity = sigma / System.Math.Max(0.01, System.Math.Sqrt(System.Math.Max(0.0001, T)));
+        return (int)System.Math.Max(200, System.Math.Min(1500, 250 + complexity * 350));
     }
 }
 
@@ -1207,23 +933,4 @@ public enum HestonIntegrationMethod
     /// Fallback to approximation method
     /// </summary>
     Approximation
-}
-
-/// <summary>
-/// Model types for handling different distribution characteristics
-/// </summary>
-public enum SkewKurtosisModel
-{
-    /// <summary>
-    /// Standard Heston stochastic volatility model
-    /// Good for moderate skewness and kurtosis
-    /// </summary>
-    StandardHeston,
-    
-    /// <summary>
-    /// Jump-Diffusion Heston (Bates model)
-    /// Optimal for distributions with fat tails and strong skewness
-    /// Handles discrete jumps and crash scenarios
-    /// </summary>
-    JumpDiffusionHeston
 }
