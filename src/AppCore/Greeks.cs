@@ -1,9 +1,10 @@
-﻿using System.Diagnostics;
+﻿using AppCore.Models;
+using System.Diagnostics;
 
 namespace AppCore;
 
 [DebuggerDisplay("d:{DeltaHeston}, g:{Gamma}, t:{ThetaHeston}, v:{Vega}, vn:{Vanna}, c:{Charm}")]
-public struct Greeks
+public class Greeks
 {
     public float DeltaBLS;
     public float DeltaHeston;
@@ -16,4 +17,6 @@ public struct Greeks
     public float Vega;
     public float Vanna;
     public float Charm;
+
+    public SortedList<float, Position> OvervaluedPositions = new();
 }

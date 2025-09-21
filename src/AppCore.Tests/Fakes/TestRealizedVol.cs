@@ -18,4 +18,8 @@ public class TestRealizedVol : IRealizedVolatility
         value = TestValue;
         return true;
     }
+
+    public bool TryGetVolatilityOfVolatility(out double value) {
+        throw new NotImplementedException();
+    }
 }

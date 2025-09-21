@@ -111,15 +111,15 @@ public sealed partial class RiskGraph : UserControl
             }
         }
 
-        DeltaHestonText.Text = $"{greeks.Value.DeltaHeston:N2}";
+        DeltaHestonText.Text = $"{greeks.DeltaHeston:N2}";
 
-        DeltaBlSText.Text = $"{greeks.Value.DeltaBLS:N2}";
-        GammaText.Text = $"{greeks.Value.Gamma:N4}";
-        CharmText.Text = $"{greeks.Value.Charm:N2}";
-        VannaText.Text = $"{greeks.Value.Vanna:N2}";
+        DeltaBlSText.Text = $"{greeks.DeltaBLS:N2}";
+        GammaText.Text = $"{greeks.Gamma:N4}";
+        CharmText.Text = $"{greeks.Charm:N2}";
+        VannaText.Text = $"{greeks.Vanna:N2}";
         if (Account != null && Account.NetLiquidationValue != 0) {
-            VegaText.Text = $"{greeks.Value.Vega / Account.NetLiquidationValue:P2}";
-            ThetaText.Text = $"{greeks.Value.ThetaBLS / Account.NetLiquidationValue:P2}";
+            VegaText.Text = $"{greeks.Vega / Account.NetLiquidationValue:P2}";
+            ThetaText.Text = $"{greeks.ThetaBLS / Account.NetLiquidationValue:P2}";
         }
     }
 

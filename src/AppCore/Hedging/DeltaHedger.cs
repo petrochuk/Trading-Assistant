@@ -96,20 +96,31 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         try
         {
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
+            if (_underlyingPosition.RealizedVol != null &&  _underlyingPosition.RealizedVol.TryGetVolatilityOfVolatility(out var volOfVol))
+                _logger.LogDebug($"Realized Vol: {_underlyingPosition.RealizedVol:f4}, Vol of Vol: {volOfVol:f4} for {_underlyingPosition.Symbol}");
+            else
+                _logger.LogDebug($"Realized Vol: {_underlyingPosition.RealizedVol:f4}, Vol of Vol: N/A for {_underlyingPosition.Symbol}");
 
-            var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition);
-            if (greeks == null || float.IsNaN(greeks.Value.DeltaHeston) || float.IsNaN(greeks.Value.Charm)) {
+            var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, addOvervaluedOptions: true);
+            if (greeks == null || float.IsNaN(greeks.DeltaHeston) || float.IsNaN(greeks.Charm)) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
 
-            var deltaPlus1 = greeks.Value.DeltaHeston;
+            // Output overvalued options in reverse order
+            if (greeks.OvervaluedPositions != null && greeks.OvervaluedPositions.Count > 0) {
+                foreach (var option in greeks.OvervaluedPositions) {
+                    _logger.LogInformation($"  {option.Key} o: {option.Value}");
+                }
+            }
+
+            var deltaPlus1 = greeks.DeltaHeston;
             if (MathF.Abs(deltaPlus1) < _configuration.Delta + _configuration.MinDeltaAdjustment) {
-                _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.DeltaHeston:f3}, Charm: {greeks.Value.Charm:f3}. No hedging required.");
+                _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. No hedging required.");
                 return;
             }
 
-            _logger.LogInformation($"Delta+1: Abs({deltaPlus1:f3}) exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.Value.DeltaHeston:f3}, Charm: {greeks.Value.Charm:f3}. Executing hedge.");
+            _logger.LogInformation($"Delta+1: Abs({deltaPlus1:f3}) exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. Executing hedge.");
 
             // Round delta down to 0 in whole numbers
             var deltaHedgeSize = 0 < deltaPlus1 ? MathF.Ceiling(_configuration.Delta - deltaPlus1) : MathF.Floor(-_configuration.Delta - deltaPlus1);

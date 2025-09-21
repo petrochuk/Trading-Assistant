@@ -179,7 +179,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
     }
 
-    public Greeks? CalculateGreeks(float minIV = 0, UnderlyingPosition? underlyingPosition = null, bool useRealizedVol = true) {
+    public Greeks? CalculateGreeks(float minIV = 0, UnderlyingPosition? underlyingPosition = null, bool useRealizedVol = true, bool addOvervaluedOptions = false) {
         if (underlyingPosition == null) {
             if (_selectedPosition == null) {
                 return null;
@@ -281,25 +281,31 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     vg.CalculateAll();
 
                     // Calculate cheapness/richness
-                    if (position.Contract.IsCall) {
-                        if (position.Size > 0) {
-                            if (vg.CallValue < position.Contract.MarketPrice.Value)
-                                _logger.LogWarning($"Long call position {position.Contract} is overpriced: market {position.Contract.MarketPrice.Value} > model {vg.CallValue}");
+                    if (addOvervaluedOptions) { 
+                        if (position.Contract.IsCall) {
+                            if (position.Size > 0) {
+                                if (vg.CallValue < position.Contract.MarketPrice.Value) {
+                                    greeks.OvervaluedPositions.Add(position.Contract.MarketPrice.Value - vg.CallValue, position);
+                                }
+                            }
+                            else {
+                                if (vg.CallValue > position.Contract.MarketPrice.Value) {
+                                    greeks.OvervaluedPositions.Add(vg.CallValue - position.Contract.MarketPrice.Value, position);
+                                }
+                            }
                         }
                         else {
-                            if (vg.CallValue > position.Contract.MarketPrice.Value)
-                                _logger.LogWarning($"Short call position {position.Contract} is underpriced: market {position.Contract.MarketPrice.Value} < model {vg.CallValue}");
-                        }
-                    }
-                    else {
-                        if (position.Size > 0) {
-                            if (vg.PutValue < position.Contract.MarketPrice.Value)
-                                _logger.LogWarning($"Long put position {position.Contract} is overpriced: market {position.Contract.MarketPrice.Value} > model {vg.PutValue}");
-                        }
-                        else {
-                            if (vg.PutValue > position.Contract.MarketPrice.Value)
-                                _logger.LogWarning($"Short put position {position.Contract} is underpriced: market {position.Contract.MarketPrice.Value} < model {vg.PutValue}");
-                        }
+                            if (position.Size > 0) {
+                                if (vg.PutValue < position.Contract.MarketPrice.Value) {
+                                    greeks.OvervaluedPositions.Add(position.Contract.MarketPrice.Value - vg.PutValue, position);
+                                }
+                            }
+                            else {
+                                if (vg.PutValue > position.Contract.MarketPrice.Value) {
+                                    greeks.OvervaluedPositions.Add(vg.PutValue - position.Contract.MarketPrice.Value, position);
+                                }
+                            }
+                        }                    
                     }
 
                     var charm = (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut);
