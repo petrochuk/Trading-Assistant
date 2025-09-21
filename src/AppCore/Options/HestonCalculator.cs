@@ -535,40 +535,11 @@ public class HestonCalculator
     }
 
     /// <summary>
-    /// Calculate optimal bump size for finite difference delta based on option characteristics
-    /// </summary>
-    private float CalculateOptimalBumpSize()
-    {
-        float baseBump = 1.0f;
-        
-        if (ExpiryTime < 7.0f / 365.0f)
-        {
-            baseBump = MathF.Max(0.01f, StockPrice * 0.0001f);
-        }
-        else if (ExpiryTime < 30.0f / 365.0f)
-        {
-            baseBump = MathF.Max(0.1f, StockPrice * 0.0005f);
-        }
-        
-        if (StockPrice > 1000.0f)
-        {
-            baseBump = MathF.Max(baseBump, StockPrice * 0.0001f);
-        }
-        return baseBump;
-    }
-
-    /// <summary>
     /// Calculate delta using finite difference method with analytical fallbacks
     /// </summary>
     private void CalculateDelta()
     {
         float originalPrice = StockPrice;
-
-        if (ExpiryTime < 0.01f / 365.0f)
-        {
-            CalculateDeltaAnalytical();
-            return;
-        }
 
         float moneyness = StockPrice / Strike;
         if (moneyness > 100.0f)
@@ -584,7 +555,8 @@ public class HestonCalculator
             return;
         }
 
-        float deltaBump = CalculateOptimalBumpSize();
+        // Simple relative bump (removed heuristic method)
+        float deltaBump = MathF.Max(0.01f, 0.001f * StockPrice);
 
         StockPrice = originalPrice + deltaBump;
         CalculateCallPut();
@@ -602,7 +574,7 @@ public class HestonCalculator
         if (float.IsNaN(DeltaCall) || float.IsInfinity(DeltaCall) ||
             float.IsNaN(DeltaPut) || float.IsInfinity(DeltaPut))
         {
-            CalculateDeltaAnalytical();
+            CalculateDeltaFallbackBlackScholes();
             StockPrice = originalPrice;
             CalculateCallPut();
             return;
@@ -612,7 +584,7 @@ public class HestonCalculator
         float putPriceDiff = MathF.Abs(putUp - putDown);
         if (callPriceDiff < 0.001f || putPriceDiff < 0.001f)
         {
-            CalculateDeltaAnalytical();
+            CalculateDeltaFallbackBlackScholes();
             StockPrice = originalPrice;
             CalculateCallPut();
             return;
@@ -620,7 +592,7 @@ public class HestonCalculator
 
         if (DeltaCall > 1.5f || DeltaCall < -0.5f || DeltaPut > 0.5f || DeltaPut < -1.5f)
         {
-            CalculateDeltaAnalytical();
+            CalculateDeltaFallbackBlackScholes();
             StockPrice = originalPrice;
             CalculateCallPut();
             return;
@@ -629,7 +601,7 @@ public class HestonCalculator
         float combinedDelta = DeltaCall - DeltaPut;
         if (MathF.Abs(combinedDelta - 1.0f) > 0.15f)
         {
-            CalculateDeltaAnalytical();
+            CalculateDeltaFallbackBlackScholes();
             StockPrice = originalPrice;
             CalculateCallPut();
             return;
@@ -656,9 +628,9 @@ public class HestonCalculator
     }
 
     /// <summary>
-    /// Analytical delta approximation (Black-Scholes with effective variance)
+    /// Fallback Black-Scholes style delta using heuristic effective variance (not true Heston analytic delta)
     /// </summary>
-    private void CalculateDeltaAnalytical()
+    private void CalculateDeltaFallbackBlackScholes()
     {        
         float effectiveVol = MathF.Sqrt(CalculateEffectiveVariance());
         
