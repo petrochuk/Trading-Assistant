@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using AppCore.Options;
+using System.Text;
 
 namespace Simulation
 {
@@ -19,6 +20,9 @@ namespace Simulation
                 {
                     case "--calibrate":
                         await RunCalibrationAsync();
+                        return;
+                    case "--gamma-fit":
+                        await RunGammaFitAsync();
                         return;
                     case "--help":
                         ShowHelp();
@@ -51,6 +55,19 @@ namespace Simulation
             Console.WriteLine();
             Console.WriteLine("Calibration completed. Press any key to exit...");
             Console.ReadKey();
+        }
+
+        private static async Task RunGammaFitAsync() {
+            Console.WriteLine("Starting Heston Model Gamma Fit...");
+            Console.WriteLine("This will fit the gamma of the Heston model to market data.");
+            Console.WriteLine();
+            try {
+                var gammaFitter = new VarianceGammaFitter();
+                await gammaFitter.RunGammaFitAsync(@"spx_d.csv");
+            }
+            catch (Exception ex) {
+                Console.WriteLine($"Error during gamma fit: {ex.Message}");
+            }
         }
 
         private static void ShowHelp()
