@@ -260,7 +260,7 @@ public static class TimeExtensions
     public static float BusinessDaysTo(this DateTimeOffset fromDate, DateTimeOffset toDate) {
         if (toDate < fromDate)
             throw new ArgumentOutOfRangeException($"fromDate {fromDate} should be before toDate {toDate}");
-        if (fromDate.Offset != toDate.Offset)
+        if (1 < System.Math.Abs(fromDate.Offset.TotalHours - toDate.Offset.TotalHours))
             throw new ArgumentOutOfRangeException($"fromDate {fromDate} and toDate {toDate} should have the same offset");
 
         if (fromDate == toDate)

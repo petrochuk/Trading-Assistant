@@ -1,4 +1,5 @@
-﻿using AppCore.Models;
+﻿using AppCore.Collections;
+using AppCore.Models;
 using System.Diagnostics;
 
 namespace AppCore;
@@ -18,5 +19,5 @@ public class Greeks
     public float Vanna;
     public float Charm;
 
-    public SortedList<float, Position> OvervaluedPositions = new();
+    public SortedList<float, Position> OvervaluedPositions = new(new DuplicateKeyComparer<float>());
 }
