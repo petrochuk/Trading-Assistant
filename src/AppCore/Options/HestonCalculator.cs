@@ -88,7 +88,32 @@ public class HestonCalculator
     /// </summary>
     public HestonIntegrationMethod IntegrationMethod { get; set; } = HestonIntegrationMethod.Approximation;
 
-    // Existing properties
+    // Tail-risk / numerical control toggles (new)
+    /// <summary>
+    /// If true (default false), enforce Feller condition by capping sigma. Disabling preserves tail vol-of-vol.
+    /// </summary>
+    public bool EnforceFellerByCappingSigma { get; set; } = false;
+    /// <summary>
+    /// Fixed integration upper bound for non-adaptive methods (in Fourier space). Default widened from 100 -> 200.
+    /// </summary>
+    public double FixedIntegrationUpperBound { get; set; } = 200.0;
+    /// <summary>
+    /// Number of integration points for fixed/approximation methods (increased for better tail capture).
+    /// </summary>
+    public int FixedIntegrationPoints { get; set; } = 800;
+    /// <summary>
+    /// Multiplier applied to adaptive upper bound determination (default 2x) to improve tail mass integration.
+    /// </summary>
+    public double AdaptiveUpperBoundMultiplier { get; set; } = 2.0;
+    /// <summary>
+    /// Use full symmetric trapezoid rule including u=0 (default true) instead of previous partial weighting.
+    /// </summary>
+    public bool UseFullTrapezoidWeights { get; set; } = true;
+    /// <summary>
+    /// Enable legacy strike variance adjustment that reduced effective variance for OTM puts (disabled by default to avoid tail suppression).
+    /// </summary>
+    public bool EnableStrikeVarianceAdjustment { get; set; } = false;
+
     /// <summary>
     /// Delta for Call options
     /// </summary>
@@ -249,8 +274,8 @@ public class HestonCalculator
     {
         var lnS = System.Math.Log(S);
         var lnK = System.Math.Log(K);
-        var upperBound = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
-            DetermineIntegrationBounds(T, sigma) : 100.0;
+        double upperBound = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
+            DetermineIntegrationBounds(T, sigma) : FixedIntegrationUpperBound;
         Complex phiMinusI = EvaluateCharacteristicFunction(-Complex.ImaginaryOne, lnS, r, T, v0, theta, kappa, sigma, rho);
         if (phiMinusI == Complex.Zero) phiMinusI = Complex.One;
         double integralP1 = IntegrateProbability(lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, upperBound, isP1: true);
@@ -267,16 +292,34 @@ public class HestonCalculator
         double upperBound, bool isP1)
     {
         int numPoints = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
-            DetermineOptimalQuadraturePoints(T, sigma) : 500;
+            DetermineOptimalQuadraturePoints(T, sigma) : FixedIntegrationPoints;
+        if (numPoints < 50) numPoints = 50;
         double integral = 0.0;
         double du = upperBound / numPoints;
-        for (int i = 1; i <= numPoints; i++)
+
+        // Full trapezoid weights (include u=0) improves low-frequency contribution and tail accuracy.
+        if (UseFullTrapezoidWeights)
         {
-            double u = i * du;
-            double weight = (i == numPoints) ? 0.5 : 1.0;
-            var integrandVal = ProbabilityIntegrand(u, lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, isP1);
-            if (!double.IsNaN(integrandVal) && !double.IsInfinity(integrandVal))
-                integral += weight * integrandVal;
+            for (int i = 0; i <= numPoints; i++)
+            {
+                double u = i * du;
+                double weight = (i == 0 || i == numPoints) ? 0.5 : 1.0;
+                var integrandVal = ProbabilityIntegrand(u, lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, isP1);
+                if (!double.IsNaN(integrandVal) && !double.IsInfinity(integrandVal))
+                    integral += weight * integrandVal;
+            }
+        }
+        else
+        {
+            // Legacy behaviour (skipping u=0)
+            for (int i = 1; i <= numPoints; i++)
+            {
+                double u = i * du;
+                double weight = (i == numPoints) ? 0.5 : 1.0;
+                var integrandVal = ProbabilityIntegrand(u, lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, isP1);
+                if (!double.IsNaN(integrandVal) && !double.IsInfinity(integrandVal))
+                    integral += weight * integrandVal;
+            }
         }
         return integral * du;
     }
@@ -284,7 +327,7 @@ public class HestonCalculator
     private double ProbabilityIntegrand(double u, double lnS, double lnK, double r, double T,
         double v0, double theta, double kappa, double sigma, double rho, Complex phiMinusI, bool isP1)
     {
-        if (u == 0.0) return 0.0; // integrand tends to 0
+        if (u == 0.0) return 0.0; // integrand tends to 0; explicit safe value
         try
         {
             Complex iu = new Complex(u, 0.0);
@@ -303,7 +346,7 @@ public class HestonCalculator
         catch { return 0.0; }
     }
 
-    // New dedicated CF evaluator (risk-neutral) without P1/P2 specific shifts
+    // Characteristic function evaluator with relaxed negative exponent clamp (improves far OTM tails)
     private Complex EvaluateCharacteristicFunction(Complex u, double lnS, double r, double T,
         double v0, double theta, double kappa, double sigma, double rho)
     {
@@ -323,8 +366,10 @@ public class HestonCalculator
             Complex D = (alpha - d) / (sigma * sigma) * (1.0 - expNegdT) / oneMinusGExp;
             Complex drift = i * u * (lnS + r * T);
             Complex exponent = C + D * v0 + drift;
-            if (exponent.Real > 300.0) exponent = new Complex(300.0, exponent.Imaginary);
-            if (exponent.Real < -300.0) exponent = new Complex(-300.0, exponent.Imaginary);
+            // Updated clamp: allow deeper negative (down to -700) so far wings aren't artificially truncated.
+            double upperClamp = 300.0, lowerClamp = -700.0;
+            if (exponent.Real > upperClamp) exponent = new Complex(upperClamp, exponent.Imaginary);
+            if (exponent.Real < lowerClamp) exponent = new Complex(lowerClamp, exponent.Imaginary);
             return Complex.Exp(exponent);
         }
         catch { return Complex.Zero; }
@@ -332,8 +377,7 @@ public class HestonCalculator
 
     /// <summary>
     /// Validate and adjust parameters to ensure numerical stability
-    /// Applies standard bounds and enforces the classic Feller condition (2 kappa theta >= sigma^2)
-    /// by capping sigma if necessary.
+    /// Applies standard bounds; optionally enforces the classic Feller condition by capping sigma.
     /// </summary>
     private void ValidateAndAdjustParameters()
     {
@@ -342,16 +386,16 @@ public class HestonCalculator
         LongTermVolatility = MathF.Max(0.001f, LongTermVolatility);
         VolatilityMeanReversion = MathF.Max(0.001f, VolatilityMeanReversion);
         VolatilityOfVolatility = MathF.Max(0.001f, VolatilityOfVolatility);
-        
-        // Ensure correlation is within valid bounds
         Correlation = MathF.Max(-0.999f, MathF.Min(0.999f, Correlation));
-        
-        // Enforce Feller condition strictly by reducing sigma if violated
-        float thetaVar = LongTermVolatility * LongTermVolatility; // theta (variance)
-        float fellerBoundSigma = MathF.Sqrt(2.0f * VolatilityMeanReversion * thetaVar); // sqrt(2 kappa theta)
-        if (VolatilityOfVolatility > fellerBoundSigma)
+
+        if (EnforceFellerByCappingSigma)
         {
-            VolatilityOfVolatility = fellerBoundSigma * 0.999f; // slight margin inside boundary
+            float thetaVar = LongTermVolatility * LongTermVolatility; // theta (variance)
+            float fellerBoundSigma = MathF.Sqrt(2.0f * VolatilityMeanReversion * thetaVar); // sqrt(2 kappa theta)
+            if (VolatilityOfVolatility > fellerBoundSigma)
+            {
+                VolatilityOfVolatility = fellerBoundSigma * 0.999f; // slight margin inside boundary
+            }
         }
     }
 
@@ -429,7 +473,7 @@ public class HestonCalculator
         // Base variance with mean reversion
         float meanReversionTerm = kappa * T;
         float decay = (meanReversionTerm > 20) ? 0 : MathF.Exp(-meanReversionTerm);
-        
+
         float baseVariance;
         if (meanReversionTerm > 0.001f)
         {
@@ -439,20 +483,22 @@ public class HestonCalculator
         {
             baseVariance = v0; // No mean reversion
         }
-        
-        float volOfVolAdjustment = xi * xi * T / 3.0f; 
-        float secondOrderEffect = xi * xi * MathF.Sqrt(MathF.Max(0.0001f, xi)) * T * 0.08f; 
+
+        float volOfVolAdjustment = xi * xi * T / 3.0f;
+        float secondOrderEffect = xi * xi * MathF.Sqrt(MathF.Max(0.0001f, xi)) * T * 0.08f;
         float thirdOrderEffect = xi * xi * xi * T * 0.02f;
-        
-        // Apply strike-dependent adjustment for put monotonicity
-        // Lower effective variance for higher strikes (OTM puts) to help preserve monotonicity
-        float moneyness = StockPrice / Strike;
+
         float strikeAdjustment = 1.0f;
-        if (moneyness > 1.01f && !isCall) // OTM put
+        if (EnableStrikeVarianceAdjustment)
         {
-            strikeAdjustment = 1.0f - 0.05f * MathF.Min(1.0f, (moneyness - 1.0f) * 2.0f);
+            // Legacy adjustment (kept optional) that lowered variance for high strikes (OTM puts)
+            float moneyness = StockPrice / Strike;
+            if (moneyness > 1.01f && !isCall)
+            {
+                strikeAdjustment = 1.0f - 0.05f * MathF.Min(1.0f, (moneyness - 1.0f) * 2.0f);
+            }
         }
-        
+
         float effectiveVariance = (baseVariance + volOfVolAdjustment + secondOrderEffect + thirdOrderEffect) * strikeAdjustment;
         return MathF.Max(0.0001f, effectiveVariance); // Ensure minimum positive variance
     }
@@ -478,7 +524,7 @@ public class HestonCalculator
         float b = c2 * MathF.Exp(-z * z / 2.0f);
         float n = ((((b5 * t + b4) * t + b3) * t + b2) * t + b1) * t;
         n = 1.0f - b * n;
-        
+
         return z < 0.0f ? 1.0f - n : n;
     }
 
@@ -503,7 +549,6 @@ public class HestonCalculator
             return;
         }
 
-        // Simple relative bump (removed heuristic method)
         float deltaBump = MathF.Max(0.01f, 0.001f * StockPrice);
 
         StockPrice = originalPrice + deltaBump;
@@ -735,7 +780,6 @@ public class HestonCalculator
         if (marketPutPrices.Length != strikes.Length || strikes.Length != expiries.Length)
             throw new ArgumentException("Arrays must have the same length");
 
-        // Simple grid search for calibration (in practice, use more sophisticated optimization)
         float bestTheta = LongTermVolatility;
         float bestKappa = VolatilityMeanReversion;
         float bestSigma = VolatilityOfVolatility;
@@ -863,18 +907,19 @@ public class HestonCalculator
 
     #endregion
 
-    // Local helpers (in case earlier versions removed / reorganized)
+    // Local helpers
     private double DetermineIntegrationBounds(double T, double sigma)
     {
         var baseBound = 50.0f;
         var adjustment = System.Math.Max(1.0, sigma * System.Math.Sqrt(System.Math.Max(0.0001, T)) * 5.0);
-        return System.Math.Min(baseBound * adjustment, 200.0);
+        var raw = baseBound * adjustment * AdaptiveUpperBoundMultiplier;
+        return System.Math.Min(raw, 400.0); // allow larger cap for better tail capture
     }
 
     private int DetermineOptimalQuadraturePoints(double T, double sigma)
     {
         var complexity = sigma / System.Math.Max(0.01, System.Math.Sqrt(System.Math.Max(0.0001, T)));
-        return (int)System.Math.Max(200, System.Math.Min(1500, 250 + complexity * 350));
+        return (int)System.Math.Max(400, System.Math.Min(2500, 400 + complexity * 500));
     }
 
     private void EnforcePutCallParity()
@@ -887,14 +932,12 @@ public class HestonCalculator
         float diff = CallValue - PutValue;
         if (MathF.Abs(diff - targetDiff) <= 1e-4f) return;
 
-        // Updated European bounds
         float callLower = MathF.Max(StockPrice - Strike * discount, 0f);
         float callUpper = StockPrice;
         float putLower = MathF.Max(Strike * discount - StockPrice, 0f);
         float putUpper = Strike * discount;
 
-        // Favor reducing put instead of inflating deep OTM call
-        float desiredPut = CallValue - targetDiff; // from parity
+        float desiredPut = CallValue - targetDiff;
         if (desiredPut >= putLower - 1e-5f && desiredPut <= putUpper + 1e-5f)
         {
             PutValue = MathF.Min(putUpper, MathF.Max(putLower, desiredPut));
@@ -909,7 +952,6 @@ public class HestonCalculator
         float minDiff = callLower - putUpper;
         float maxDiff = callUpper - putLower;
         float feasibleDiff = MathF.Max(minDiff, MathF.Min(maxDiff, targetDiff));
-        // Keep put within bounds first (helps deep OTM calls stay tiny)
         PutValue = MathF.Min(putUpper, MathF.Max(putLower, PutValue));
         CallValue = PutValue + feasibleDiff;
         if (CallValue < callLower)
@@ -926,19 +968,9 @@ public class HestonCalculator
     }
 }
 
-// Move enum inside namespace so using AppCore.Options resolves it
 public enum HestonIntegrationMethod
 {
-    /// <summary>
-    /// Adaptive integration with optimal quadrature points
-    /// </summary>
     Adaptive,
-    /// <summary>
-    /// Fixed integration with standard number of points
-    /// </summary>
     Fixed,
-    /// <summary>
-    /// Fallback to approximation method
-    /// </summary>
     Approximation
 }

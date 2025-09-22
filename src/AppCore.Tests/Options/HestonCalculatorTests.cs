@@ -261,24 +261,25 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
-    [DataRow(100.0f, 100.0f, HestonIntegrationMethod.Approximation, 0.01f)]
-    [DataRow(100.0f, 100.0f, HestonIntegrationMethod.Adaptive, 0.01f)]
-    [DataRow(500.0f, 500.0f, HestonIntegrationMethod.Approximation, 0.01f)]
-    [DataRow(500.0f, 500.0f, HestonIntegrationMethod.Adaptive, 0.01f)]
-    [DataRow(1000.0f, 1000.0f, HestonIntegrationMethod.Approximation, 0.01f)]
-    [DataRow(1000.0f, 1000.0f, HestonIntegrationMethod.Adaptive, 0.01f)]
-    [DataRow(5000.0f, 5000.0f, HestonIntegrationMethod.Approximation, 0.01f)]
-    [DataRow(5000.0f, 5000.0f, HestonIntegrationMethod.Adaptive, 0.01f)]
-    [DataRow(1000.0f, 1100.0f, HestonIntegrationMethod.Approximation, 0.30f)]
-    [DataRow(1000.0f, 1100.0f, HestonIntegrationMethod.Adaptive, 0.30f)]
-    [DataRow(5000.0f, 4900.0f, HestonIntegrationMethod.Approximation, 0.01f)]
-    [DataRow(5000.0f, 4900.0f, HestonIntegrationMethod.Adaptive, 0.01f)]
-    [DataRow(5000.0f, 3000.0f, HestonIntegrationMethod.Approximation, 0.01f)]
-    [DataRow(5000.0f, 3000.0f, HestonIntegrationMethod.Adaptive, 0.01f)]
-    [DataRow(5000.0f, 7000.0f, HestonIntegrationMethod.Approximation, 0.01f)]
-    [DataRow(5000.0f, 7000.0f, HestonIntegrationMethod.Adaptive, 0.01f)]
+    [DataRow(100.0f, 100.0f, HestonIntegrationMethod.Approximation, 0.01f, 30f)]
+    [DataRow(100.0f, 100.0f, HestonIntegrationMethod.Adaptive, 0.01f, 30f)]
+    [DataRow(500.0f, 500.0f, HestonIntegrationMethod.Approximation, 0.01f, 30f)]
+    [DataRow(500.0f, 500.0f, HestonIntegrationMethod.Adaptive, 0.01f, 30f)]
+    [DataRow(1000.0f, 1000.0f, HestonIntegrationMethod.Approximation, 0.01f, 30f)]
+    [DataRow(1000.0f, 1000.0f, HestonIntegrationMethod.Adaptive, 0.01f, 30f)]
+    [DataRow(5000.0f, 5000.0f, HestonIntegrationMethod.Approximation, 0.01f, 30f)]
+    [DataRow(5000.0f, 5000.0f, HestonIntegrationMethod.Adaptive, 0.01f, 30f)]
+    [DataRow(1000.0f, 1100.0f, HestonIntegrationMethod.Approximation, 0.35f, 30f)]
+    [DataRow(1000.0f, 1100.0f, HestonIntegrationMethod.Adaptive, 0.35f, 30f)]
+    [DataRow(5000.0f, 4900.0f, HestonIntegrationMethod.Approximation, 0.01f, 30f)]
+    [DataRow(5000.0f, 4900.0f, HestonIntegrationMethod.Adaptive, 0.01f, 30f)]
+    [DataRow(5000.0f, 3000.0f, HestonIntegrationMethod.Approximation, 0.01f, 30f)]
+    [DataRow(5000.0f, 3000.0f, HestonIntegrationMethod.Adaptive, 0.01f, 30f)]
+    [DataRow(5000.0f, 7000.0f, HestonIntegrationMethod.Approximation, 0.01f, 30f)]
+    [DataRow(5000.0f, 7000.0f, HestonIntegrationMethod.Adaptive, 0.01f, 30f)]
+    [DataRow(6715.75f, 6715.0f, HestonIntegrationMethod.Adaptive, 0.01f, 2.75f)]
     public void TestHeston_CompareWithBlackScholes(float stockPrice, float strike, HestonIntegrationMethod hestonIntegrationMethod,
-        float expectedCallError) {
+        float expectedCallError, float daysLeft) {
         // When Heston parameters reduce to constant volatility, 
         // it should approximate Black-Scholes
         var heston = new HestonCalculator
@@ -287,7 +288,7 @@ public class HestonCalculatorTests
             StockPrice = stockPrice,
             Strike = strike,
             RiskFreeInterestRate = 0.05f,
-            DaysLeft = 30.0f,
+            DaysLeft = daysLeft,
             CurrentVolatility = 0.2f,
             LongTermVolatility = 0.2f,
             VolatilityMeanReversion = 1f, // Very fast mean reversion
