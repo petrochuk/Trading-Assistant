@@ -213,6 +213,7 @@ public class HestonCalculator
             PutValue = MathF.Max(Strike - StockPrice, 0);
             return;
         }
+
         ValidateAndAdjustParameters();
         bool needFallback = false;
         try
@@ -910,16 +911,29 @@ public class HestonCalculator
     // Local helpers
     private double DetermineIntegrationBounds(double T, double sigma)
     {
-        var baseBound = 50.0f;
-        var adjustment = System.Math.Max(1.0, sigma * System.Math.Sqrt(System.Math.Max(0.0001, T)) * 5.0);
-        var raw = baseBound * adjustment * AdaptiveUpperBoundMultiplier;
-        return System.Math.Min(raw, 400.0); // allow larger cap for better tail capture
+        // Improve short-maturity resolution: boost upper bound ~ 1/sqrt(T) (capped) so near-term ATM time value captured
+        double shortTimeBoost = 1.0;
+        if (T > 0)
+            shortTimeBoost = 1.0 + 1.0 / System.Math.Max(0.02, System.Math.Sqrt(T)); // grows as T->0, capped
+        var volAdjustment = System.Math.Max(1.0, sigma * System.Math.Sqrt(System.Math.Max(0.0001, T)) * 5.0);
+        var baseBound = 50.0;
+        var raw = baseBound * volAdjustment * shortTimeBoost * AdaptiveUpperBoundMultiplier;
+        return System.Math.Min(raw, 2000.0); // allow larger cap for better near-term capture
     }
 
     private int DetermineOptimalQuadraturePoints(double T, double sigma)
     {
-        var complexity = sigma / System.Math.Max(0.01, System.Math.Sqrt(System.Math.Max(0.0001, T)));
-        return (int)System.Math.Max(400, System.Math.Min(2500, 400 + complexity * 500));
+        // Increase density for very short maturities
+        int basePoints = 400;
+        if (T > 0)
+        {
+            double shortMaturityFactor = 1.0 + 3.0 / System.Math.Max(0.02, System.Math.Sqrt(T));
+            basePoints = (int)(basePoints * shortMaturityFactor);
+        }
+        // Additional adjustment for higher sigma (vol-of-vol)
+        double sigmaFactor = 1.0 + sigma * 10.0;
+        basePoints = (int)(basePoints * sigmaFactor);
+        return (int)System.Math.Max(400, System.Math.Min(3000, basePoints));
     }
 
     private void EnforcePutCallParity()
@@ -934,7 +948,7 @@ public class HestonCalculator
 
         float callLower = MathF.Max(StockPrice - Strike * discount, 0f);
         float callUpper = StockPrice;
-        float putLower = MathF.Max(Strike * discount - StockPrice, 0f);
+        float putLower = MathF.Max(Strike * discount - StockPrice, 0f); // (K e^{-rT} - S)+
         float putUpper = Strike * discount;
 
         float desiredPut = CallValue - targetDiff;
