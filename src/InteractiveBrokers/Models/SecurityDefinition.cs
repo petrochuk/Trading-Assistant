@@ -48,6 +48,16 @@ public class SecurityDefinition
                 _ => throw new ArgumentException($"Invalid week code: {weekCode}")
             };
         }
+        if (symbol == "MES") {
+            return weekCode switch {
+                'A' => DayOfWeek.Monday,
+                'B' => DayOfWeek.Tuesday,
+                'C' => DayOfWeek.Wednesday,
+                'D' => DayOfWeek.Thursday,
+                'X' => DayOfWeek.Friday,
+                _ => throw new ArgumentException($"Invalid week code: {weekCode}")
+            };
+        }
         else if (symbol == "ZN") {
             return weekCode switch {
                 'V' => DayOfWeek.Monday,

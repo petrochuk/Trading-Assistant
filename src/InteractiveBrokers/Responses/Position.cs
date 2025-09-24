@@ -269,7 +269,7 @@ public class Position : IPosition, IJsonOnDeserialized
                     }
                     else if (AssetClass == AssetClass.FutureOption) {
                         if (descriptionParts.Length < 5) {
-                            if (Symbol == "ES") {
+                            if (Symbol == "ES" || Symbol == "MES") {
                                 var thirdFriday = expiration.NextThirdFriday();
                                 // Add default expiration time of 9:30:00 EST
                                 var morningExpirationDate = new DateTime(thirdFriday.Year, thirdFriday.Month, thirdFriday.Day, 9, 30, 0, DateTimeKind.Unspecified);
@@ -308,6 +308,26 @@ public class Position : IPosition, IJsonOnDeserialized
                                 else
                                     throw new InvalidOperationException($"Invalid option symbol format: {optionSymbol}");
 
+                                break;
+                            case "MES":
+                                if (optionSymbol == "EX") {
+                                    expirationDate = expiration.LastBusinessDayOfMonth();
+                                    // Add default expiration time of 16:00:00 EST
+                                    expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                }
+                                else if (optionSymbol.Length == 3) {
+                                    dayCode = optionSymbol[1] == 'X' ? 'X' : optionSymbol[2];
+                                    weekNumber = dayCode == 'X' ? optionSymbol[2] - '0' : optionSymbol[1] - '0'; // Convert char to int
+                                    if (weekNumber < 1 || weekNumber > 5)
+                                        throw new InvalidOperationException($"Invalid week number in option symbol: {optionSymbol}");
+                                    expirationDate = TimeExtensions.NthDayOfMonth(expiration.Year, expiration.Month, SecurityDefinition.WeekCodeToDayOfWeek(Symbol, dayCode), weekNumber);
+                                    // Add default expiration time of 16:00:00 EST
+                                    expirationDate = new DateTime(expirationDate.Year, expirationDate.Month, expirationDate.Day, 16, 0, 0, DateTimeKind.Unspecified);
+                                    _expiration = new DateTimeOffset(expirationDate, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(expirationDate));
+                                }
+                                else
+                                    throw new InvalidOperationException($"Invalid option symbol format: {optionSymbol}");
                                 break;
                             case "ZN":
                                 if (optionSymbol == "OZN") {

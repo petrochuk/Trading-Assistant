@@ -8,6 +8,7 @@ public static class KnownContracts
     {
         // Initialize known future multipliers
         FutureMultiplier.Add("ES", 50f); // E-mini S&P 500
+        FutureMultiplier.Add("MES", 5f); // Micro E-mini S&P 500
         FutureMultiplier.Add("NQ", 20f); // E-mini NASDAQ-100
         FutureMultiplier.Add("CL", 1000f); // Crude Oil
         FutureMultiplier.Add("GC", 100f); // Gold

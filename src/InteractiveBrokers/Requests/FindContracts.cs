@@ -51,6 +51,7 @@ internal class FindContracts : Request
                 DateTimeOffset expirationTime;
                 switch (_symbol) {
                     case "ES":
+                    case "MES":
                         expirationTime = new DateTimeOffset(expirationDate.Year, expirationDate.Month, expirationDate.Day, 9, 30, 0, TimeSpan.FromHours(-4));
                         break;
                     case "ZN":

@@ -9,6 +9,7 @@ public class ExpirationCalendar
         switch (symbol)
         {
             case "ES":
+            case "MES":
                 return GetFrontMonthExpiration_ES(dateTimeOffset);
             case "ZN":
                 return GetFrontMonthExpiration_ZN(dateTimeOffset);
