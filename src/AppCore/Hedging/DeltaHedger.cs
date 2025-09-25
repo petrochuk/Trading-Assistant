@@ -41,7 +41,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         _accountId = accountId;
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _underlyingPosition = underlyingPosition ?? throw new ArgumentNullException(nameof(underlyingPosition));
-        _underlyingPosition.RealizedVol?.Reset(_configuration.MinIV);
+        _underlyingPosition.RealizedVol?.Reset(_configuration.InitialIV);
         _positions = positions ?? throw new ArgumentNullException(nameof(positions));
 
         _broker.OnOrderPlaced += Broker_OnOrderPlaced;
@@ -96,10 +96,12 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         try
         {
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
-            if (_underlyingPosition.RealizedVol != null &&  _underlyingPosition.RealizedVol.TryGetVolatilityOfVolatility(out var volOfVol))
-                _logger.LogDebug($"Realized Vol: {_underlyingPosition.RealizedVol:f4}, Vol of Vol: {volOfVol:f4} for {_underlyingPosition.Symbol}");
+            if (_underlyingPosition.RealizedVol != null &&  _underlyingPosition.RealizedVol.TryGetVolatilityOfVolatility(out var volOfVol)) {
+                _underlyingPosition.RealizedVol.TryGetValue(out var realizedVol);
+                _logger.LogDebug($"Realized Vol: {realizedVol:f4}, Vol of Vol: {volOfVol:f4} for {_underlyingPosition.Symbol}");
+            }
             else
-                _logger.LogDebug($"Realized Vol: {_underlyingPosition.RealizedVol:f4}, Vol of Vol: N/A for {_underlyingPosition.Symbol}");
+                _logger.LogDebug($"Vol of Vol: N/A for {_underlyingPosition.Symbol}");
 
             var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, addOvervaluedOptions: true);
             if (greeks == null || float.IsNaN(greeks.DeltaHeston) || float.IsNaN(greeks.Charm)) {

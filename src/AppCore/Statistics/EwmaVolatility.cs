@@ -130,7 +130,8 @@ public sealed class EwmaVolatility
 
         if (initialSubsampleVariance.HasValue)
             _variance = initialSubsampleVariance.Value;
-        _count = 0;
+
+        _count = 1;
         _lastValue = null;
     }
 }
