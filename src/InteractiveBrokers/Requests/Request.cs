@@ -33,7 +33,7 @@ internal abstract class Request
                     throw;
                 }
                 // Add a delay before retrying
-                Thread.Sleep(1000 * attempt); // Exponential backoff
+                Thread.Sleep(2000 * attempt); // Exponential backoff
             }
         }
 

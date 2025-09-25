@@ -22,7 +22,7 @@ internal class AccountPositions : Request
 
     public override void Execute(HttpClient httpClient) {
         Logger?.LogInformation($"Requesting positions for account {AccountId.Mask()}");
-        var positionsResponse = GetResponse(httpClient, Uri, SourceGeneratorContext.Default.ListPosition);
+        var positionsResponse = GetResponse(httpClient, Uri, retryCount:3, SourceGeneratorContext.Default.ListPosition);
 
         // Sometimes IB returns all positions as invalid. Ignore this case.
         var allInvalid = true;

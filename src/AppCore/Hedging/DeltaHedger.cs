@@ -106,6 +106,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
+            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta Heston: {greeks.DeltaHeston:f3}, Delta BLS: {greeks.DeltaBLS:f3},Theta: {greeks.ThetaHeston:f3}");
 
             // Output overvalued options in reverse order
             if (greeks.OvervaluedPositions != null && greeks.OvervaluedPositions.Count > 0) {
