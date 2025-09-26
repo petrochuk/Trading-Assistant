@@ -96,9 +96,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         try
         {
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
-            if (_underlyingPosition.RealizedVol != null &&  _underlyingPosition.RealizedVol.TryGetVolatilityOfVolatility(out var volOfVol)) {
-                _underlyingPosition.RealizedVol.TryGetValue(out var realizedVol);
-                _logger.LogDebug($"Realized Vol: {realizedVol:f4}, Vol of Vol: {volOfVol:f4} for {_underlyingPosition.Symbol}");
+            if (_underlyingPosition.RealizedVol != null) {
+                if (_underlyingPosition.RealizedVol.TryGetValue(out var realizedVol))
+                    _logger.LogDebug($"Realized Vol: {realizedVol:f4} for {_underlyingPosition.Symbol}");
+                if (_underlyingPosition.RealizedVol.TryGetVolatilityOfVolatility(out var volOfVol))
+                    _logger.LogDebug($"Vol of Vol: {volOfVol:f4} for {_underlyingPosition.Symbol}");
             }
             else
                 _logger.LogDebug($"Vol of Vol: N/A for {_underlyingPosition.Symbol}");

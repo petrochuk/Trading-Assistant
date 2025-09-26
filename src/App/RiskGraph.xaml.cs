@@ -119,7 +119,7 @@ public sealed partial class RiskGraph : UserControl
         VannaText.Text = $"{greeks.Vanna:N2}";
         if (Account != null && Account.NetLiquidationValue != 0) {
             VegaText.Text = $"{greeks.Vega / Account.NetLiquidationValue:P2}";
-            ThetaText.Text = $"{greeks.ThetaBLS / Account.NetLiquidationValue:P2}";
+            ThetaText.Text = $"{greeks.ThetaHeston / Account.NetLiquidationValue:P2}";
         }
     }
 
