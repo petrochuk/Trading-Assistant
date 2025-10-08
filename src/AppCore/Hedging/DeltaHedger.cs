@@ -120,12 +120,12 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             }
 
             var deltaPlus1 = greeks.DeltaHeston;
-            if (MathF.Abs(deltaPlus1) < _configuration.Delta + _configuration.MinDeltaAdjustment) {
-                _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. No hedging required.");
+            if (MathF.Abs(deltaPlus1) < _configuration.MinDeltaAdjustment) {
+                _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. No hedging required.");
                 return;
             }
 
-            _logger.LogInformation($"Delta+1: Abs({deltaPlus1:f3}) exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. Executing hedge.");
+            _logger.LogInformation($"Delta+1: Abs({deltaPlus1:f3}) exceeds threshold: {_configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. Executing hedge.");
 
             // Round delta down to 0 in whole numbers
             var deltaHedgeSize = 0 < deltaPlus1 ? MathF.Floor(_configuration.Delta - deltaPlus1) : MathF.Ceiling(-_configuration.Delta - deltaPlus1);
