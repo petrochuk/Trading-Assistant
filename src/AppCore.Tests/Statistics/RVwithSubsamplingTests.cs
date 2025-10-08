@@ -77,9 +77,9 @@ public sealed class RVwithSubsamplingTests
         Assert.AreEqual(annualVolatility, volatility, 0.02, "Volatility should be close to simulated annual volatility");
 
         Assert.IsTrue(hasVoV, "Should have volatility of volatility after enough data points");
-        Assert.IsTrue(vov > 0, "Volatility of volatility should be positive");
+        Assert.IsGreaterThan(0, vov, "Volatility of volatility should be positive");
         // For constant volatility with a longer observation window, VoV should be lower
-        Assert.IsTrue(vov < 0.1, $"Volatility of volatility should be reasonable for stable volatility. Actual: {vov:F6}");
+        Assert.IsLessThan(0.1, vov, $"Volatility of volatility should be reasonable for stable volatility. Actual: {vov:F6}");
     }
 
     [TestMethod]
@@ -113,7 +113,9 @@ public sealed class RVwithSubsamplingTests
         rvWithSubsampling.Reset(initialVolatility);
 
         // Assert
-        Assert.IsFalse(rvWithSubsampling.TryGetValue(out _), "Should not have volatility immediately after reset");
+        Assert.IsTrue(rvWithSubsampling.TryGetValue(out var subsampledVolatility), "Should have volatility immediately after reset");
+        Assert.AreEqual(initialVolatility, subsampledVolatility, 1e-6, "Initial volatility should match the set value");
+
         Assert.IsFalse(rvWithSubsampling.TryGetVolatilityOfVolatility(out _), "Should not have VoV immediately after reset");
     }
 
@@ -156,7 +158,7 @@ public sealed class RVwithSubsamplingTests
         
         if (hasVoV) // Only assert if we have enough data
         {
-            Assert.IsTrue(vov > 0, "Volatility of volatility should be positive");
+            Assert.IsGreaterThan(0, vov, "Volatility of volatility should be positive");
         }
     }
 }

@@ -128,10 +128,15 @@ public sealed class EwmaVolatility
         if (initialSubsampleVariance.HasValue && initialSubsampleVariance.Value < 0)
             throw new ArgumentOutOfRangeException(nameof(initialSubsampleVariance), "Initial variance must be non-negative.");
 
-        if (initialSubsampleVariance.HasValue)
+        if (initialSubsampleVariance.HasValue) {
             _variance = initialSubsampleVariance.Value;
+            _count = 1;
+        }
+        else {
+            _variance = null;
+            _count = 0;
+        }
 
-        _count = 1;
         _lastValue = null;
     }
 }

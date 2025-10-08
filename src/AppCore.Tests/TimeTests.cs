@@ -42,7 +42,7 @@ public class TimeTests
     public void BusinessDaysTo_DifferentOffsets_ThrowsException()
     {
         // Arrange
-        var fromDate = new DateTimeOffset(2024, 6, 10, 10, 0, 0, TimeSpan.FromHours(-5));
+        var fromDate = new DateTimeOffset(2024, 6, 10, 10, 0, 0, TimeSpan.FromHours(-8));
         var toDate = new DateTimeOffset(2024, 6, 11, 10, 0, 0, TimeSpan.FromHours(-4));
 
         // Act & Assert

@@ -10,7 +10,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNETTestSdkVersion)" />
     <PackageReference Include="MSTest" Version="$(MSTestVersion)" />
-    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.8.0" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.9.0" />
     <PackageReference Include="MathNet.Numerics.Signed" Version="5.0.0" />
   </ItemGroup>
 
