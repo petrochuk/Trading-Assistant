@@ -128,7 +128,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogInformation($"Delta+1: Abs({deltaPlus1:f3}) exceeds threshold: {_configuration.Delta + _configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. Executing hedge.");
 
             // Round delta down to 0 in whole numbers
-            var deltaHedgeSize = 0 < deltaPlus1 ? MathF.Ceiling(_configuration.Delta - deltaPlus1) : MathF.Floor(-_configuration.Delta - deltaPlus1);
+            var deltaHedgeSize = 0 < deltaPlus1 ? MathF.Floor(_configuration.Delta - deltaPlus1) : MathF.Ceiling(-_configuration.Delta - deltaPlus1);
+            if (deltaHedgeSize == 0) {
+                _logger.LogDebug($"Calculated delta hedge size is 0 after rounding for {_underlyingPosition.Symbol}. No hedging required.");
+                return;
+            }
 
             _logger.LogDebug($"Placing delta hedge size: {deltaHedgeSize} for {_underlyingPosition.Symbol}");
             // Set a delay to prevent immediate re-hedging
