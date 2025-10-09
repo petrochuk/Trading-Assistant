@@ -11,7 +11,6 @@ public class TestRealizedVol : IRealizedVolatility
     }
 
     public void Reset(double? initialValue = 0) {
-        throw new NotImplementedException();
     }
 
     public bool TryGetValue(out double value) {
@@ -20,6 +19,7 @@ public class TestRealizedVol : IRealizedVolatility
     }
 
     public bool TryGetVolatilityOfVolatility(out double value) {
-        throw new NotImplementedException();
+        value = 0;
+        return false;
     }
 }

@@ -119,18 +119,17 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                 }
             }
 
-            var deltaPlus1 = greeks.DeltaHeston;
-            if (MathF.Abs(deltaPlus1) < _configuration.MinDeltaAdjustment) {
-                _logger.LogDebug($"Delta+1 is within threshold: Abs({deltaPlus1:f3}) < {_configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. No hedging required.");
+            if (MathF.Abs(greeks.DeltaHeston) < _configuration.Delta) {
+                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({greeks.DeltaHeston:f3}) < {_configuration.Delta}. Delta: {greeks.DeltaHeston:f3}. No hedging required.");
                 return;
             }
 
-            _logger.LogInformation($"Delta+1: Abs({deltaPlus1:f3}) exceeds threshold: {_configuration.MinDeltaAdjustment}. Delta: {greeks.DeltaHeston:f3}, Charm: {greeks.Charm:f3}. Executing hedge.");
+            _logger.LogInformation($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta Abs({greeks.DeltaHeston:f3}) exceeds threshold: {_configuration.Delta}. Delta: {greeks.DeltaHeston:f3}, Executing hedge.");
 
             // Round delta down to 0 in whole numbers
-            var deltaHedgeSize = 0 < deltaPlus1 ? MathF.Floor(_configuration.Delta - deltaPlus1) : MathF.Ceiling(-_configuration.Delta - deltaPlus1);
-            if (deltaHedgeSize == 0) {
-                _logger.LogDebug($"Calculated delta hedge size is 0 after rounding for {_underlyingPosition.Symbol}. No hedging required.");
+            var deltaHedgeSize = 0 < greeks.DeltaHeston ? MathF.Floor(_configuration.Delta - greeks.DeltaHeston) : MathF.Ceiling(-_configuration.Delta - greeks.DeltaHeston);
+            if (MathF.Abs(deltaHedgeSize) < _configuration.MinDeltaAdjustment ) {
+                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta hedge adjustment {deltaHedgeSize:f3} is below minimum adjustment {_configuration.MinDeltaAdjustment}. No hedging required.");
                 return;
             }
 

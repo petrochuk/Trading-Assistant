@@ -6,5 +6,6 @@ public interface IContractFactory
 {
     Contract Create(IPosition position);
 
-    Contract Create(string symbol, AssetClass assetClass, int contractId, int? underlyingContractId = null, DateTimeOffset? expiration = null);
+    Contract Create(string symbol, AssetClass assetClass, int contractId, 
+        int? underlyingContractId = null, DateTimeOffset? expiration = null, float? strike = null, bool? isCall = null);
 }

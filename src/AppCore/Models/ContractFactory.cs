@@ -47,13 +47,16 @@ public class ContractFactory : IContractFactory
         return contract;
     }
 
-    public Contract Create(string symbol, AssetClass assetClass, int contractId, int? underlyingContractId = null, DateTimeOffset? expiration = null) {
+    public Contract Create(string symbol, AssetClass assetClass, int contractId, int? underlyingContractId = null, 
+        DateTimeOffset? expiration = null, float? strike = null, bool? isCall = null) {
         var contract = new Contract {
             Id = contractId,
             Symbol = symbol,
             AssetClass = assetClass,
             Expiration = expiration,
-            UnderlyingContractId = underlyingContractId
+            UnderlyingContractId = underlyingContractId,
+            Strike = strike ?? 0,
+            IsCall = isCall ?? false
         };
         ApplyConfiguration(contract);
         return contract;
