@@ -22,6 +22,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     private readonly UnderlyingPosition _underlyingPosition;
     private readonly PositionsCollection _positions;
     private readonly SemaphoreSlim _hedgeSemaphore = new(1, 1);
+    private readonly ISoundPlayer? _soundPlayer;
     private Guid? _activeOrderId;
     private DateTimeOffset? _hedgeDelay;
     private bool _disposed = false;
@@ -31,7 +32,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     /// </summary>
     /// <param name="configuration">The delta hedger configuration.</param>
     public DeltaHedger(ILogger<DeltaHedger> logger, TimeProvider timeProvider, IBroker broker, string accountId,
-        UnderlyingPosition underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration)
+        UnderlyingPosition underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration, ISoundPlayer? soundPlayer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -43,6 +44,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         _underlyingPosition = underlyingPosition ?? throw new ArgumentNullException(nameof(underlyingPosition));
         _underlyingPosition.RealizedVol?.Reset(_configuration.InitialIV);
         _positions = positions ?? throw new ArgumentNullException(nameof(positions));
+        _soundPlayer = soundPlayer; 
 
         _broker.OnOrderPlaced += Broker_OnOrderPlaced;
     }
@@ -92,6 +94,8 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogDebug($"Hedge order already in progress for  {_underlyingPosition.Symbol}. Skipping overlapping execution.");
             return;
         }
+
+        _soundPlayer?.PlaySound("CarAlarm");
 
         try
         {
