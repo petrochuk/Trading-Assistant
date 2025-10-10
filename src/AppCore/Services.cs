@@ -13,7 +13,8 @@ public static class IServiceCollectionExtension
             .AddTransient<IAccountFactory, AccountFactory>()
             .AddSingleton<IContractFactory, ContractFactory>()
             .AddSingleton<ExpirationCalendar>()
-            .AddTransient<IDeltaHedgerFactory, DeltaHedgerFactory>();
+            .AddTransient<IDeltaHedgerFactory, DeltaHedgerFactory>()
+            .AddSingleton<ISoundPlayer, Media.SoundPlayer>();
 
         return services;
     }
