@@ -12,17 +12,18 @@ namespace AppCore.Tests.Hedging;
 public sealed class DeltaHedgerTests
 {
     [TestMethod]
-    [DataRow(5000.0f, true, 5, -3)]
-    [DataRow(5000.0f, true, 1, -1)]
-    [DataRow(5000.0f, true, -1, 0)]
-    [DataRow(4900.0f, true, 5, -4)]
-    [DataRow(4900.0f, true, -1, 0)]
-    [DataRow(4900.0f, true, -2, 0)]
-    [DataRow(4900.0f, true, -3, 1)]
-    [DataRow(4900.0f, true, -10, 6)]
-    [DataRow(5000.0f, false, 1, 0)]
-    [DataRow(5000.0f, false, 2, 0)]
-    public void DeltaHedger_DeltaHedge(float strike, bool isCall, float optionSize, int expectedHedgeSize)
+    [DataRow(5000.0f, true, 5, 0.75f, -3)]
+    [DataRow(5000.0f, true, 1, 0.75f, -1)]
+    [DataRow(5000.0f, true, -1, 0.75f, 0)]
+    [DataRow(4900.0f, true, 5, 0.75f, -4)]
+    [DataRow(4900.0f, true, -1, 0.75f, 0)]
+    [DataRow(4900.0f, true, -2, 0.75f, 0)]
+    [DataRow(4900.0f, true, -3, 0.75f, 1)]
+    [DataRow(4900.0f, true, -10, 0.75f, 6)]
+    [DataRow(4900.0f, true, -10, 2.75f, 4)]
+    [DataRow(5000.0f, false, 1, 0.75f, 0)]
+    [DataRow(5000.0f, false, 2, 0.75f, 0)]
+    public void DeltaHedger_DeltaHedge(float strike, bool isCall, float optionSize, float delta, int expectedHedgeSize)
     {
         // Arrange
         var contractFactory = new TestContractFactory();
@@ -55,7 +56,7 @@ public sealed class DeltaHedgerTests
             Configs = new ()
             {
                 { "ES", new () { 
-                        Delta = 0.75f,
+                        Delta = delta,
                         MinDeltaAdjustment = 1f,
                     } 
                 }
