@@ -117,11 +117,13 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta Heston: {greeks.DeltaHeston:f3}, Delta BLS: {greeks.DeltaBLS:f3},Theta: {greeks.ThetaHeston:f3}");
 
             // Output overvalued options in reverse order
+            /*
             if (greeks.OvervaluedPositions != null && greeks.OvervaluedPositions.Count > 0) {
                 foreach (var option in greeks.OvervaluedPositions) {
                     _logger.LogInformation($"  {option.Key} o: {option.Value}");
                 }
             }
+            */
 
             if (MathF.Abs(greeks.DeltaHeston) < _configuration.Delta) {
                 _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({greeks.DeltaHeston:f3}) < {_configuration.Delta}. Delta: {greeks.DeltaHeston:f3}. No hedging required.");
