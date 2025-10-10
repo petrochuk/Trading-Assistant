@@ -22,9 +22,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Resources\CarAlarm.wav">
+    <Content Include="Resources\CarAlarm.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Resource>
+    </Content>
   </ItemGroup>
   
 </Project>
