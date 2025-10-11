@@ -350,7 +350,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         var currentTime = _timeProvider.EstNow();
 
         // Go through the price range and calculate the P&L for each position
-        for (var currentMove = minMove; currentMove < maxMove; currentMove += moveIncrement) {
+        for (var currentMove = minMove; currentMove <= maxMove; currentMove += moveIncrement) {
             var totalPL = CalculatePL(underlyingSymbol, currentTime, lookaheadSpan, currentMove);
 
             if (!totalPL.HasValue) {
@@ -367,6 +367,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
         var bls = new BlackNScholesCaculator();
         float totalPL = 0;
+        float positionPL = 0;
         foreach (var position in Values) {
             // Skip any positions that are not in the same underlying
             if (position.Contract.Symbol != underlyingSymbol)
@@ -377,8 +378,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 continue;
             }
 
+            positionPL = 0;
             if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
-                totalPL += position.Size * (currentMove - 1f) * position.Contract.MarketPrice.Value * position.Contract.Multiplier;
+                positionPL = position.Size * (currentMove - 1f) * position.Contract.MarketPrice.Value * position.Contract.Multiplier;
             } 
             else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
                 if (!position.TryGetUnderlying(out var underlyingContract)) {
@@ -388,26 +390,16 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
                 // Assume expired options are assigned or worthless
                 var currentPrice = underlyingContract.MarketPrice!.Value * currentMove;
-                if (position.Contract.Expiration!.Value < currentTime + lookaheadSpan) {
-                    if (position.Contract.IsCall) {
-                        if (position.Contract.Strike < currentPrice)
-                            totalPL += (currentPrice - position.Contract.Strike - position.Contract.MarketPrice.Value) * position.Size * position.Contract.Multiplier;
-                    }
-                    else {
-                        if (currentPrice < position.Contract.Strike)
-                            totalPL += (position.Contract.Strike - currentPrice - position.Contract.MarketPrice.Value) * position.Size * position.Contract.Multiplier;
-                    }
+                var optionPrice = CalculateOptionPrice(lookaheadSpan, underlyingContract.MarketPrice!.Value, currentTime, currentPrice, bls, position);
+                if (!optionPrice.HasValue) {
+                    _logger.LogWarning($"Unable to calculate option price for position {position.Contract}");
+                    return null;
                 }
-                else {
-                    var optionPrice = CalculateOptionPrice(lookaheadSpan, underlyingContract.MarketPrice!.Value, currentTime, currentPrice, bls, position);
-                    if (!optionPrice.HasValue) {
-                        _logger.LogWarning($"Unable to calculate option price for position {position.Contract}");
-                        return null;
-                    }
 
-                    totalPL += (optionPrice.Value - position.Contract.MarketPrice.Value) * position.Size * position.Contract.Multiplier;
-                }
+                positionPL = (optionPrice.Value - position.Contract.MarketPrice.Value) * position.Size * position.Contract.Multiplier;
             }
+
+            totalPL += positionPL;
         }
 
         return totalPL;
@@ -420,23 +412,25 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
         
         // Past expiration calculate realized value at mid price (market price)
-        if (position.Contract.Expiration!.Value  < currentTime + lookaheadSpan) {
+        bls.DaysLeft = currentTime.BusinessDaysTo(position.Contract.Expiration!.Value);
+        if (bls.DaysLeft <= lookaheadSpan.TotalDays) {
+            // Calculate price at expiration assuming straight line move midPrice -> currentPrice
+            var priceAtExpiration = midPrice + (currentPrice - midPrice) * ((float)bls.DaysLeft / (float)lookaheadSpan.TotalDays);
             if (position.Contract.IsCall) {
-                if (midPrice <= position.Contract.Strike)
+                if (priceAtExpiration <= position.Contract.Strike)
                     return 0;
 
-                return midPrice - position.Contract.Strike;
+                return priceAtExpiration - position.Contract.Strike;
             } 
             else {
-                if (position.Contract.Strike <= midPrice)
+                if (position.Contract.Strike <= priceAtExpiration)
                     return 0;
 
-                return position.Contract.Strike - midPrice;
+                return position.Contract.Strike - priceAtExpiration;
             }
         }
         
         float optionPrice = 0f;
-        bls.DaysLeft = currentTime.BusinessDaysTo(position.Contract.Expiration!.Value);
         bls.StockPrice = midPrice;
         bls.Strike = position.Contract.Strike;
         if (position.Contract.IsCall) {

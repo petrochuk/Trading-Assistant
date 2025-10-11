@@ -145,8 +145,8 @@ public sealed partial class RiskGraph : UserControl
         }
 
         var underlyingSymbol = Account.Positions.SelectedPosition.Symbol;
-        var minMove = 0.98f;
-        var maxMove = 1.02f;
+        var minMove = 0.97f;
+        var maxMove = 1.03f;
         var riskCurves = new Dictionary<TimeSpan, RiskCurve>();
         var maxPL = float.MinValue;
         var minPL = float.MaxValue;

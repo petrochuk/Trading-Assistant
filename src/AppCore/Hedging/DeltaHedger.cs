@@ -95,8 +95,6 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             return;
         }
 
-        _soundPlayer?.PlaySound("CarAlarm");
-
         try
         {
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
@@ -169,6 +167,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogInformation($"Delta hedge order {_activeOrderId} failed to be placed. Delay hedging");
             _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(5);
             _activeOrderId = null; // Reset active order ID
+            _soundPlayer?.PlaySound("CarAlarm");
             return;
         }
 
