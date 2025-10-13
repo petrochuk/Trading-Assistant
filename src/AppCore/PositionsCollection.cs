@@ -256,7 +256,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         VolatilityOfVolatility = underlyingContract.VolatilityOfVolatility,
                         Correlation = underlyingContract.Correlation,
                     };
-                    heston.CalculateAll();
+                    heston.CalculateAll(skipVanna: true, skipCharm: true);
 
                     var bls = new BlackNScholesCaculator() {
                         StockPrice = underlyingContract.MarketPrice.Value,

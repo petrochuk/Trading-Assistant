@@ -84,7 +84,7 @@ public class HestonCalculatorTests
         heston.CalculateCallPut();
         float otmCallValue = heston.CallValue;
 
-        Assert.IsTrue(itmCallValue > atmCallValue, "ITM call should be more valuable than ATM call");
+        Assert.IsGreaterThan(atmCallValue, itmCallValue, "ITM call should be more valuable than ATM call");
         Assert.IsTrue(atmCallValue > otmCallValue, "ATM call should be more valuable than OTM call");
     }
 
@@ -187,11 +187,9 @@ public class HestonCalculatorTests
         var posCorrPutValue = heston.PutValue;
 
         // Negative correlation should increase put values (more downside volatility)  
-        Assert.IsTrue(negCorrPutValue > noCorrPutValue, 
-            $"Negative correlation should increase put value compared to no correlation. Neg: {negCorrPutValue}, No: {noCorrPutValue}");
+        Assert.IsGreaterThan(noCorrPutValue, negCorrPutValue, $"Negative correlation should increase put value compared to no correlation. Neg: {negCorrPutValue}, No: {noCorrPutValue}");
 
-        Assert.IsTrue(posCorrPutValue < noCorrPutValue, 
-            $"Positive correlation should decrease put value compared to no correlation. Pos: {posCorrPutValue}, No: {noCorrPutValue}");
+        Assert.IsLessThan(noCorrPutValue, posCorrPutValue, $"Positive correlation should decrease put value compared to no correlation. Pos: {posCorrPutValue}, No: {noCorrPutValue}");
     }
 
     [TestMethod]
@@ -252,7 +250,7 @@ public class HestonCalculatorTests
         try
         {
             heston.CalculateAll();
-            Assert.IsTrue(heston.CallValue > 0, "Should still produce positive call value");
+            Assert.IsGreaterThan(0, heston.CallValue, "Should still produce positive call value");
         }
         catch (Exception ex)
         {
