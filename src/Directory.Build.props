@@ -7,9 +7,9 @@
   <!-- Package Versions -->
   <PropertyGroup Label="Package Versions">
     <MicrosoftNETTestSdkVersion>18.0.0</MicrosoftNETTestSdkVersion>
-    <MSTestVersion>4.0.0</MSTestVersion>
-    <MicrosoftExtensionsVersion>9.0.9</MicrosoftExtensionsVersion>
+    <MSTestVersion>4.0.1</MSTestVersion>
+    <MicrosoftExtensionsVersion>9.0.10</MicrosoftExtensionsVersion>
     <MicrosoftWindowsSDKVersion>10.0.26100.6584</MicrosoftWindowsSDKVersion>
-    <MicrosoftWindowsAppSDK>1.8.250916003</MicrosoftWindowsAppSDK>
+    <MicrosoftWindowsAppSDK>1.8.251003001</MicrosoftWindowsAppSDK>
   </PropertyGroup>
 </Project>
