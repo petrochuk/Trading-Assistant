@@ -73,8 +73,8 @@ public class HestonCalculatorLatestFeaturesTests
         float deltaCallChange = MathF.Abs(deltaCall2 - deltaCall);
         float deltaPutChange = MathF.Abs(deltaPut2 - deltaPut);
         
-        Assert.IsTrue(deltaCallChange < 0.01f, $"Call delta change should be small for short-term options, got {deltaCallChange}");
-        Assert.IsTrue(deltaPutChange < 0.01f, $"Put delta change should be small for short-term options, got {deltaPutChange}");
+        Assert.IsLessThan(0.01f, deltaCallChange, $"Call delta change should be small for short-term options, got {deltaCallChange}");
+        Assert.IsLessThan(0.01f, deltaPutChange, $"Put delta change should be small for short-term options, got {deltaPutChange}");
         
         // Verify that the delta calculation is stable (not jumping to extreme values)
         Assert.IsFalse(deltaCall2 == 1.0f && deltaPut2 == 0.0f, "Delta calculation should not jump to extreme boundary values");
@@ -105,7 +105,7 @@ public class HestonCalculatorLatestFeaturesTests
         var putValue1 = heston.PutValue;
 
         // Put value should increase with higher vol of vol
-        Assert.IsTrue(putValue1 > putValue0, $"Put value should increase with higher vol of vol, got {putValue0} -> {putValue1}");
+        Assert.IsGreaterThan(putValue0, putValue1, $"Put value should increase with higher vol of vol, got {putValue0} -> {putValue1}");
     }
 
     [TestMethod]
@@ -133,10 +133,10 @@ public class HestonCalculatorLatestFeaturesTests
         var putValue2 = heston.PutValue;
 
         // Put delta should become more negative with lower correlation
-        Assert.IsTrue(putDelta2 < putDelta, $"Put delta should become more negative with lower correlation, got {putDelta} -> {putDelta2}");
+        Assert.IsLessThan(putDelta, putDelta2, $"Put delta should become more negative with lower correlation, got {putDelta} -> {putDelta2}");
 
         // Put value should increase with lower correlation (adjusted expectation for more conservative adjustment)
-        Assert.IsTrue(putValue2 > putValue, $"Put value should increase with lower correlation, got {putValue} -> {putValue2}");
+        Assert.IsGreaterThan(putValue, putValue2, $"Put value should increase with lower correlation, got {putValue} -> {putValue2}");
     }
 
 
@@ -166,8 +166,8 @@ public class HestonCalculatorLatestFeaturesTests
         float approxPut = heston.PutValue;
 
         // Test that approximation method works
-        Assert.IsTrue(approxCall > 0, "Approximation method should produce positive call value");
-        Assert.IsTrue(approxPut > 0, "Approximation method should produce positive put value");
+        Assert.IsGreaterThan(0, approxCall, "Approximation method should produce positive call value");
+        Assert.IsGreaterThan(0, approxPut, "Approximation method should produce positive put value");
 
         // Test that IntegrationMethod property can be set
         heston.IntegrationMethod = HestonIntegrationMethod.Adaptive;
@@ -183,8 +183,8 @@ public class HestonCalculatorLatestFeaturesTests
         {
             heston.CalculateCallPut();
             // Even if it falls back to approximation, it should produce non-negative values
-            Assert.IsTrue(heston.CallValue >= 0, $"Adaptive method should produce non-negative call value, got {heston.CallValue}");
-            Assert.IsTrue(heston.PutValue >= 0, $"Adaptive method should produce non-negative put value, got {heston.PutValue}");
+            Assert.IsGreaterThanOrEqualTo(0, heston.CallValue, $"Adaptive method should produce non-negative call value, got {heston.CallValue}");
+            Assert.IsGreaterThanOrEqualTo(0, heston.PutValue, $"Adaptive method should produce non-negative put value, got {heston.PutValue}");
         }
         catch (Exception ex)
         {
@@ -215,8 +215,8 @@ public class HestonCalculatorLatestFeaturesTests
         try
         {
             heston.CalculateCallPut();
-            Assert.IsTrue(heston.CallValue >= 0, "Call value should be non-negative even with invalid initial parameters");
-            Assert.IsTrue(heston.PutValue >= 0, "Put value should be non-negative even with invalid initial parameters");
+            Assert.IsGreaterThanOrEqualTo(0, heston.CallValue, "Call value should be non-negative even with invalid initial parameters");
+            Assert.IsGreaterThanOrEqualTo(0, heston.PutValue, "Put value should be non-negative even with invalid initial parameters");
         }
         catch (Exception ex)
         {
@@ -325,7 +325,7 @@ public class HestonCalculatorLatestFeaturesTests
         for (var idx = 0; idx < strikes.Length; idx++) {
             heston.Strike = strikes[idx];
             heston.CalculateAll();
-            Assert.IsTrue(heston.PutValue >= prevPutValue, $"Put value should increase with strike. Prev: {prevPutValue}, Current: {heston.PutValue} for strike {strikes[idx]}");
+            Assert.IsGreaterThanOrEqualTo(prevPutValue, heston.PutValue, $"Put value should increase with strike. Prev: {prevPutValue}, Current: {heston.PutValue} for strike {strikes[idx]}");
             prevPutValue = heston.PutValue;
         }
     }
@@ -351,7 +351,7 @@ public class HestonCalculatorLatestFeaturesTests
         for (var idx = 0; idx < strikes.Length; idx++) {
             heston.Strike = strikes[idx];
             heston.CalculateAll();
-            Assert.IsTrue(heston.PutValue >= prevPutValue, $"Put value should increase with strike. Prev: {prevPutValue}, Current: {heston.PutValue} for strike {strikes[idx]}");
+            Assert.IsGreaterThanOrEqualTo(prevPutValue, heston.PutValue, $"Put value should increase with strike. Prev: {prevPutValue}, Current: {heston.PutValue} for strike {strikes[idx]}");
             prevPutValue = heston.PutValue;
         }
     }
