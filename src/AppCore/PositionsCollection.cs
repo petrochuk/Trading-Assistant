@@ -316,7 +316,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
-                    greeks.DeltaBLS += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
+                    var deltaBls = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
+                    greeks.DeltaBLS += deltaBls * position.Size;
 
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
@@ -330,7 +331,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     bls.ImpliedVolatility = (float)hestonIV;
                     bls.CalculateAll();
 
-                    greeks.DeltaHeston += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
+                    var deltaHeston = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
+                    greeks.DeltaHeston += deltaHeston * position.Size;
                     greeks.ThetaHeston += thetaHeston * position.Size * position.Contract.Multiplier;
                 }
                 else {
