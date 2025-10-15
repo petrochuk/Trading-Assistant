@@ -271,7 +271,7 @@ public class HestonCalculatorTests
             DaysLeft = 5,
             CurrentVolatility = vol,
             LongTermVolatility = longTermVol,
-            VolatilityMeanReversion = 0f, // Very fast mean reversion
+            VolatilityMeanReversion = 0f,
             VolatilityOfVolatility = 0.001f, // Very low vol of vol
             Correlation = 0f // No correlation
         };
@@ -295,6 +295,11 @@ public class HestonCalculatorTests
         heston.VolatilityMeanReversion = 20f;
         heston.CalculateAll();
 
+        // For downward moving stock, put value should increase (more downside vol)
+        if (stockMove < 1.0f) {
+            Assert.IsGreaterThan(blackScholes.PutValue, heston.PutValue, $"Put value should increase with negative correlation and high vol of vol. Heston: {heston.PutValue}, BS: {blackScholes.PutValue}");
+            //Assert.IsLessThan(blackScholes.DeltaPut, heston.DeltaPut, $"Put delta should be more negative with negative correlation and high vol of vol. Heston: {heston.DeltaPut}, BS: {blackScholes.DeltaPut}");
+        }
     }
 
     [TestMethod]

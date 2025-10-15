@@ -317,16 +317,21 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
                     greeks.DeltaBLS += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
-                    greeks.DeltaHeston += (position.Contract.IsCall ? heston.DeltaCall : heston.DeltaPut) * position.Size;
 
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
 
                     greeks.ThetaBLS += thetaBLS * position.Size * position.Contract.Multiplier;
-                    greeks.ThetaHeston += thetaHeston * position.Size * position.Contract.Multiplier;
 
                     greeks.Vanna += (position.Contract.IsCall ? bls.VannaCall * 0.01f : bls.VannaPut * 0.01f) * position.Size;
                     greeks.Charm += charm * position.Size;
+
+                    var hestonIV = position.Contract.IsCall ? bls.GetCallIVBisections(heston.CallValue) : bls.GetPutIVBisections(heston.PutValue);
+                    bls.ImpliedVolatility = (float)hestonIV;
+                    bls.CalculateAll();
+
+                    greeks.DeltaHeston += (position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size;
+                    greeks.ThetaHeston += thetaHeston * position.Size * position.Contract.Multiplier;
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
