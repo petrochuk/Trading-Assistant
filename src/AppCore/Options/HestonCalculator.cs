@@ -407,15 +407,15 @@ public class HestonCalculator
     /// <summary>
     /// Calculate all option values and Greeks
     /// </summary>
-    public void CalculateAll()
+    public void CalculateAll(bool skipVanna = false, bool skipCharm = false)
     {
         CalculateCallPut();
         CalculateDelta();
         CalculateGamma();
         CalculateVega();
         CalculateTheta();
-        CalculateVanna();
-        CalculateCharm();
+        if (!skipVanna) CalculateVanna();
+        if (!skipCharm) CalculateCharm();
     }
 
     /// <summary>

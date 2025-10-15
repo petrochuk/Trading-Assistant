@@ -44,11 +44,11 @@ public sealed partial class RiskGraph : UserControl
         _riskIntervals.Add(TimeSpan.FromHours(3), new SolidColorBrush(Color.FromArgb(0xff, 0xb3, 0xd9, 0xe0)));
         _riskIntervals.Add(TimeSpan.FromHours(6), new SolidColorBrush(Color.FromArgb(0xff, 0x99, 0xd2, 0xdb)));
         _riskIntervals.Add(TimeSpan.FromHours(12), new SolidColorBrush(Color.FromArgb(0xff, 0x80, 0xc9, 0xd4)));
-        _riskIntervals.Add(TimeSpan.FromDays(1), new SolidColorBrush(Color.FromArgb(0xff, 0x66, 0xc2, 0xcc)));
-        _riskIntervals.Add(TimeSpan.FromDays(2), new SolidColorBrush(Color.FromArgb(0xff, 0x4c, 0xa9, 0xc4)));
-        _riskIntervals.Add(TimeSpan.FromDays(3), new SolidColorBrush(Color.FromArgb(0xff, 0x34, 0xa1, 0xbf)));
-        _riskIntervals.Add(TimeSpan.FromDays(4), new SolidColorBrush(Color.FromArgb(0xff, 0x34, 0xa1, 0xbf)));
-        _riskIntervals.Add(TimeSpan.FromDays(5), new SolidColorBrush(Color.FromArgb(0xff, 0x28, 0x91, 0xa2)));
+        _riskIntervals.Add(TimeSpan.FromDays(1), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xc2, 0xcc)));
+        _riskIntervals.Add(TimeSpan.FromDays(2), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xa9, 0xc4)));
+        _riskIntervals.Add(TimeSpan.FromDays(3), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xa1, 0xbf)));
+        _riskIntervals.Add(TimeSpan.FromDays(4), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xa1, 0xbf)));
+        _riskIntervals.Add(TimeSpan.FromDays(5), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0x91, 0xa2)));
 
         _drawRiskTimer.Tick += (s, args) => {
             Redraw();
