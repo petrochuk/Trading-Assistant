@@ -410,7 +410,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate option price.");
             return null;
         }
-        
+
+        // Skip expired options
+        if (position.Contract.Expiration!.Value <= currentTime)
+            return null;
+
         // Past expiration calculate realized value at mid price (market price)
         bls.DaysLeft = currentTime.BusinessDaysTo(position.Contract.Expiration!.Value);
         if (bls.DaysLeft <= lookaheadSpan.TotalDays) {
