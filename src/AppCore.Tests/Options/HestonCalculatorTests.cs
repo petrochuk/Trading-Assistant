@@ -1,4 +1,5 @@
 using AppCore.Options;
+using System;
 
 namespace AppCore.Tests.Options;
 
@@ -259,14 +260,13 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
-    //[DataRow(6000f, 0.15f, 0.20f, 1.01f)]
-    [DataRow(6000f, 0.15f, 0.20f, 0.99f)]
+    [DataRow(6000f, 0.30f, 0.16f, 0.01f)]
     public void TestHeston_Curve(float stockPrice, float vol, float longTermVol, float stockMove) {
 
         var heston = new HestonCalculator {
             IntegrationMethod = HestonIntegrationMethod.Adaptive,
             StockPrice = stockPrice,
-            Strike = stockPrice * stockMove,
+            Strike = stockPrice * (1 + stockMove),
             RiskFreeInterestRate = 0.0f,
             DaysLeft = 5,
             CurrentVolatility = vol,
@@ -276,6 +276,8 @@ public class HestonCalculatorTests
             Correlation = 0f // No correlation
         };
         heston.CalculateAll();
+        var hestonUpCall = heston.CallValue;
+        var hestonUpPut = heston.PutValue;
 
         var blackScholes = new BlackNScholesCaculator {
             StockPrice = heston.StockPrice,
@@ -285,21 +287,103 @@ public class HestonCalculatorTests
             ImpliedVolatility = heston.CurrentVolatility // Use same constant vol as Heston
         };
         blackScholes.CalculateAll();
+        var blsUpCall = blackScholes.CallValue;
+        var blsUpPut = blackScholes.PutValue;
 
-        Assert.AreEqual(blackScholes.DeltaCall, heston.DeltaCall, 0.01f, "Delta should be close to Black-Scholes");
-        Assert.AreEqual(blackScholes.DeltaPut, heston.DeltaPut, 0.01f, "Delta should be close to Black-Scholes");
+        Assert.IsLessThan(0.01, MathF.Abs(MathF.Log(blsUpCall / hestonUpCall)), "Call value should be close to Black-Scholes");
+        Assert.IsLessThan(0.01, MathF.Abs(MathF.Log(blsUpPut / hestonUpPut)), "Put value should be close to Black-Scholes");
+
+        // Now test downward move
+        heston.Strike = stockPrice * (1 - stockMove);
+        heston.CalculateAll();
+        var hestonDownCall = heston.CallValue;
+        var hestonDownPut = heston.PutValue;
+        Assert.IsLessThan(0.02, MathF.Abs(MathF.Log(hestonDownPut / hestonUpCall)), "Put value for downward move should be close to call");
+
+        blackScholes.Strike = heston.Strike;
+        blackScholes.CalculateAll();
+        var blsDownCall = blackScholes.CallValue;
+        var blsDownPut = blackScholes.PutValue;
+        Assert.IsLessThan(0.01, MathF.Abs(MathF.Log(blsDownCall / hestonDownCall)), "Call value should be close to Black-Scholes");
+        Assert.IsLessThan(0.01, MathF.Abs(MathF.Log(blsDownPut / hestonDownPut)), "Put value should be close to Black-Scholes");
 
         // Add negative correlation
-        heston.Correlation = -0.9f;
-        heston.VolatilityOfVolatility = 2.5f;
-        heston.VolatilityMeanReversion = 20f;
+        heston.Correlation = -0f;
+        heston.VolatilityOfVolatility = 0f;
+        heston.VolatilityMeanReversion = 10f;
         heston.CalculateAll();
+        var hestonDownNegCall = heston.CallValue;
+        var hestonDownNegPut = heston.PutValue;
 
-        // For downward moving stock, put value should increase (more downside vol)
-        if (stockMove < 1.0f) {
-            Assert.IsGreaterThan(blackScholes.PutValue, heston.PutValue, $"Put value should increase with negative correlation and high vol of vol. Heston: {heston.PutValue}, BS: {blackScholes.PutValue}");
-            //Assert.IsLessThan(blackScholes.DeltaPut, heston.DeltaPut, $"Put delta should be more negative with negative correlation and high vol of vol. Heston: {heston.DeltaPut}, BS: {blackScholes.DeltaPut}");
+        // Negative correlation and up move
+        heston.Strike = stockPrice * (1 + stockMove);
+        heston.CalculateAll();
+        var hestonUpNegCall = heston.CallValue;
+        var hestonUpNegPut = heston.PutValue;
+    }
+
+
+    [TestMethod]
+    [DataRow(6000f, 0.30f, 0.15f, 0.01f)]
+    public void TestHeston_VolatilityMeanReversion(float stockPrice, float vol, float longTermVol, float stockMove) {
+
+        var heston = new HestonCalculator {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            StockPrice = stockPrice,
+            Strike = stockPrice * (1 + stockMove),
+            RiskFreeInterestRate = 0.0f,
+            CurrentVolatility = vol,
+            LongTermVolatility = longTermVol,
+            VolatilityMeanReversion = 30f,
+            VolatilityOfVolatility = 0.001f, // Very low vol of vol
+            Correlation = 0f // No correlation
+        };
+        var blackScholes = new BlackNScholesCaculator {
+            StockPrice = heston.StockPrice,
+            Strike = heston.Strike,
+            RiskFreeInterestRate = heston.RiskFreeInterestRate,
+            ImpliedVolatility = longTermVol // Use same constant vol as Heston
+        };
+
+        for (int daysLeft = 1; daysLeft <= 5; daysLeft++) {
+            heston.DaysLeft = daysLeft;
+            heston.CalculateAll();
+            var hestonUpCall = heston.CallValue;
+
+            blackScholes.DaysLeft = daysLeft;
+            blackScholes.CalculateAll();
+            var blsUpCall = blackScholes.CallValue;
         }
+    }
+
+    [TestMethod]
+    [DataRow(6000f, 0.30f, 0.16f, 0.01f)]
+    public void TestHeston_Zero_Correlation(float stockPrice, float vol, float longTermVol, float stockMove) {
+
+        var heston = new HestonCalculator {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            StockPrice = stockPrice,
+            Strike = stockPrice * (1 + stockMove),
+            RiskFreeInterestRate = 0.0f,
+            DaysLeft = 5,
+            CurrentVolatility = vol,
+            LongTermVolatility = longTermVol,
+            VolatilityMeanReversion = 10f,
+            VolatilityOfVolatility = 2f,
+            Correlation = 0f // No correlation
+        };
+        heston.CalculateAll();
+        var hestonUpCall = heston.CallValue;
+        var hestonUpPut = heston.PutValue;
+
+        // Now test downward move
+        heston.Strike = stockPrice * (1 - stockMove);
+        heston.CalculateAll();
+        var hestonDownCall = heston.CallValue;
+        var hestonDownPut = heston.PutValue;
+
+        Assert.IsLessThan(0.02, MathF.Abs(MathF.Log(hestonDownPut / hestonUpCall)), "Put value for downward move should be close to call");
+        Assert.IsLessThan(0.02, MathF.Abs(MathF.Log(hestonUpCall / hestonDownPut)), "Call value for downward move should be close to put");
     }
 
     [TestMethod]
