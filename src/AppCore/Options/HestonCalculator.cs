@@ -457,52 +457,23 @@ public class HestonCalculator
 
     #region Greeks And Support Methods (Restored)
 
-    /// <summary>
-    /// Calculate effective variance using Heston parameters
-    /// </summary>
-    /// <param name="isCall">True for call options, false for put options (kept for future differentiation)</param>
-    private float CalculateEffectiveVariance(bool isCall = true)
-    {
-        var v0 = CurrentVolatility * CurrentVolatility;
-        var vLong = LongTermVolatility * LongTermVolatility;
-        var kappa = VolatilityMeanReversion;
-        var xi = VolatilityOfVolatility;
-        var T = ExpiryTime;
 
-        if (T <= 0) return v0;
+    private float CalculateEffectiveVariance() {
+        float v0 = CurrentVolatility * CurrentVolatility;
+        float thetaVar = LongTermVolatility * LongTermVolatility;
+        float kappa = VolatilityMeanReversion;
+        float T = ExpiryTime;
+        if (T <= 0f) return v0;
+        float kappaT = kappa * T;
 
-        // Base variance with mean reversion
-        float meanReversionTerm = kappa * T;
-        float decay = (meanReversionTerm > 20) ? 0 : MathF.Exp(-meanReversionTerm);
+        // Avoid numerical issues for very small kappaT; fallback to current variance.
+        float avgVariance = (kappaT < 1e-5f)
+            ? v0
+            : thetaVar + (v0 - thetaVar) * (1f - MathF.Exp(-kappaT)) / kappaT;
 
-        float baseVariance;
-        if (meanReversionTerm > 0.001f)
-        {
-            baseVariance = vLong + (v0 - vLong) * (1 - decay) / meanReversionTerm;
-        }
-        else
-        {
-            baseVariance = v0; // No mean reversion
-        }
-
-        float volOfVolAdjustment = xi * xi * T / 3.0f;
-        float secondOrderEffect = xi * xi * MathF.Sqrt(MathF.Max(0.0001f, xi)) * T * 0.08f;
-        float thirdOrderEffect = xi * xi * xi * T * 0.02f;
-
-        float strikeAdjustment = 1.0f;
-        if (EnableStrikeVarianceAdjustment)
-        {
-            // Legacy adjustment (kept optional) that lowered variance for high strikes (OTM puts)
-            float moneyness = StockPrice / Strike;
-            if (moneyness > 1.01f && !isCall)
-            {
-                strikeAdjustment = 1.0f - 0.05f * MathF.Min(1.0f, (moneyness - 1.0f) * 2.0f);
-            }
-        }
-
-        float effectiveVariance = (baseVariance + volOfVolAdjustment + secondOrderEffect + thirdOrderEffect) * strikeAdjustment;
-        return MathF.Max(0.0001f, effectiveVariance); // Ensure minimum positive variance
+        return MathF.Max(0.0001f, avgVariance);
     }
+
 
     /// <summary>
     /// Cumulative normal distribution approximation
