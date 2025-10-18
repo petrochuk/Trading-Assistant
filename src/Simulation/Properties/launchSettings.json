@@ -2,7 +2,7 @@
   "profiles": {
     "Simulation": {
       "commandName": "Project",
-      "commandLineArgs": "--gamma-fit"
+      "commandLineArgs": "--calibrate-har-rv"
     },
     "calibrate": {
       "commandName": "Project",

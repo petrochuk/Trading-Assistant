@@ -13,11 +13,13 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
     private readonly ILogger<DeltaHedger> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly ISoundPlayer? _soundPlayer;
+    private readonly IVolForecaster _volForecaster;
 
-    public DeltaHedgerFactory(ILogger<DeltaHedger> logger, TimeProvider timeProvider, ISoundPlayer? soundPlayer)
+    public DeltaHedgerFactory(ILogger<DeltaHedger> logger, TimeProvider timeProvider, IVolForecaster volForecaster, ISoundPlayer? soundPlayer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _volForecaster = volForecaster ?? throw new ArgumentNullException(nameof(volForecaster));
         _soundPlayer = soundPlayer;
     }
 
@@ -28,6 +30,7 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
         if (symbolConfiguration == null)
             throw new ArgumentException($"No configuration found for symbol {underlying.Symbol}", nameof(configuration));
 
-        return new DeltaHedger(_logger, _timeProvider, broker, accountId, underlying, positions, symbolConfiguration, _soundPlayer);
+        return new DeltaHedger(_logger, _timeProvider, broker, accountId, underlying, 
+            positions, symbolConfiguration, _volForecaster, _soundPlayer);
     }
 }

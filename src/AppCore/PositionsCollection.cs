@@ -1,5 +1,4 @@
-﻿using AppCore.Configuration;
-using AppCore.Extenstions;
+﻿using AppCore.Extenstions;
 using AppCore.Interfaces;
 using AppCore.Models;
 using AppCore.Options;
@@ -179,7 +178,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
     }
 
-    public Greeks? CalculateGreeks(float minIV = 0, UnderlyingPosition? underlyingPosition = null, bool useRealizedVol = true, bool addOvervaluedOptions = false) {
+    public Greeks? CalculateGreeks(float minIV = 0, UnderlyingPosition? underlyingPosition = null, IVolForecaster? volForecaster = null, bool useRealizedVol = true, bool addOvervaluedOptions = false) {
         if (underlyingPosition == null) {
             if (_selectedPosition == null) {
                 return null;
@@ -199,6 +198,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
         if (realizedVol < minIV) {
             realizedVol = minIV;
+        }
+
+        if (volForecaster != null) {
+            volForecaster.SetIntradayVolatilityEstimate(realizedVol, isAnnualized: true);
         }
 
         var stopWatch = new Stopwatch();
@@ -245,6 +248,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
 
                     var daysLeft = _timeProvider.EstNow().BusinessDaysTo(position.Contract.Expiration.Value);
+                    if (volForecaster != null) {
+                        // Forecast volatility to option expiration
+                        realizedVol = volForecaster.Forecast(daysLeft, useIterativeForecast: true);
+                        if (realizedVol < minIV) {
+                            realizedVol = minIV;
+                        }
+                    }
+
                     var heston = new HestonCalculator() {
                         IntegrationMethod = HestonIntegrationMethod.Adaptive,
                         StockPrice = underlyingContract.MarketPrice.Value,

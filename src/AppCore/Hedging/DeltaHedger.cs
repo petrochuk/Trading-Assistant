@@ -22,6 +22,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     private readonly UnderlyingPosition _underlyingPosition;
     private readonly PositionsCollection _positions;
     private readonly SemaphoreSlim _hedgeSemaphore = new(1, 1);
+    private readonly IVolForecaster _volForecaster;
     private readonly ISoundPlayer? _soundPlayer;
     private Guid? _activeOrderId;
     private DateTimeOffset? _hedgeDelay;
@@ -32,7 +33,8 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     /// </summary>
     /// <param name="configuration">The delta hedger configuration.</param>
     public DeltaHedger(ILogger<DeltaHedger> logger, TimeProvider timeProvider, IBroker broker, string accountId,
-        UnderlyingPosition underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration, ISoundPlayer? soundPlayer)
+        UnderlyingPosition underlyingPosition, PositionsCollection positions, DeltaHedgerSymbolConfiguration configuration,
+        IVolForecaster volForecaster, ISoundPlayer? soundPlayer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -44,9 +46,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         _underlyingPosition = underlyingPosition ?? throw new ArgumentNullException(nameof(underlyingPosition));
         _underlyingPosition.RealizedVol?.Reset(_configuration.InitialIV);
         _positions = positions ?? throw new ArgumentNullException(nameof(positions));
+        _volForecaster = volForecaster ?? throw new ArgumentNullException(nameof(volForecaster));
         _soundPlayer = soundPlayer; 
 
         _broker.OnOrderPlaced += Broker_OnOrderPlaced;
+
     }
 
     public UnderlyingPosition UnderlyingPosition => _underlyingPosition;
@@ -65,6 +69,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         if (_underlyingPosition.FrontContract == null) {
             _logger.LogWarning($"No front contract available for {_underlyingPosition.Symbol}. Cannot hedge.");
             return;
+        }
+
+        if (!_volForecaster.IsCalibrated) {
+            _logger.LogInformation($"Vol forecaster not calibrated. Calibrating from file for {_underlyingPosition.Symbol}.");
+            _volForecaster.CalibrateFromFile(_underlyingPosition.FrontContract.OHLCHistoryFilePath, skipLines: 1);
         }
 
         if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value)
@@ -107,7 +116,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             else
                 _logger.LogDebug($"Vol of Vol: N/A for {_underlyingPosition.Symbol}");
 
-            var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, addOvervaluedOptions: true);
+            var greeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true);
             if (greeks == null || float.IsNaN(greeks.DeltaHeston) || float.IsNaN(greeks.Charm)) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;

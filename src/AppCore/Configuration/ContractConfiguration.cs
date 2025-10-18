@@ -13,4 +13,6 @@ public class ContractConfiguration
     public float Correlation { get; set; } = -1f;
 
     public float VarianceGammaDrift { get; set; } = -0.1f;
+
+    public string OHLCHistoryFilePath { get; set; } = string.Empty;
 }

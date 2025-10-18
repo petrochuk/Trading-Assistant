@@ -71,6 +71,7 @@ public class ContractFactory : IContractFactory
             contract.VolatilityOfVolatility = config.VolatilityOfVolatility;
             contract.VolatilityMeanReversion = config.VolatilityMeanReversion;
             contract.VarianceGammaDrift = config.VarianceGammaDrift;
+            contract.OHLCHistoryFilePath = config.OHLCHistoryFilePath;
         }
     }
 }

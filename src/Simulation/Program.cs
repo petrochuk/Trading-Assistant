@@ -1,4 +1,5 @@
 ﻿using AppCore.Options;
+using AppCore.Statistics;
 using System.Text;
 
 namespace Simulation
@@ -20,6 +21,9 @@ namespace Simulation
                 {
                     case "--calibrate":
                         await RunCalibrationAsync();
+                        return;
+                    case "--calibrate-har-rv":
+                        RunCalibrationHarRv();
                         return;
                     case "--gamma-fit":
                         await RunGammaFitAsync();
@@ -55,6 +59,66 @@ namespace Simulation
             Console.WriteLine();
             Console.WriteLine("Calibration completed. Press any key to exit...");
             Console.ReadKey();
+        }
+
+        private static void RunCalibrationHarRv() {
+            Console.WriteLine("Testing different HAR-RV specifications:\n");
+            
+            // Test 1: Original specification (no daily term - often works better!)
+            Console.WriteLine("=== Test 1: Weekly + Monthly (no daily) ===");
+            var forecaster1 = new HarRvForecaster(
+                includeDaily: false,
+                includeWeekly: true,
+                includeMonthly: true,
+                includeLeverageEffect: false);
+            forecaster1.LoadFromFileWithRollingRV(@"c:\temp\spx.csv", skipLines: 1);
+            PrintResults(forecaster1);
+            
+            // Test 2: Standard HAR-RV with all components
+            Console.WriteLine("\n=== Test 2: Full HAR-RV (Daily + Weekly + Monthly) ===");
+            var forecaster2 = new HarRvForecaster(
+                includeDaily: true,
+                includeWeekly: true,
+                includeMonthly: true,
+                includeLeverageEffect: false);
+            forecaster2.LoadFromFileWithRollingRV(@"c:\temp\spx.csv", skipLines: 1);
+            PrintResults(forecaster2);
+
+            // Test 3: With leverage effect
+            Console.WriteLine("\n=== Test 3: Full HAR-RV + Leverage Effect ===");
+            var forecaster3 = new HarRvForecaster(
+                includeDaily: true,
+                includeWeekly: true,
+                includeMonthly: true,
+                useLogVariance: true,
+                includeLeverageEffect: true);
+            forecaster3.LoadFromFileWithRollingRV(@"c:\temp\spx.csv", skipLines: 1);
+            PrintResults(forecaster3);
+            forecaster3.SetIntradayVolatilityEstimate(0.32, isAnnualized: true);
+            var forecast = forecaster3.Forecast(4.75);
+        }
+
+        private static void PrintResults(HarRvForecaster forecaster) {
+
+            var rSquared1 = forecaster.CalculateRSquared();
+            
+            Console.WriteLine($"  R²: {rSquared1:F4}");
+            
+            Console.WriteLine($"\nCoefficients:");
+            Console.WriteLine($"  β₀ (intercept): {forecaster.Beta0:F6}");
+            Console.WriteLine($"  β₁ (daily):     {forecaster.Beta1:F6}");
+            Console.WriteLine($"  β₁ (3 days):    {forecaster.BetaShortTerm:F6}");
+            Console.WriteLine($"  β₂ (weekly):    {forecaster.Beta2:F6}");
+            Console.WriteLine($"  β₂ (bi-weekly)  {forecaster.BetaBiWeekly:F6}");
+            Console.WriteLine($"  β₃ (monthly):   {forecaster.Beta3:F6}");
+            if (forecaster.BetaLeverage != 0)
+                Console.WriteLine($"  βL (leverage):  {forecaster.BetaLeverage:F6}");
+            
+            var persistence = forecaster.Beta1 + forecaster.BetaShortTerm + forecaster.Beta2 + forecaster.BetaBiWeekly + forecaster.Beta3;
+            Console.WriteLine($"  Persistence:    {persistence:F6}");
+            
+            if (forecaster.Beta1 < 0)
+                Console.WriteLine($"  ⚠️  Negative daily coefficient!");
         }
 
         private static async Task RunGammaFitAsync() {

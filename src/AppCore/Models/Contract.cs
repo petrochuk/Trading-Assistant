@@ -39,6 +39,7 @@ public class Contract
     public float VolatilityOfVolatility { get; internal set; }
     public float VolatilityMeanReversion { get; internal set; }
     public float VarianceGammaDrift { get; internal set; }
+    public string OHLCHistoryFilePath { get; internal set; } = string.Empty;
 
     public override string ToString() {
         var sb = new System.Text.StringBuilder();
