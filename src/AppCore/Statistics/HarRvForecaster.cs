@@ -572,8 +572,9 @@ public sealed class HarRvForecaster : IVolForecaster
 
 		double? previousPrice = null;
 		int lineNumber = 0;
+		int openIdx = 1, highIdx = 2, lowIdx = 3, closeIdx = 4;
 
-		foreach (var rawLine in File.ReadLines(filePath))
+        foreach (var rawLine in File.ReadLines(filePath))
 		{
 			lineNumber++;
 			if (lineNumber <= skipLines)
@@ -592,7 +593,29 @@ public sealed class HarRvForecaster : IVolForecaster
                 colummns[i] = colummns[i].Trim('"');
             }
 
-            if (!double.TryParse(colummns[4], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var close))
+			// Parse header
+			if (lineNumber == 1) {
+                for (int i = 0; i < colummns.Length; i++) {
+                    switch (colummns[i].ToLowerInvariant()) {
+						case "open":
+							openIdx = i;
+							break;
+						case "high":
+							highIdx = i;
+							break;
+						case "low":
+							lowIdx = i;
+							break;
+						case "price":
+                        case "close":
+                            closeIdx = i;
+							break;
+                    }
+                }
+				continue;
+            }
+
+            if (!double.TryParse(colummns[closeIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var close))
 				throw new FormatException($"Unable to parse numeric value on line {lineNumber}: '{rawLine}'.");
 
 			if (_treatInputAsPrices)
@@ -600,9 +623,9 @@ public sealed class HarRvForecaster : IVolForecaster
 				if (colummns.Length < 5)
 					continue;
 
-				if (!double.TryParse(colummns[1], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var open) ||
-					!double.TryParse(colummns[2], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var high) ||
-					!double.TryParse(colummns[3], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var low))
+				if (!double.TryParse(colummns[openIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var open) ||
+					!double.TryParse(colummns[highIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var high) ||
+					!double.TryParse(colummns[lowIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var low))
 				{
 					throw new FormatException($"Unable to parse OHLC values on line {lineNumber}: '{rawLine}'.");
 				}

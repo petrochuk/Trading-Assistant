@@ -73,9 +73,9 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             return;
         }
 
-        if (!_volForecaster.IsCalibrated) {
+        if (_volForecaster != null && !_volForecaster.IsCalibrated) {
             _logger.LogInformation($"Vol forecaster not calibrated. Calibrating from file for {_underlyingPosition.Symbol}.");
-            _volForecaster.CalibrateFromFile(_underlyingPosition.FrontContract.OHLCHistoryFilePath, skipLines: 1);
+            _volForecaster.CalibrateFromFile(_underlyingPosition.FrontContract.OHLCHistoryFilePath);
         }
 
         if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value)
