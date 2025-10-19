@@ -587,6 +587,11 @@ public sealed class HarRvForecaster : IVolForecaster
             if (colummns.Length < 5)
                 continue;
 
+            // Trim optional double quotes from each column
+            for (int i = 0; i < colummns.Length; i++) {
+                colummns[i] = colummns[i].Trim('"');
+            }
+
             if (!double.TryParse(colummns[4], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var close))
 				throw new FormatException($"Unable to parse numeric value on line {lineNumber}: '{rawLine}'.");
 
