@@ -13,13 +13,13 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
     private readonly ILogger<DeltaHedger> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly ISoundPlayer? _soundPlayer;
-    private readonly IVolForecaster _volForecaster;
+    private readonly IVolForecaster? _volForecaster;
 
-    public DeltaHedgerFactory(ILogger<DeltaHedger> logger, TimeProvider timeProvider, IVolForecaster volForecaster, ISoundPlayer? soundPlayer)
+    public DeltaHedgerFactory(ILogger<DeltaHedger> logger, TimeProvider timeProvider, IVolForecaster? volForecaster, ISoundPlayer? soundPlayer)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-        _volForecaster = volForecaster ?? throw new ArgumentNullException(nameof(volForecaster));
+        _volForecaster = volForecaster;
         _soundPlayer = soundPlayer;
     }
 

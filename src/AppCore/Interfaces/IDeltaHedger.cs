@@ -10,4 +10,6 @@ public interface IDeltaHedger : IDisposable
     DeltaHedgerSymbolConfiguration Configuration { get; }
 
     UnderlyingPosition UnderlyingPosition { get; }
+
+    Greeks? LastGreeks { get; }
 }

@@ -51,7 +51,7 @@ public sealed class DeltaHedgerTests
         optionPosition.Underlying = underlyingPosition;
         positions.TryAdd(optionPosition.Contract.Id, optionPosition);
 
-        var deltaHedgerFactory = new DeltaHedgerFactory(NullLogger<DeltaHedger>.Instance, timeProvider, null);
+        var deltaHedgerFactory = new DeltaHedgerFactory(NullLogger<DeltaHedger>.Instance, timeProvider, null, null);
         var deltaHedgerConfiguration = new DeltaHedgerConfiguration {
             Configs = new ()
             {

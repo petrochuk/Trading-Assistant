@@ -93,12 +93,15 @@ public sealed partial class RiskGraph : UserControl
         var selectedSymbol = Account.Positions.SelectedPosition.Symbol;
         bool useRealizedVol = true;
         float minIV = 0;
+        Greeks? greeks;
         if (Account.DeltaHedgers.TryGetValue(selectedSymbol, out var hedger)) { 
             useRealizedVol = false;
             minIV = hedger.Configuration.MinIV;
+            greeks = hedger.LastGreeks;
         }
+        else
+            greeks = Account.Positions!.CalculateGreeks(minIV, useRealizedVol: useRealizedVol);
 
-        var greeks = Account.Positions!.CalculateGreeks(minIV, useRealizedVol: useRealizedVol);
         if (greeks == null) {
             ClearGreeks();
             return;
