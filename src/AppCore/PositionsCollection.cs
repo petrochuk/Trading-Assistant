@@ -339,6 +339,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     greeks.Charm += charm * position.Size;
 
                     var hestonIV = position.Contract.IsCall ? bls.GetCallIVBisections(heston.CallValue) : bls.GetPutIVBisections(heston.PutValue);
+                    // _logger.LogInformation($"{position} is using IV: {hestonIV:f6}");
                     bls.ImpliedVolatility = (float)hestonIV;
                     bls.CalculateAll();
 

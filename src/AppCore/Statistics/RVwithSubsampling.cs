@@ -25,13 +25,14 @@ public class RVwithSubsampling : IRealizedVolatility
             throw new ArgumentException($"Period must be greater than zero. Actual {period}", nameof(period));
             
         _period = period;
-        
+
+        int averagePeriod = (int)(12.0 * 60.0 / period.TotalMinutes);
         for (int i = 0; i < subsamplesCount; i++)
         {
             //_subsamples.Add(new RollingStandardDeviation());
             // 24 hours = 24 * 60 / 5min
-            _subsamples.Add(EwmaVolatility.FromPeriod(288));
-            _volOfVolSubsamples.Add(EwmaVolatility.FromPeriod(288));
+            _subsamples.Add(EwmaVolatility.FromPeriod(averagePeriod));
+            _volOfVolSubsamples.Add(EwmaVolatility.FromPeriod(averagePeriod));
         }
     }
 
