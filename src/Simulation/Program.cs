@@ -94,8 +94,8 @@ namespace Simulation
                 includeLeverageEffect: true);
             forecaster3.LoadFromFileWithRollingRV(@"c:\temp\spx.csv", skipLines: 1);
             PrintResults(forecaster3);
-            forecaster3.SetIntradayVolatilityEstimate(0.32, isAnnualized: true);
-            var forecast = forecaster3.Forecast(4.75);
+            forecaster3.SetIntradayVolatilityEstimate(0.1375, isAnnualized: true);
+            var forecast = forecaster3.Forecast(3);
         }
 
         private static void PrintResults(HarRvForecaster forecaster) {
