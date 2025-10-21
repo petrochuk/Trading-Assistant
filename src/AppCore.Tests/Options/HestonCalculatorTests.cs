@@ -7,6 +7,7 @@ namespace AppCore.Tests.Options;
 public class HestonCalculatorTests
 {
     private HestonCalculator CreateStandardHeston(
+        float daysLeft = 30.0f,
         float stockPrice = 100.0f, 
         float strike = 100.0f,
         float correlation = -0.7f) {
@@ -15,8 +16,8 @@ public class HestonCalculatorTests
             IntegrationMethod = HestonIntegrationMethod.Adaptive,
             StockPrice = stockPrice,
             Strike = strike,
-            RiskFreeInterestRate = 0.05f,
-            DaysLeft = 30.0f,
+            RiskFreeInterestRate = 0f,
+            DaysLeft = daysLeft,
             CurrentVolatility = 0.2f,
             LongTermVolatility = 0.2f,
             VolatilityMeanReversion = 2.0f,
@@ -239,6 +240,48 @@ public class HestonCalculatorTests
         var negCorrCallValue = heston.CallValue;
 
         Assert.IsGreaterThan(lowVolVolCallValue, highVolVolCallValue, $"Higher vol of vol should increase option value. Low: {lowVolVolCallValue}, High: {highVolVolCallValue}");
+    }
+
+    [TestMethod]
+    [DataRow(0f, 0f)]
+    [DataRow(0f, 1f)]
+    [DataRow(0f, 2f)]
+    [DataRow(+1f, 0f)]
+    [DataRow(-1f, 0f)]
+    [DataRow(+1f, 1f)]
+    [DataRow(-1f, 1f)]
+    public void Test_Compare_RoughHeston_To_StandardHeston(float correlation, float volOfVol)
+    {
+        // 5% OTM call option
+        var heston = CreateStandardHeston(daysLeft:10, stockPrice: 1000, strike: 1050, correlation: correlation);
+        heston.VolatilityOfVolatility = volOfVol;
+        heston.CalculateCallPut();
+        var standardCallValue = heston.CallValue;
+
+        // 5% OTM put option
+        heston.Strike = 950;
+        heston.CalculateCallPut();
+        var standardPutValue = heston.PutValue;
+
+        heston.UseRoughHeston = true;
+        heston.Strike = 1050;
+        heston.CalculateCallPut();
+        var roughCallValue = heston.CallValue;
+        Assert.IsGreaterThan(standardCallValue, roughCallValue, $"Rough Heston call value should increase. Standard: {standardCallValue}, Rough: {roughCallValue}");
+
+        heston.Strike = 950;
+        heston.CalculateCallPut();
+        var roughPutValue = heston.PutValue;
+        Assert.IsGreaterThan(standardPutValue, roughPutValue, $"Rough Heston put value should increase. Standard: {standardPutValue}, Rough: {roughPutValue}");
+
+        if (correlation < 0) {
+            Assert.IsTrue(standardPutValue > standardCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+            Assert.IsTrue(roughPutValue > roughCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+        }
+        else if (correlation > 0) {
+            Assert.IsTrue(standardCallValue > standardPutValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+            Assert.IsTrue(roughCallValue > roughPutValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+        }
     }
 
     [TestMethod]
