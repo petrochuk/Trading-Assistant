@@ -233,6 +233,11 @@ public class HestonCalculatorTests
         heston.CalculateCallPut();
         float highVolVolCallValue = heston.CallValue;
 
+        // Negative correlation
+        heston.Correlation = -1f;
+        heston.CalculateCallPut();
+        var negCorrCallValue = heston.CallValue;
+
         Assert.IsGreaterThan(lowVolVolCallValue, highVolVolCallValue, $"Higher vol of vol should increase option value. Low: {lowVolVolCallValue}, High: {highVolVolCallValue}");
     }
 
