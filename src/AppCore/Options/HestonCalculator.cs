@@ -1,7 +1,13 @@
 using System.Numerics;
-using System;
 
 namespace AppCore.Options;
+
+public enum HestonIntegrationMethod
+{
+    Adaptive,
+    Fixed,
+    Approximation
+}
 
 /// <summary>
 /// Enhanced Heston Stochastic Volatility Model for option pricing with Jump-Diffusion capabilities.
@@ -463,8 +469,24 @@ float H = MathF.Max(0.01f, MathF.Min(0.99f, HurstParameter));
             return;
      }
 
+ // For extreme leverage effect scenarios (strong correlation + large vol-of-vol),
+ // use Monte Carlo directly to capture asymmetric tail behaviour more faithfully.
+ if (MathF.Abs(Correlation) >0.95f && VolatilityOfVolatility >=0.5f)
+ {
+ CalculateRoughHestonMonteCarlo();
+ float discountFactorFinalMC = MathF.Exp(-RiskFreeInterestRate * MathF.Max(ExpiryTime,0f));
+ float callLowerMC = MathF.Max(StockPrice - Strike * discountFactorFinalMC,0f);
+ float callUpperMC = StockPrice;
+ float putLowerMC = MathF.Max(Strike * discountFactorFinalMC - StockPrice,0f);
+ float putUpperMC = Strike * discountFactorFinalMC;
+ CallValue = MathF.Min(MathF.Max(CallValue, callLowerMC), callUpperMC);
+ PutValue = MathF.Min(MathF.Max(PutValue, putLowerMC), putUpperMC);
+ EnforcePutCallParity();
+ return;
+ }
+
  try
-        {
+ {
      // Use hybrid approximation: characteristic function with fractional kernel adjustment
             if (UseRiemannLiouvilleKernel)
  {
@@ -483,15 +505,15 @@ float H = MathF.Max(0.01f, MathF.Min(0.99f, HurstParameter));
         }
 
         // Apply bounds and parity
-        float discountFactorFinal = MathF.Exp(-RiskFreeInterestRate * MathF.Max(ExpiryTime, 0f));
-    float callLower = MathF.Max(StockPrice - Strike * discountFactorFinal, 0f);
-  float callUpper = StockPrice;
-        float putLower = MathF.Max(Strike * discountFactorFinal - StockPrice, 0f);
-        float putUpper = Strike * discountFactorFinal;
-        CallValue = MathF.Min(MathF.Max(CallValue, callLower), callUpper);
-  PutValue = MathF.Min(MathF.Max(PutValue, putLower), putUpper);
+        float discountFactorFinal = MathF.Exp(-RiskFreeInterestRate * MathF.Max(ExpiryTime,0f));
+ float callLower = MathF.Max(StockPrice - Strike * discountFactorFinal,0f);
+ float callUpper = StockPrice;
+ float putLower = MathF.Max(Strike * discountFactorFinal - StockPrice,0f);
+ float putUpper = Strike * discountFactorFinal;
+ CallValue = MathF.Min(MathF.Max(CallValue, callLower), callUpper);
+ PutValue = MathF.Min(MathF.Max(PutValue, putLower), putUpper);
 
-   EnforcePutCallParity();
+ EnforcePutCallParity();
     }
 
     /// <summary>
@@ -592,71 +614,74 @@ try
   /// Monte Carlo simulation for Rough Heston (most accurate for extreme roughness)
  /// </summary>
     private void CalculateRoughHestonMonteCarlo()
-{
-        int nPaths = RoughHestonMonteCarloPaths;
-     int nSteps = RoughHestonTimeSteps;
-    double dt = ExpiryTime / nSteps;
-    double H = HurstParameter;
+ {
+ int nPaths = RoughHestonMonteCarloPaths;
+ int nSteps = RoughHestonTimeSteps;
+ if (nSteps <2) nSteps =2;
+ double dt = ExpiryTime / nSteps;
+ double H = HurstParameter;
 
-        double S = StockPrice;
-        double v0 = CurrentVolatility * CurrentVolatility;
-     double theta = LongTermVolatility * LongTermVolatility;
-        double kappa = VolatilityMeanReversion;
-     double sigma = VolatilityOfVolatility;
-        double rho = Correlation;
-   double r = RiskFreeInterestRate;
+ double S0 = StockPrice;
+ double v0 = CurrentVolatility * CurrentVolatility;
+ double theta = LongTermVolatility * LongTermVolatility;
+ double kappa = VolatilityMeanReversion;
+ double sigma = VolatilityOfVolatility;
+ double rho = Correlation; // leverage effect
+ double r = RiskFreeInterestRate;
 
-  Random rand = new Random(42); // Fixed seed for reproducibility
-        double callPayoffSum = 0.0;
-    double putPayoffSum = 0.0;
+ Random rand = new Random(42); // deterministic seed for reproducibility
+ double callPayoffSum =0.0;
+ double putPayoffSum =0.0;
 
-        // Precompute fractional kernel weights
-     double[] kernelWeights = ComputeFractionalKernelWeights(nSteps, H);
+ // Precompute fractional kernel weights for volatility driver (rough component)
+ double[] kernelWeights = ComputeFractionalKernelWeights(nSteps, H);
 
-        for (int path = 0; path < nPaths; path++)
-      {
-      double St = S;
-     double vt = v0;
+ // Path loop
+ for (int path =0; path < nPaths; path++)
+ {
+ double St = S0;
+ double vt = v0;
 
-            // Generate all Brownian increments for this path upfront
-            double[] dW_vol = new double[nSteps];
-  for (int i = 0; i < nSteps; i++)
-   {
-    dW_vol[i] = NormalRandom(rand);
-            }
+ // Store past volatility Brownian increments for fractional convolution
+ double[] dWVolHistory = new double[nSteps];
 
- // Generate correlated Brownian increments
-   for (int step = 0; step < nSteps; step++)
-     {
-       double Z1 = NormalRandom(rand);
-    double Z2 = rho * Z1 + System.Math.Sqrt(1 - rho * rho) * NormalRandom(rand);
+ for (int step =0; step < nSteps; step++)
+ {
+ // Generate two independent standard normals
+ double Zvol = NormalRandom(rand);
+ double Zind = NormalRandom(rand);
+ // Construct correlated price Brownian increment using leverage rho
+ double Zprice = rho * Zvol + System.Math.Sqrt(System.Math.Max(0.0,1 - rho * rho)) * Zind;
 
-       // Fractional volatility update using kernel convolution with stored increments
-     double fractionalNoise = 0.0;
- for (int j = 0; j <= step; j++)
-      {
-    fractionalNoise += kernelWeights[step - j] * dW_vol[j];
-     }
+ dWVolHistory[step] = Zvol; // store volatility increment
 
-          // Update variance with fractional dynamics
-  double vNext = vt + kappa * (theta - System.Math.Max(vt, 0)) * dt + 
-            sigma * System.Math.Sqrt(System.Math.Max(vt, 0)) * fractionalNoise * System.Math.Sqrt(dt);
-     vt = System.Math.Max(vNext, 1e-8);
+ // Fractional convolution up to current step
+ double fractionalNoise =0.0;
+ for (int j =0; j <= step; j++)
+ {
+ fractionalNoise += kernelWeights[step - j] * dWVolHistory[j];
+ }
 
-   // Update stock price
- double StNext = St * System.Math.Exp((r - 0.5 * vt) * dt + System.Math.Sqrt(vt * dt) * Z1);
-   St = StNext;
-  }
+ // Variance update (ensure positivity)
+ double sqrtVt = System.Math.Sqrt(System.Math.Max(vt,0.0));
+ double vDrift = kappa * (theta - System.Math.Max(vt,0.0)) * dt;
+ double vDiffusion = sigma * sqrtVt * fractionalNoise * System.Math.Sqrt(dt);
+ double vNext = vt + vDrift + vDiffusion;
+ vt = System.Math.Max(vNext,1e-8);
 
-    // Compute payoffs
-       callPayoffSum += System.Math.Max(St - Strike, 0.0);
-   putPayoffSum += System.Math.Max(Strike - St, 0.0);
-     }
+ // Stock price update with correlated increment
+ double StNext = St * System.Math.Exp((r -0.5 * vt) * dt + System.Math.Sqrt(vt * dt) * Zprice);
+ St = StNext;
+ }
 
-        double discount = System.Math.Exp(-r * ExpiryTime);
-      CallValue = (float)(discount * callPayoffSum / nPaths);
-        PutValue = (float)(discount * putPayoffSum / nPaths);
-    }
+ callPayoffSum += System.Math.Max(St - Strike,0.0);
+ putPayoffSum += System.Math.Max(Strike - St,0.0);
+ }
+
+ double discount = System.Math.Exp(-r * ExpiryTime);
+ CallValue = (float)(discount * callPayoffSum / nPaths);
+ PutValue = (float)(discount * putPayoffSum / nPaths);
+ }
 
     /// <summary>
     /// Compute fractional kernel adjustment for mean reversion
@@ -1287,11 +1312,4 @@ double sumWeights = 0.0;
         }
         PutValue = MathF.Min(putUpper, MathF.Max(putLower, PutValue));
     }
-}
-
-public enum HestonIntegrationMethod
-{
-    Adaptive,
-    Fixed,
-    Approximation
 }

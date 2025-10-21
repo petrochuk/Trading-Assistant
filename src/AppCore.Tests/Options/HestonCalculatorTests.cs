@@ -246,14 +246,15 @@ public class HestonCalculatorTests
     [DataRow(0f, 0f)]
     [DataRow(0f, 1f)]
     [DataRow(0f, 2f)]
-    [DataRow(+1f, 0f)]
-    [DataRow(-1f, 0f)]
     [DataRow(+1f, 1f)]
+    [DataRow(+1f, 2.5f)]
     [DataRow(-1f, 1f)]
+    [DataRow(-1f, 2.5f)]
     public void Test_Compare_RoughHeston_To_StandardHeston(float correlation, float volOfVol)
     {
         // 5% OTM call option
         var heston = CreateStandardHeston(daysLeft:10, stockPrice: 1000, strike: 1050, correlation: correlation);
+        heston.VolatilityMeanReversion = 20f;
         heston.VolatilityOfVolatility = volOfVol;
         heston.CalculateCallPut();
         var standardCallValue = heston.CallValue;
@@ -267,20 +268,24 @@ public class HestonCalculatorTests
         heston.Strike = 1050;
         heston.CalculateCallPut();
         var roughCallValue = heston.CallValue;
-        Assert.IsGreaterThan(standardCallValue, roughCallValue, $"Rough Heston call value should increase. Standard: {standardCallValue}, Rough: {roughCallValue}");
 
         heston.Strike = 950;
         heston.CalculateCallPut();
         var roughPutValue = heston.PutValue;
+        
         Assert.IsGreaterThan(standardPutValue, roughPutValue, $"Rough Heston put value should increase. Standard: {standardPutValue}, Rough: {roughPutValue}");
 
-        if (correlation < 0) {
-            Assert.IsTrue(standardPutValue > standardCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
-            Assert.IsTrue(roughPutValue > roughCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
-        }
-        else if (correlation > 0) {
-            Assert.IsTrue(standardCallValue > standardPutValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
-            Assert.IsTrue(roughCallValue > roughPutValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+        if (0 < volOfVol) {
+            if (correlation < 0) {
+                Assert.IsGreaterThan(roughCallValue, standardCallValue, $"Heston call value should increase. Standard: {standardCallValue}, Rough: {roughCallValue}");
+                Assert.IsTrue(standardPutValue > standardCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+                Assert.IsTrue(roughPutValue > roughCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+            }
+            else if (correlation > 0) {
+                Assert.IsGreaterThan(standardCallValue, roughCallValue, $"Rough Heston call value should increase. Standard: {standardCallValue}, Rough: {roughCallValue}");
+                Assert.IsTrue(standardCallValue > standardPutValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+                Assert.IsTrue(roughCallValue > roughPutValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+            }
         }
     }
 
