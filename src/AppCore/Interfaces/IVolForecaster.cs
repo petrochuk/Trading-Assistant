@@ -10,4 +10,6 @@ public interface IVolForecaster
 
 
     double Forecast(double forecastHorizonDays, bool useIterativeForecast = true);
+
+    string Symbol { get; set; }
 }

@@ -67,8 +67,10 @@ public sealed class HarRvForecaster : IVolForecaster
 		_includeBiWeekly = includeBiWeekly;
 	}
 
-	/// <summary>Number of daily returns currently stored.</summary>
-	public int Count => _returns.Count;
+	public string Symbol { get; set; } = string.Empty;
+
+    /// <summary>Number of daily returns currently stored.</summary>
+    public int Count => _returns.Count;
 
 	/// <summary>True once <see cref="Calibrate"/> has been called successfully.</summary>
 	public bool IsCalibrated => _isCalibrated;

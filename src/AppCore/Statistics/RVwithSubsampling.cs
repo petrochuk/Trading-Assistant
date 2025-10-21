@@ -26,11 +26,11 @@ public class RVwithSubsampling : IRealizedVolatility
             
         _period = period;
 
-        int averagePeriod = (int)(12.0 * 60.0 / period.TotalMinutes);
+        // 6 hours = 6 * 60 / 5min
+        int averagePeriod = (int)(6.0 * 60.0 / period.TotalMinutes);
         for (int i = 0; i < subsamplesCount; i++)
         {
             //_subsamples.Add(new RollingStandardDeviation());
-            // 24 hours = 24 * 60 / 5min
             _subsamples.Add(EwmaVolatility.FromPeriod(averagePeriod));
             _volOfVolSubsamples.Add(EwmaVolatility.FromPeriod(averagePeriod));
         }
