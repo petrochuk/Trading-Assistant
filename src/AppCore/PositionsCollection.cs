@@ -266,6 +266,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         VolatilityMeanReversion = underlyingContract.VolatilityMeanReversion,
                         VolatilityOfVolatility = underlyingContract.VolatilityOfVolatility,
                         Correlation = underlyingContract.Correlation,
+                        UseRoughHeston = true,
                     };
                     heston.CalculateAll(skipVanna: true, skipCharm: true);
 
@@ -345,7 +346,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     var deltaHeston = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
                     greeks.DeltaHeston += deltaHeston * position.Size;
                     greeks.ThetaHeston += thetaHeston * position.Size * position.Contract.Multiplier;
-                    _logger.LogInformation($"{position} is using IV: {hestonIV:f3} d:{deltaHeston:f2} t:{deltaHeston * position.Size:f2}");
+                    _logger.LogInformation($"{position} is using IV: {hestonIV:f3} rv:{realizedVol:f3} p:{(position.Contract.IsCall ? heston.CallValue : heston.PutValue):f2} t:{daysLeft:f2} d:{deltaHeston:f2} t:{deltaHeston * position.Size:f2}");
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
