@@ -61,6 +61,7 @@ public class HestonCalibrator
             VolatilityMeanReversion = 10f,
             VolatilityOfVolatility = 0.95f,
             Correlation = -1f,
+            UseRoughHeston = true
         };
 
         float CalculateError()
@@ -145,7 +146,7 @@ public class HestonCalibrator
     private void CalibrateStandardHeston(HestonCalculator heston, Action<string> evaluate)
     {
         var currentVolatilities = new float[] { 0.10f};
-        var volOfVols = new float[] { 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 4.5f, 5f };
+        var volOfVols = new float[] { 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 4.5f, 5f };
         var longTermVols = new float[] { 0.08f, 0.10f, 0.12f, 0.14f, 0.15f, 0.16f, 0.17f, 0.18f, 0.20f };
         var meanReversions = new float[] { 5f, 7f, 10f, 12f, 15f, 20f };
         var correlations = new float[] { -1.0f, -0.9f, -0.8f, -0.7f, -0.6f, -0.5f, -0.4f, -0.3f };

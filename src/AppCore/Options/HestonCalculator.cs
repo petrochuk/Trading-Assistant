@@ -1,13 +1,20 @@
 using System.Numerics;
-using System;
 
 namespace AppCore.Options;
+
+public enum HestonIntegrationMethod
+{
+    Adaptive,
+    Fixed,
+    Approximation
+}
 
 /// <summary>
 /// Enhanced Heston Stochastic Volatility Model for option pricing with Jump-Diffusion capabilities.
 /// The Heston model assumes that the volatility of the underlying asset follows a square-root process.
 /// Enhanced for distributions with strong downside skew, fat tails, and leptokurtic characteristics.
 /// Updated with latest publicly documented adjustments for improved accuracy and numerical stability.
+/// Includes Rough Heston extension for fractional volatility dynamics.
 /// </summary>
 public class HestonCalculator
 {
@@ -76,7 +83,7 @@ public class HestonCalculator
     /// <summary>
     /// Volatility of volatility (sigma in Heston model)
     /// </summary>
-    public float VolatilityOfVolatility { get; set; }
+  public float VolatilityOfVolatility { get; set; }
 
     /// <summary>
     /// Correlation between stock price and volatility (rho in Heston model)
@@ -91,9 +98,9 @@ public class HestonCalculator
     // Tail-risk / numerical control toggles (new)
     /// <summary>
     /// If true (default false), enforce Feller condition by capping sigma. Disabling preserves tail vol-of-vol.
-    /// </summary>
+ /// </summary>
     public bool EnforceFellerByCappingSigma { get; set; } = false;
-    /// <summary>
+  /// <summary>
     /// Fixed integration upper bound for non-adaptive methods (in Fourier space). Default widened from 100 -> 200.
     /// </summary>
     public double FixedIntegrationUpperBound { get; set; } = 200.0;
@@ -113,6 +120,38 @@ public class HestonCalculator
     /// Enable legacy strike variance adjustment that reduced effective variance for OTM puts (disabled by default to avoid tail suppression).
     /// </summary>
     public bool EnableStrikeVarianceAdjustment { get; set; } = false;
+
+    // Rough Heston parameters
+    /// <summary>
+    /// Enable Rough Heston model (fractional volatility). When false, uses standard Heston.
+    /// </summary>
+    public bool UseRoughHeston { get; set; } = false;
+
+    /// <summary>
+    /// Hurst parameter for fractional Brownian motion (H). 
+    /// H = 0.5 gives standard Brownian motion (classic Heston).
+    /// H &lt; 0.5 (typically 0.05-0.15) gives rough/anti-persistent paths observed in volatility.
+    /// H &gt; 0.5 gives persistent paths.
+    /// </summary>
+    public float HurstParameter { get; set; } = 0.1f;
+
+    /// <summary>
+    /// Number of time steps for Rough Heston simulation/approximation.
+    /// Higher values give better accuracy but slower computation.
+    /// </summary>
+    public int RoughHestonTimeSteps { get; set; } = 100;
+
+    /// <summary>
+    /// Number of Monte Carlo paths for Rough Heston pricing.
+    /// Only used when UseRoughHeston is true and simulation is needed.
+    /// </summary>
+    public int RoughHestonMonteCarloPaths { get; set; } = 10000;
+
+    /// <summary>
+    /// Use Riemann-Liouville fractional kernel approximation for Rough Heston.
+    /// When true, uses more accurate but slower method. When false, uses faster power-law approximation.
+    /// </summary>
+    public bool UseRiemannLiouvilleKernel { get; set; } = true;
 
     /// <summary>
     /// Delta for Call options
@@ -136,7 +175,7 @@ public class HestonCalculator
 
     /// <summary>
     /// Vega for Put options
-    /// </summary>
+  /// </summary>
     public float VegaPut { get; set; }
 
     /// <summary>
@@ -159,10 +198,10 @@ public class HestonCalculator
     /// </summary>
     public float VannaPut { get; set; }
 
-    /// <summary>
+ /// <summary>
     /// Charm for Call options
     /// </summary>
-    public float CharmCall { get; set; }
+  public float CharmCall { get; set; }
 
     /// <summary>
     /// Charm for Put options
@@ -175,13 +214,13 @@ public class HestonCalculator
     public float DaysLeft
     {
         get => _dayLeft;
-        set
-        {
-            _dayLeft = value;
-            ExpiryTime = _dayLeft / 365.0f;
-        }
+    set
+     {
+  _dayLeft = value;
+    ExpiryTime = _dayLeft / 365.0f;
+   }
     }
-    private float _dayLeft;
+private float _dayLeft;
 
     /// <summary>
     /// Check if Feller condition is satisfied (ensures volatility stays positive)
@@ -190,7 +229,7 @@ public class HestonCalculator
     /// </summary>
     public bool IsFellerConditionSatisfied =>
         2.0f * VolatilityMeanReversion * (LongTermVolatility * LongTermVolatility) >=
-        (VolatilityOfVolatility * VolatilityOfVolatility);
+  (VolatilityOfVolatility * VolatilityOfVolatility);
 
     /// <summary>
     /// Added flag to optionally disable fallback pricing for sensitivity tests
@@ -206,64 +245,72 @@ public class HestonCalculator
     /// with latest numerical stability improvements
     /// </summary>
     private void CalculateHestonCharacteristicFunction()
-    {
+  {
         if (ExpiryTime <= 1e-6f)
-        {
-            CallValue = MathF.Max(StockPrice - Strike, 0);
+  {
+     CallValue = MathF.Max(StockPrice - Strike, 0);
             PutValue = MathF.Max(Strike - StockPrice, 0);
-            return;
-        }
+ return;
+     }
 
         ValidateAndAdjustParameters();
-        bool needFallback = false;
+
+        // Route to Rough Heston if enabled
+        if (UseRoughHeston)
+     {
+    CalculateRoughHestonPrice();
+     return;
+        }
+
+    bool needFallback = false;
         try
         {
-            double S = StockPrice, K = Strike, r = RiskFreeInterestRate, T = ExpiryTime;
+double S = StockPrice, K = Strike, r = RiskFreeInterestRate, T = ExpiryTime;
             double v0 = CurrentVolatility * CurrentVolatility;
-            double theta = LongTermVolatility * LongTermVolatility;
+   double theta = LongTermVolatility * LongTermVolatility;
             double kappa = VolatilityMeanReversion;
-            double sigma = VolatilityOfVolatility;
+      double sigma = VolatilityOfVolatility;
             double rho = Correlation;
-            var (p1, p2) = CalculateHestonProbabilities(S, K, r, T, v0, theta, kappa, sigma, rho);
-            var discountFactor = System.Math.Exp(-r * T);
-            CallValue = (float)(S * p1 - K * discountFactor * p2);
-            PutValue = (float)(K * discountFactor * (1 - p2) - S * (1 - p1));
+       var (p1, p2) = CalculateHestonProbabilities(S, K, r, T, v0, theta, kappa, sigma, rho);
+      var discountFactor = System.Math.Exp(-r * T);
+CallValue = (float)(S * p1 - K * discountFactor * p2);
+ PutValue = (float)(K * discountFactor * (1 - p2) - S * (1 - p1));
             if (float.IsNaN(CallValue) || float.IsNaN(PutValue) || float.IsInfinity(CallValue) || float.IsInfinity(PutValue) || CallValue < -1e-6f || PutValue < -1e-6f)
-                needFallback = true;
+        needFallback = true;
         }
-        catch { needFallback = true; }
+      catch { needFallback = true; }
 
-        if (needFallback && !DisablePricingFallback)
+      if (needFallback && !DisablePricingFallback)
         {
-            float effectiveVol = MathF.Sqrt(CalculateEffectiveVariance());
-            if (effectiveVol < 1e-6f) effectiveVol = CurrentVolatility;
-            float sqrtT = MathF.Sqrt(ExpiryTime);
-            float d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + 0.5f * effectiveVol * effectiveVol) * ExpiryTime) / (effectiveVol * sqrtT);
-            float d2 = d1 - effectiveVol * sqrtT;
+          float effectiveVol = MathF.Sqrt(CalculateEffectiveVariance());
+    if (effectiveVol < 1e-6f) effectiveVol = CurrentVolatility;
+  float sqrtT = MathF.Sqrt(ExpiryTime);
+     float d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + 0.5f * effectiveVol * effectiveVol) * ExpiryTime) / (effectiveVol * sqrtT);
+   float d2 = d1 - effectiveVol * sqrtT;
             float nd1 = CumulativeNormalDistribution(d1);
-            float nd2 = CumulativeNormalDistribution(d2);
-            float nmd1 = CumulativeNormalDistribution(-d1);
-            float nmd2 = CumulativeNormalDistribution(-d2);
+       float nd2 = CumulativeNormalDistribution(d2);
+         float nmd1 = CumulativeNormalDistribution(-d1);
+float nmd2 = CumulativeNormalDistribution(-d2);
             float discount = MathF.Exp(-RiskFreeInterestRate * ExpiryTime);
             CallValue = StockPrice * nd1 - Strike * discount * nd2;
-            PutValue = Strike * discount * nmd2 - StockPrice * nmd1;
+          PutValue = Strike * discount * nmd2 - StockPrice * nmd1;
         }
         else if (needFallback && DisablePricingFallback)
         {
             CallValue = MathF.Max(CallValue, 0f);
-            PutValue = MathF.Max(PutValue, 0f);
+  PutValue = MathF.Max(PutValue, 0f);
         }
 
         // European option no-arbitrage bounds
         float discountFactorFinal = MathF.Exp(-RiskFreeInterestRate * MathF.Max(ExpiryTime, 0f));
         float callLower = MathF.Max(StockPrice - Strike * discountFactorFinal, 0f); // (S - K e^{-rT})+
         float callUpper = StockPrice;
-        float putLower = MathF.Max(Strike * discountFactorFinal - StockPrice, 0f); // (K e^{-rT} - S)+
+    float putLower = MathF.Max(Strike * discountFactorFinal - StockPrice, 0f); // (K e^{-rT} - S)+
         float putUpper = Strike * discountFactorFinal;
-        CallValue = MathF.Min(MathF.Max(CallValue, callLower), callUpper);
+ CallValue = MathF.Min(MathF.Max(CallValue, callLower), callUpper);
         PutValue = MathF.Min(MathF.Max(PutValue, putLower), putUpper);
 
-        EnforcePutCallParity();
+   EnforcePutCallParity();
     }
 
     /// <summary>
@@ -398,6 +445,320 @@ public class HestonCalculator
                 VolatilityOfVolatility = fellerBoundSigma * 0.999f; // slight margin inside boundary
             }
         }
+    }
+
+    #endregion
+
+    #region Rough Heston Implementation
+
+    /// <summary>
+    /// Calculate option prices using Rough Heston model with fractional Brownian motion
+    /// </summary>
+    private void CalculateRoughHestonPrice()
+    {
+        // Validate Hurst parameter
+float H = MathF.Max(0.01f, MathF.Min(0.99f, HurstParameter));
+
+        // For near-standard Heston (H ˜ 0.5), use standard model for efficiency
+        if (MathF.Abs(H - 0.5f) < 0.02f)
+        {
+       bool wasRough = UseRoughHeston;
+    UseRoughHeston = false;
+            CalculateHestonCharacteristicFunction();
+       UseRoughHeston = wasRough;
+            return;
+     }
+
+ // For extreme leverage effect scenarios (strong correlation + large vol-of-vol),
+ // use Monte Carlo directly to capture asymmetric tail behaviour more faithfully.
+ if (MathF.Abs(Correlation) >0.95f && VolatilityOfVolatility >=0.5f)
+ {
+ CalculateRoughHestonMonteCarlo();
+ float discountFactorFinalMC = MathF.Exp(-RiskFreeInterestRate * MathF.Max(ExpiryTime,0f));
+ float callLowerMC = MathF.Max(StockPrice - Strike * discountFactorFinalMC,0f);
+ float callUpperMC = StockPrice;
+ float putLowerMC = MathF.Max(Strike * discountFactorFinalMC - StockPrice,0f);
+ float putUpperMC = Strike * discountFactorFinalMC;
+ CallValue = MathF.Min(MathF.Max(CallValue, callLowerMC), callUpperMC);
+ PutValue = MathF.Min(MathF.Max(PutValue, putLowerMC), putUpperMC);
+ EnforcePutCallParity();
+ return;
+ }
+
+ try
+ {
+     // Use hybrid approximation: characteristic function with fractional kernel adjustment
+            if (UseRiemannLiouvilleKernel)
+ {
+       CalculateRoughHestonCharacteristicApproximation();
+ }
+         else
+            {
+     // Faster power-law approximation
+    CalculateRoughHestonPowerLawApproximation();
+            }
+        }
+        catch
+     {
+  // Fallback to Monte Carlo simulation
+            CalculateRoughHestonMonteCarlo();
+        }
+
+        // Apply bounds and parity
+        float discountFactorFinal = MathF.Exp(-RiskFreeInterestRate * MathF.Max(ExpiryTime,0f));
+ float callLower = MathF.Max(StockPrice - Strike * discountFactorFinal,0f);
+ float callUpper = StockPrice;
+ float putLower = MathF.Max(Strike * discountFactorFinal - StockPrice,0f);
+ float putUpper = Strike * discountFactorFinal;
+ CallValue = MathF.Min(MathF.Max(CallValue, callLower), callUpper);
+ PutValue = MathF.Min(MathF.Max(PutValue, putLower), putUpper);
+
+ EnforcePutCallParity();
+    }
+
+    /// <summary>
+    /// Rough Heston characteristic function approximation using Riemann-Liouville fractional kernel
+    /// </summary>
+private void CalculateRoughHestonCharacteristicApproximation()
+ {
+        double S = StockPrice, K = Strike, r = RiskFreeInterestRate, T = ExpiryTime;
+        double v0 = CurrentVolatility * CurrentVolatility;
+        double theta = LongTermVolatility * LongTermVolatility;
+        double kappa = VolatilityMeanReversion;
+    double sigma = VolatilityOfVolatility;
+    double rho = Correlation;
+      double H = HurstParameter;
+
+// Compute fractional kernel adjustment
+        double alpha = H + 0.5; // Fractional order
+        double kernelAdjustment = ComputeFractionalKernelAdjustment(alpha, T);
+        double kappaEffective = kappa * kernelAdjustment;
+        
+        // Ensure effective kappa is reasonable
+      if (kappaEffective < 0.001 || double.IsNaN(kappaEffective) || double.IsInfinity(kappaEffective))
+    {
+     // Fallback to power-law approximation
+            CalculateRoughHestonPowerLawApproximation();
+return;
+ }
+
+ // Use modified characteristic function with effective mean reversion
+    try
+{
+    var (p1, p2) = CalculateHestonProbabilities(S, K, r, T, v0, theta, kappaEffective, sigma, rho);
+        var discountFactor = System.Math.Exp(-r * T);
+   CallValue = (float)(S * p1 - K * discountFactor * p2);
+   PutValue = (float)(K * discountFactor * (1 - p2) - S * (1 - p1));
+       
+            // Check for valid results
+            if (float.IsNaN(CallValue) || float.IsNaN(PutValue) || CallValue < 0 || PutValue < 0)
+    {
+    // Fallback to power-law approximation
+     CalculateRoughHestonPowerLawApproximation();
+      return;
+    }
+
+        // Additional roughness correction for implied volatility
+    float roughnessCorrection = ComputeRoughnessVolatilityCorrection(H, (float)T);
+     CallValue *= roughnessCorrection;
+    PutValue *= roughnessCorrection;
+     }
+        catch
+        {
+      // Fallback to power-law approximation
+    CalculateRoughHestonPowerLawApproximation();
+        }
+    }
+
+    /// <summary>
+    /// Power-law approximation for Rough Heston (faster but less accurate)
+    /// </summary>
+    private void CalculateRoughHestonPowerLawApproximation()
+ {
+  double S = StockPrice, K = Strike, r = RiskFreeInterestRate, T = ExpiryTime;
+  double v0 = CurrentVolatility * CurrentVolatility;
+        double theta = LongTermVolatility * LongTermVolatility;
+    double kappa = VolatilityMeanReversion;
+      double sigma = VolatilityOfVolatility;
+        double rho = Correlation;
+        double H = HurstParameter;
+
+  // Power-law adjustment to volatility of volatility
+   // For H < 0.5, this increases sigma for shorter maturities
+  double sigmaAdjusted = sigma * System.Math.Pow(T, H - 0.5);
+        
+  // Ensure adjusted sigma is reasonable
+        sigmaAdjusted = System.Math.Max(0.001, System.Math.Min(sigmaAdjusted, 10.0));
+
+try
+      {
+        var (p1, p2) = CalculateHestonProbabilities(S, K, r, T, v0, theta, kappa, sigmaAdjusted, rho);
+        var discountFactor = System.Math.Exp(-r * T);
+     CallValue = (float)(S * p1 - K * discountFactor * p2);
+      PutValue = (float)(K * discountFactor * (1 - p2) - S * (1 - p1));
+  
+       // If still invalid, fall back to Monte Carlo
+   if (float.IsNaN(CallValue) || float.IsNaN(PutValue) || CallValue < -1e-6f || PutValue < -1e-6f)
+      {
+   CalculateRoughHestonMonteCarlo();
+     }
+        }
+        catch
+   {
+   // Final fallback to Monte Carlo
+     CalculateRoughHestonMonteCarlo();
+ }
+    }
+
+    /// <summary>
+  /// Monte Carlo simulation for Rough Heston (most accurate for extreme roughness)
+ /// </summary>
+    private void CalculateRoughHestonMonteCarlo()
+ {
+ int nPaths = RoughHestonMonteCarloPaths;
+ int nSteps = RoughHestonTimeSteps;
+ if (nSteps <2) nSteps =2;
+ double dt = ExpiryTime / nSteps;
+ double H = HurstParameter;
+
+ double S0 = StockPrice;
+ double v0 = CurrentVolatility * CurrentVolatility;
+ double theta = LongTermVolatility * LongTermVolatility;
+ double kappa = VolatilityMeanReversion;
+ double sigma = VolatilityOfVolatility;
+ double rho = Correlation; // leverage effect
+ double r = RiskFreeInterestRate;
+
+ Random rand = new Random(42); // deterministic seed for reproducibility
+ double callPayoffSum =0.0;
+ double putPayoffSum =0.0;
+
+ // Precompute fractional kernel weights for volatility driver (rough component)
+ double[] kernelWeights = ComputeFractionalKernelWeights(nSteps, H);
+
+ // Path loop
+ for (int path =0; path < nPaths; path++)
+ {
+ double St = S0;
+ double vt = v0;
+
+ // Store past volatility Brownian increments for fractional convolution
+ double[] dWVolHistory = new double[nSteps];
+
+ for (int step =0; step < nSteps; step++)
+ {
+ // Generate two independent standard normals
+ double Zvol = NormalRandom(rand);
+ double Zind = NormalRandom(rand);
+ // Construct correlated price Brownian increment using leverage rho
+ double Zprice = rho * Zvol + System.Math.Sqrt(System.Math.Max(0.0,1 - rho * rho)) * Zind;
+
+ dWVolHistory[step] = Zvol; // store volatility increment
+
+ // Fractional convolution up to current step
+ double fractionalNoise =0.0;
+ for (int j =0; j <= step; j++)
+ {
+ fractionalNoise += kernelWeights[step - j] * dWVolHistory[j];
+ }
+
+ // Variance update (ensure positivity)
+ double sqrtVt = System.Math.Sqrt(System.Math.Max(vt,0.0));
+ double vDrift = kappa * (theta - System.Math.Max(vt,0.0)) * dt;
+ double vDiffusion = sigma * sqrtVt * fractionalNoise * System.Math.Sqrt(dt);
+ double vNext = vt + vDrift + vDiffusion;
+ vt = System.Math.Max(vNext,1e-8);
+
+ // Stock price update with correlated increment
+ double StNext = St * System.Math.Exp((r -0.5 * vt) * dt + System.Math.Sqrt(vt * dt) * Zprice);
+ St = StNext;
+ }
+
+ callPayoffSum += System.Math.Max(St - Strike,0.0);
+ putPayoffSum += System.Math.Max(Strike - St,0.0);
+ }
+
+ double discount = System.Math.Exp(-r * ExpiryTime);
+ CallValue = (float)(discount * callPayoffSum / nPaths);
+ PutValue = (float)(discount * putPayoffSum / nPaths);
+ }
+
+    /// <summary>
+    /// Compute fractional kernel adjustment for mean reversion
+    /// </summary>
+  private double ComputeFractionalKernelAdjustment(double alpha, double T)
+    {
+        // Gamma function approximation for Gamma(alpha)
+        double gammaAlpha = System.Math.Exp(LogGamma(alpha));
+  
+        // Fractional kernel integral approximation
+        double kernelIntegral = System.Math.Pow(T, alpha) / (alpha * gammaAlpha);
+      
+        return 1.0 / (1.0 + kernelIntegral);
+ }
+
+    /// <summary>
+    /// Compute roughness correction factor for volatility
+    /// </summary>
+private float ComputeRoughnessVolatilityCorrection(double H, float T)
+    {
+    // Empirical correction based on H parameter
+   // H < 0.5: increases short-term volatility (roughness)
+// H > 0.5: decreases short-term volatility (smoothness)
+        double correction = 1.0 + (0.5 - H) * System.Math.Sqrt(T) * 0.2;
+        return (float)System.Math.Max(0.5, System.Math.Min(2.0, correction));
+    }
+
+    /// <summary>
+    /// Compute fractional kernel weights for Riemann-Liouville fractional derivative
+    /// </summary>
+    private double[] ComputeFractionalKernelWeights(int nSteps, double H)
+    {
+    double alpha = H + 0.5;
+ double[] weights = new double[nSteps];
+        
+// Compute normalization factor
+double sumWeights = 0.0;
+        for (int k = 0; k < nSteps; k++)
+        {
+      // Power-law kernel: (k+1)^(H-0.5)
+     weights[k] = System.Math.Pow(k + 1, H - 0.5);
+    sumWeights += weights[k] * weights[k]; // For normalization
+      }
+        
+        // Normalize to ensure proper variance scaling
+        double normFactor = System.Math.Sqrt(sumWeights);
+   if (normFactor > 1e-10)
+    {
+            for (int k = 0; k < nSteps; k++)
+    {
+       weights[k] /= normFactor;
+          }
+    }
+
+        return weights;
+    }
+
+    /// <summary>
+    /// Log-Gamma function approximation (Stirling's approximation)
+    /// </summary>
+    private double LogGamma(double x)
+  {
+        if (x <= 0) return 0;
+        
+        // Stirling's approximation for log(Gamma(x))
+        return (x - 0.5) * System.Math.Log(x) - x + 0.5 * System.Math.Log(2 * System.Math.PI) +
+       1.0 / (12.0 * x) - 1.0 / (360.0 * x * x * x);
+    }
+
+    /// <summary>
+    /// Generate normal random variable using Box-Muller transform
+    /// </summary>
+    private double NormalRandom(Random rand)
+ {
+    double u1 = 1.0 - rand.NextDouble();
+        double u2 = 1.0 - rand.NextDouble();
+        return System.Math.Sqrt(-2.0 * System.Math.Log(u1)) * System.Math.Cos(2.0 * System.Math.PI * u2);
     }
 
     #endregion
@@ -616,7 +977,7 @@ public class HestonCalculator
             return;
         }
         
-        float d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + effectiveVol * effectiveVol / 2.0f) * ExpiryTime) /
+        float d1 = (MathF.Log(StockPrice / Strike) + (RiskFreeInterestRate + effectiveVol * effectiveVol / 2.0f) * ExpiryTime) / 
                    (effectiveVol * MathF.Sqrt(ExpiryTime));
 
         DeltaCall = CumulativeNormalDistribution(d1);
@@ -951,11 +1312,4 @@ public class HestonCalculator
         }
         PutValue = MathF.Min(putUpper, MathF.Max(putLower, PutValue));
     }
-}
-
-public enum HestonIntegrationMethod
-{
-    Adaptive,
-    Fixed,
-    Approximation
 }
