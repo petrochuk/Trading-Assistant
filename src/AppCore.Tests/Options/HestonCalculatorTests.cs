@@ -290,6 +290,37 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
+    public void Test_RoughHeston_CompareToMarket() {
+        var heston = new HestonCalculator {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            StockPrice = 6770f,
+            Strike = 6740f,
+            RiskFreeInterestRate = 0.0f,
+            DaysLeft = 3,
+            CurrentVolatility = 0.1375f,
+            LongTermVolatility = 0.20f,
+            VolatilityMeanReversion = 20f,
+            VolatilityOfVolatility = 1.7f,
+            Correlation = -0.8f,
+            UseRoughHeston = true
+        };
+
+        heston.CalculateAll();
+        var hestonCall = heston.CallValue;
+
+        // Use BLS to get IV
+        var blackScholes = new BlackNScholesCaculator {
+            StockPrice = heston.StockPrice,
+            Strike = heston.Strike,
+            RiskFreeInterestRate = heston.RiskFreeInterestRate,
+            DaysLeft = heston.DaysLeft,
+            ImpliedVolatility = heston.CurrentVolatility // Use same constant vol as Heston
+        };
+
+        var blsIv = blackScholes.GetCallIVBisections(hestonCall); // Market price
+    }
+
+    [TestMethod]
     public void TestHeston_ExtremeParameters()
     {
         var heston = CreateStandardHeston();
