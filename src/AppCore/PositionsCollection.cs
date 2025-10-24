@@ -75,7 +75,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
     public void Reconcile(Dictionary<int, IPosition> positions) {
 
-        _rwLock.EnterWriteLock();
+        _rwLock.EnterUpgradeableReadLock();
         try { 
             // Add or update positions from the new list
             foreach (var positionKV in positions) {
@@ -88,11 +88,17 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         continue;
                     }
 
-                    var contract = _contractFactory.Create(positionKV.Value);
-                    AddPosition(new Position(contract) { 
-                        Size = positionKV.Value.Size,
-                        MarketValue = positionKV.Value.MarketValue,
-                    });
+                    _rwLock.EnterWriteLock();
+                    try {
+                        var contract = _contractFactory.Create(positionKV.Value);
+                        AddPosition(new Position(contract) { 
+                            Size = positionKV.Value.Size,
+                            MarketValue = positionKV.Value.MarketValue,
+                        });
+                    }
+                    finally {
+                        _rwLock.ExitWriteLock();
+                    }
                 }
             }
 
@@ -101,7 +107,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
         finally
         {
-            _rwLock.ExitWriteLock();
+            _rwLock.ExitUpgradeableReadLock();
         }
     }
 
@@ -164,10 +170,17 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         for (int i = Underlyings.Count - 1; i >= 0; i--) {
             var underlying = Underlyings[i];
             if (!newUnderlyings.ContainsKey(underlying.Symbol)) {
-                _logger.LogInformation($"Removing underlying {underlying.Symbol}");
-                Underlyings.RemoveAt(i);
-                if (_selectedPosition == underlying) {
-                    SelectedPosition = null;
+
+                _rwLock.EnterWriteLock();
+                try {
+                    _logger.LogInformation($"Removing underlying {underlying.Symbol}");
+                    Underlyings.RemoveAt(i);
+                    if (_selectedPosition == underlying) {
+                        SelectedPosition = null;
+                    }
+                }
+                finally {
+                    _rwLock.ExitWriteLock();
                 }
             }
         }

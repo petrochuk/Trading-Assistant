@@ -103,7 +103,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         // Try to acquire the semaphore without blocking
         if (!_hedgeSemaphore.Wait(0))
         {
-            _logger.LogDebug($"Hedge order already in progress for  {_underlyingPosition.Symbol}. Skipping overlapping execution.");
+            _logger.LogDebug($"Hedging in progress for {_underlyingPosition.Symbol}. Skipping overlapping execution.");
             return;
         }
 
