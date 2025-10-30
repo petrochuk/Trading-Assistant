@@ -411,6 +411,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 continue;
             }
 
+            // Skip expired contracts
+            if (position.Contract.Expiration != null && position.Contract.Expiration.Value <= currentTime)
+                continue;
+
             positionPL = 0;
             if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
                 positionPL = position.Size * (currentMove - 1f) * position.Contract.MarketPrice.Value * position.Contract.Multiplier;
