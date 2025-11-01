@@ -1,7 +1,6 @@
 ﻿using AppCore.Configuration;
 using AppCore.Extenstions;
 using AppCore.Hedging;
-using AppCore.Models;
 using AppCore.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;

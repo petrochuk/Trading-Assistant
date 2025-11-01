@@ -29,7 +29,7 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
         if (symbolConfiguration == null)
             throw new ArgumentException($"No configuration found for symbol {underlying.Symbol}", nameof(configuration));
 
-        var volForecaster = AppCore.ServiceProvider.Instance.GetService<IVolForecaster>();
+        var volForecaster = ServiceProvider.Instance != null ? ServiceProvider.Instance.GetService<IVolForecaster?>() : null;
         return new DeltaHedger(_logger, _timeProvider, broker, accountId, underlying, 
             positions, symbolConfiguration, volForecaster, _soundPlayer);
     }

@@ -33,7 +33,7 @@ public class HestonCalculatorTests
     [DataRow(5000.0f)]
     public void TestHeston_ATM_BasicCallPutCalculation(float stockPrice) {
         // Stock price equals strike price (ATM)
-        var heston = CreateStandardHeston(stockPrice);
+        var heston = CreateStandardHeston(stockPrice: stockPrice, strike: stockPrice);
         heston.CalculateCallPut();
 
         // Basic sanity checks
@@ -44,6 +44,8 @@ public class HestonCalculatorTests
         float discountedStrike = heston.Strike * MathF.Exp(-heston.RiskFreeInterestRate * heston.ExpiryTime);
         float putCallParity = heston.CallValue - heston.PutValue - (heston.StockPrice - discountedStrike);
         Assert.AreEqual(0.0f, putCallParity, 0.1f, "Put-call parity should hold within tolerance");
+
+        Assert.AreEqual(heston.PutValue, heston.CallValue, 0.1f, "Call and put values should be approximately equal for ATM options");
     }
 
     [TestMethod]
@@ -117,7 +119,7 @@ public class HestonCalculatorTests
     [DataRow(5000.0f, 4900.0f, 0.71f, -0.29f)]
     public void TestHeston_GreeksCalculation(float stockPrice, float strike, float expectedDeltaCall, float expectedDeltaPut)
     {
-        var heston = CreateStandardHeston(stockPrice, strike);
+        var heston = CreateStandardHeston(stockPrice: stockPrice, strike: strike);
         heston.CalculateAll();
 
         // Basic sanity checks for Greeks
@@ -223,7 +225,7 @@ public class HestonCalculatorTests
     public void TestHeston_VolOfVolImpact()
     {
         // 10% OTM call option
-        var heston = CreateStandardHeston(1000, 1100, correlation: 0);
+        var heston = CreateStandardHeston(stockPrice: 1000, strike: 1100, correlation: 0);
         
         // Low vol of vol
         heston.VolatilityOfVolatility = 0.1f;
