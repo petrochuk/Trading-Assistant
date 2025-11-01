@@ -383,14 +383,12 @@ public class BlackNScholesCaculator
             ImpliedVolatility = sigmaHigh
         };
 
-        blackNScholesCaculator.CalculateAll();
-        var price = blackNScholesCaculator.CallValue;
+        var price = blackNScholesCaculator.CalculateCall();
 
         while (price < optionPrice) {
             sigmaHigh = 2.0f * sigmaHigh; // keep doubling.
             blackNScholesCaculator.ImpliedVolatility = sigmaHigh;
-            blackNScholesCaculator.CalculateAll();
-            price = blackNScholesCaculator.CallValue;
+            price = blackNScholesCaculator.CalculateCall();
 
             if (sigmaHigh > HIGH_VALUE) {
                 throw new InvalidOperationException($"SigmaHigh: {sigmaHigh} exceeds {HIGH_VALUE}");
@@ -400,8 +398,7 @@ public class BlackNScholesCaculator
             var sigma = (sigmaLow + sigmaHigh) * 0.5f;
 
             blackNScholesCaculator.ImpliedVolatility = sigma;
-            blackNScholesCaculator.CalculateAll();
-            price = blackNScholesCaculator.CallValue;
+            price = blackNScholesCaculator.CalculateCall();
 
             var test = (price - optionPrice);
             if (System.Math.Abs(test) < IVCalculationPriceAccuracy) {
@@ -448,14 +445,12 @@ public class BlackNScholesCaculator
             ImpliedVolatility = sigmaHigh
         };
 
-        blackNScholesCaculator.CalculateAll();
-        var price = blackNScholesCaculator.PutValue;
+        var price = blackNScholesCaculator.CalculatePut();
 
         while (price < optionPrice) {
             sigmaHigh = 2.0f * sigmaHigh; // keep doubling.
             blackNScholesCaculator.ImpliedVolatility = sigmaHigh;
-            blackNScholesCaculator.CalculateAll();
-            price = blackNScholesCaculator.PutValue;
+            price = blackNScholesCaculator.CalculatePut();
 
             if (sigmaHigh > HIGH_VALUE) {
                 throw new InvalidOperationException($"SigmaHigh: {sigmaHigh} exceeds {HIGH_VALUE}");
@@ -465,8 +460,7 @@ public class BlackNScholesCaculator
             var sigma = (sigmaLow + sigmaHigh) * 0.5f;
 
             blackNScholesCaculator.ImpliedVolatility = sigma;
-            blackNScholesCaculator.CalculateAll();
-            price = blackNScholesCaculator.PutValue;
+            price = blackNScholesCaculator.CalculatePut();
 
             var test = (price - optionPrice);
             if (MathF.Abs(test) < IVCalculationPriceAccuracy) {
