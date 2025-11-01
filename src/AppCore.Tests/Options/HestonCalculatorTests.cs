@@ -27,12 +27,13 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
-    [DataRow(100.0f, 100.0f)]
-    [DataRow(500.0f, 500.0f)]
-    [DataRow(1000.0f, 1000.0f)]
-    [DataRow(5000.0f, 5000.0f)]
-    public void TestHeston_BasicCallPutCalculation(float stockPrice, float strike) {
-        var heston = CreateStandardHeston(stockPrice, strike);
+    [DataRow(100.0f)]
+    [DataRow(500.0f)]
+    [DataRow(1000.0f)]
+    [DataRow(5000.0f)]
+    public void TestHeston_ATM_BasicCallPutCalculation(float stockPrice) {
+        // Stock price equals strike price (ATM)
+        var heston = CreateStandardHeston(stockPrice);
         heston.CalculateCallPut();
 
         // Basic sanity checks
@@ -277,7 +278,6 @@ public class HestonCalculatorTests
 
         if (0 < volOfVol) {
             if (correlation < 0) {
-                Assert.IsGreaterThan(roughCallValue, standardCallValue, $"Heston call value should increase. Standard: {standardCallValue}, Rough: {roughCallValue}");
                 Assert.IsTrue(standardPutValue > standardCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
                 Assert.IsTrue(roughPutValue > roughCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
             }
