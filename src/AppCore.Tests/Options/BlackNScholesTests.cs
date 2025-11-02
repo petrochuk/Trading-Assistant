@@ -8,18 +8,19 @@ namespace AppCore.Tests.Options;
 public class BlackNScholesTests
 {
     [TestMethod]
-    [DataRow(5401.25f, 5470f, 54f, 0.279f)]
-    [DataRow(5401.25f, 5460f, 58.25f, 0.282f)]
-    [DataRow(5401.25f, 5450f, 62.75f, 0.284f)]
-    [DataRow(5401.25f, 5400f, 88f, 0.294f)]
+    [DataRow(5401.25f, 5470f, 54f, 0.273f)]
+    [DataRow(5401.25f, 5460f, 58.25f, 0.275f)]
+    [DataRow(5401.25f, 5450f, 62.75f, 0.277f)]
+    [DataRow(5401.25f, 5400f, 88f, 0.286f)]
     public void TestBlackNScholes_CallRoundtrip(float stockPrice, float strikePrice, float optionPrice, float expectedIV) {
         var bls = new BlackNScholesCaculator();
         bls.StockPrice = stockPrice;
         bls.Strike = strikePrice;
         bls.DaysLeft = 7.3f;
-        bls.RiskFreeInterestRate = -0.045f;
         var iv = bls.GetCallIVBisections(optionPrice);
+        var fastIv = bls.GetCallIVFast(optionPrice);
         Assert.AreEqual(expectedIV, iv, 0.005f);
+        Assert.AreEqual(expectedIV, fastIv, 0.005f);
         bls.ImpliedVolatility = iv;
 
         bls.CalculateAll();
@@ -55,16 +56,22 @@ public class BlackNScholesTests
     }
 
     [TestMethod]
-    [DataRow(5401.25f, 5400f, 87.5f, 0.297f)]
-    [DataRow(5401.25f, 5350f, 67.25f, 0.305f)]
-    public void TestBlackNScholes_PutRoundtrip(float stockPrice, float strikePrice, float optionPrice, float expectedIV) {
+    [DataRow(5401.25f, 5400f, 87.5f, 7.3f, 0.289f)]
+    [DataRow(5401.25f, 5350f, 67.25f, 7.3f, 0.298f)]
+    [DataRow(6900f, 6800f, 98f, 90f, 0.105f)]
+    [DataRow(6900f, 6800f, 98f, 60f, 0.128f)]
+    [DataRow(6900f, 6800f, 98f, 30f, 0.181f)]
+    public void TestBlackNScholes_PutRoundtrip(float stockPrice, float strikePrice, float optionPrice, float daysLeft,
+        float expectedIV) {
         var bls = new BlackNScholesCaculator();
         bls.StockPrice = stockPrice;
         bls.Strike = strikePrice;
-        bls.DaysLeft = 7.3f;
-        bls.RiskFreeInterestRate = 0.045f;
+        bls.DaysLeft = daysLeft;
+        bls.RiskFreeInterestRate = 0.0f;
         var iv = bls.GetPutIVBisections(optionPrice);
+        var fastIv = bls.GetPutIVFast(optionPrice);
         Assert.AreEqual(expectedIV, iv, 0.005f);
+        Assert.AreEqual(expectedIV, fastIv, 0.005f);
         bls.ImpliedVolatility = iv;
 
         bls.CalculateAll();

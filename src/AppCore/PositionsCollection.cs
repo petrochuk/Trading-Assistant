@@ -352,7 +352,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     greeks.Vanna += (position.Contract.IsCall ? bls.VannaCall * 0.01f : bls.VannaPut * 0.01f) * position.Size;
                     greeks.Charm += charm * position.Size;
 
-                    var hestonIV = position.Contract.IsCall ? bls.GetCallIVBisections(heston.CallValue) : bls.GetPutIVBisections(heston.PutValue);
+                    var hestonIV = position.Contract.IsCall ? bls.GetCallIVFast(heston.CallValue) : bls.GetPutIVFast(heston.PutValue);
                     bls.ImpliedVolatility = (float)hestonIV;
                     bls.CalculateAll();
 
@@ -476,14 +476,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         bls.Strike = position.Contract.Strike;
         if (position.Contract.IsCall) {
             // Estimate IV
-            var currentIV = bls.GetCallIVBisections(position.Contract.MarketPrice.Value);
+            var currentIV = bls.GetCallIVFast(position.Contract.MarketPrice.Value);
             bls.ImpliedVolatility = currentIV;
             bls.StockPrice = currentPrice;
             bls.DaysLeft -= (float)lookaheadSpan.TotalDays;
             optionPrice = bls.CalculateCall();
         } else {
             // Estimate IV
-            var currentIV = bls.GetPutIVBisections(position.Contract.MarketPrice.Value);
+            var currentIV = bls.GetPutIVFast(position.Contract.MarketPrice.Value);
             // Keep existing IV and move market price to calculate new option price
             bls.ImpliedVolatility = currentIV;
             bls.StockPrice = currentPrice;
