@@ -61,6 +61,7 @@ public class BlackNScholesTests
     [DataRow(6900f, 6800f, 98f, 90f, 0.105f)]
     [DataRow(6900f, 6800f, 98f, 60f, 0.128f)]
     [DataRow(6900f, 6800f, 98f, 30f, 0.181f)]
+    [DataRow(6895f, 5925f, 5.33f, 19f, 0.346f)]
     public void TestBlackNScholes_PutRoundtrip(float stockPrice, float strikePrice, float optionPrice, float daysLeft,
         float expectedIV) {
         var bls = new BlackNScholesCaculator();
