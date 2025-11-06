@@ -26,8 +26,8 @@ public class RVwithSubsampling : IRealizedVolatility
             
         _period = period;
 
-        // 3 hours = 3 * 60 / 5min
-        int averagePeriod = (int)(3.0 * 60.0 / period.TotalMinutes);
+        // 4 hours = 4 * 60 / 5min
+        int averagePeriod = (int)(4.0 * 60.0 / period.TotalMinutes);
         for (int i = 0; i < subsamplesCount; i++)
         {
             //_subsamples.Add(new RollingStandardDeviation());
