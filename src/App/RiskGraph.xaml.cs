@@ -1,5 +1,6 @@
 #region using
 using AppCore;
+using AppCore.Extenstions;
 using AppCore.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ using Microsoft.UI.Xaml.Shapes;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using TradingAssistant.Extensions;
 using Windows.Foundation;
 using Windows.UI;
 #endregion
@@ -21,11 +23,23 @@ public sealed partial class RiskGraph : UserControl
     #region Fields
 
     private readonly ILogger<RiskGraph> _logger;
-    private SortedList<TimeSpan, Brush> _riskIntervals = new ();
+    private List<RiskCurveUI> _riskCurves = new ();
 
     DispatcherTimer _drawRiskTimer = new () {
         Interval = TimeSpan.FromSeconds(15),
     };
+
+    class RiskCurveUI {
+        public RiskCurve RiskCurve { get; set; }
+        public Brush Brush { get; set; }
+
+        public RiskCurveUI(RiskCurve riskCurve, Brush brush) {
+            RiskCurve = riskCurve;
+            Brush = brush;
+        }
+    }
+
+    private readonly RiskCurve _expirationCurve;
 
     #endregion
 
@@ -36,19 +50,103 @@ public sealed partial class RiskGraph : UserControl
 
         _logger = AppCore.ServiceProvider.Instance.GetRequiredService<ILogger<RiskGraph>>();
 
-        _riskIntervals.Add(TimeSpan.FromMinutes(5), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xff, 0xff)));
-        _riskIntervals.Add(TimeSpan.FromMinutes(15), new SolidColorBrush(Color.FromArgb(0xff, 0xf2, 0xf5, 0xf8)));
-        _riskIntervals.Add(TimeSpan.FromMinutes(30), new SolidColorBrush(Color.FromArgb(0xff, 0xe6, 0xed, 0xf2)));
-        _riskIntervals.Add(TimeSpan.FromHours(1), new SolidColorBrush(Color.FromArgb(0xff, 0xd9, 0xe7, 0xee)));
-        _riskIntervals.Add(TimeSpan.FromHours(2), new SolidColorBrush(Color.FromArgb(0xff, 0xcc, 0xe1, 0xe7)));
-        _riskIntervals.Add(TimeSpan.FromHours(3), new SolidColorBrush(Color.FromArgb(0xff, 0xb3, 0xd9, 0xe0)));
-        _riskIntervals.Add(TimeSpan.FromHours(6), new SolidColorBrush(Color.FromArgb(0xff, 0x99, 0xd2, 0xdb)));
-        _riskIntervals.Add(TimeSpan.FromHours(12), new SolidColorBrush(Color.FromArgb(0xff, 0x80, 0xc9, 0xd4)));
-        _riskIntervals.Add(TimeSpan.FromDays(1), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xc2, 0xcc)));
-        _riskIntervals.Add(TimeSpan.FromDays(2), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xa9, 0xc4)));
-        _riskIntervals.Add(TimeSpan.FromDays(3), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xa1, 0xbf)));
-        _riskIntervals.Add(TimeSpan.FromDays(4), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0xa1, 0xbf)));
-        _riskIntervals.Add(TimeSpan.FromDays(5), new SolidColorBrush(Color.FromArgb(0xff, 0xff, 0x91, 0xa2)));
+        var riskCurve = new RiskCurve() {
+            Name = "5 Minute",
+            TimeSpan = TimeSpan.FromMinutes(5),
+            Color = 0xffffff,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "15 Minute",
+            TimeSpan = TimeSpan.FromMinutes(15),
+            Color = 0xf2f5f8,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "30 Minute",
+            TimeSpan = TimeSpan.FromMinutes(30),
+            Color = 0xe6edf2,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "1 Hour",
+            TimeSpan = TimeSpan.FromHours(1),
+            Color = 0xd9e7ee,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "2 Hour",
+            TimeSpan = TimeSpan.FromHours(2),
+            Color = 0xccdee7,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "3 Hour",
+            TimeSpan = TimeSpan.FromHours(3),
+            Color = 0xb3d9e0,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "6 Hour",
+            TimeSpan = TimeSpan.FromHours(6),
+            Color = 0x99d2db,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "12 Hour",
+            TimeSpan = TimeSpan.FromHours(12),
+            Color = 0x80c9d4,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "1 Day",
+            TimeSpan = TimeSpan.FromDays(1),
+            Color = 0xffc2cc,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "2 Day",
+            TimeSpan = TimeSpan.FromDays(2),
+            Color = 0xffa9c4,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+        
+        riskCurve = new RiskCurve() {
+            Name = "3 Day",
+            TimeSpan = TimeSpan.FromDays(3),
+            Color = 0xffa1bf,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "4 Day",
+            TimeSpan = TimeSpan.FromDays(4),
+            Color = 0xffa1bf,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        riskCurve = new RiskCurve() {
+            Name = "5 Day",
+            TimeSpan = TimeSpan.FromDays(5),
+            Color = 0xff91a2,
+        };
+        _riskCurves.Add(new RiskCurveUI(riskCurve, new SolidColorBrush(riskCurve.Color.ToColor())));
+
+        _expirationCurve = new RiskCurve() {
+            Name = "Expiration",
+            TimeSpan = TimeSpan.FromDays(4),
+            Color = 0x00ff00,
+        };
+        _riskCurves.Add(new RiskCurveUI(_expirationCurve, new SolidColorBrush(_expirationCurve.Color.ToColor())));
 
         _drawRiskTimer.Tick += (s, args) => {
             Redraw();
@@ -147,16 +245,24 @@ public sealed partial class RiskGraph : UserControl
             return;
         }
 
+        // For now assume expiration is at 16:00
+        var estNom = TimeProvider.System.EstNow();
+        if (estNom.Hour >= 16) {
+            estNom = estNom.AddBusinessDays(1);
+        }
+        var estExpiration = new DateTimeOffset(estNom.Year, estNom.Month, estNom.Day, 16, 0, 0, TimeSpan.FromHours(-5));
+        _expirationCurve.TimeSpan = estExpiration - TimeProvider.System.EstNow();
+
         var underlyingSymbol = Account.Positions.SelectedPosition.Symbol;
         var minMove = 0.97f;
         var maxMove = 1.03f;
-        var riskCurves = new Dictionary<TimeSpan, RiskCurve>();
         var maxPL = float.MinValue;
         var minPL = float.MaxValue;
-        foreach (var interval in _riskIntervals) {
-            var riskCurve = Account.Positions.CalculateRiskCurve(underlyingSymbol, interval.Key, minMove, maxMove, (maxMove - minMove) / 100f);
+        foreach (var interval in _riskCurves) {
+            interval.RiskCurve.Clear();
+            var riskCurve = Account.Positions.CalculateRiskCurve(underlyingSymbol, interval.RiskCurve, minMove, maxMove, (maxMove - minMove) / 100f);
             if (riskCurve == null) {
-                _logger.LogWarning($"Risk curve for interval {interval.Key} is null");
+                _logger.LogWarning($"Risk curve for interval {interval.RiskCurve.TimeSpan} is null");
                 continue;
             }
             if (riskCurve.MaxPL > maxPL) {
@@ -165,7 +271,6 @@ public sealed partial class RiskGraph : UserControl
             if (riskCurve.MinPL < minPL) {
                 minPL = riskCurve.MinPL;
             }
-            riskCurves.Add(interval.Key, riskCurve);
         }
 
         // Make min and max equal to each other
@@ -175,15 +280,14 @@ public sealed partial class RiskGraph : UserControl
             maxPL = -minPL;
 
         // Now draw the risk curves
-        foreach (var riskCurve in riskCurves) {
-            var curve = riskCurve.Value;
-            var points = curve.Points;
+        foreach (var riskCurve in _riskCurves) {
+            var points = riskCurve.RiskCurve.Points;
             if (points.Count == 0) {
-                _logger.LogDebug($"No points available for risk curve {riskCurve.Key}");
+                _logger.LogDebug($"No points available for risk curve {riskCurve.RiskCurve.Points}");
                 continue;
             }
             var path = new Path() {
-                Stroke = _riskIntervals[riskCurve.Key],
+                Stroke = riskCurve.Brush,
                 StrokeThickness = 1,
                 Data = new PathGeometry(),
             };

@@ -19,10 +19,20 @@ public class RiskCurve
         }
     }
 
+    public void Clear() {
+        _points.Clear();
+        _maxPL = float.MinValue;
+        _minPL = float.MaxValue;
+    }
+
     public float MaxPL => _maxPL;
     public float MinPL => _minPL;
 
     public string Name { get; set; } = string.Empty;
+
+    public TimeSpan TimeSpan { get; set; } = TimeSpan.Zero;
+    
+    public int Color { get; set; } = 0xFFFFFF;
 
     public SortedList<float, float> Points => _points;
 }

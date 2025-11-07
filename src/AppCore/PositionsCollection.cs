@@ -377,14 +377,13 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         return greeks;
     }
 
-    public RiskCurve? CalculateRiskCurve(string underlyingSymbol, TimeSpan lookaheadSpan, float minMove, float maxMove, float moveIncrement)
+    public RiskCurve? CalculateRiskCurve(string underlyingSymbol, RiskCurve riskCurve, float minMove, float maxMove, float moveIncrement)
     {
-        var riskCurve = new RiskCurve();
         var currentTime = _timeProvider.EstNow();
 
         // Go through the price range and calculate the P&L for each position
         for (var currentMove = minMove; currentMove <= maxMove; currentMove += moveIncrement) {
-            var totalPL = CalculatePL(underlyingSymbol, currentTime, lookaheadSpan, currentMove);
+            var totalPL = CalculatePL(underlyingSymbol, currentTime, riskCurve.TimeSpan, currentMove);
 
             if (!totalPL.HasValue) {
                 _logger.LogWarning($"Unable to calculate RiskCurve for {currentMove:P2} for underlying {underlyingSymbol}");
