@@ -120,40 +120,32 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                 _logger.LogDebug($"Vol of Vol: N/A for {_underlyingPosition.Symbol}");
 
             LastGreeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true);
-            if (LastGreeks == null || float.IsNaN(LastGreeks.DeltaHeston) || float.IsNaN(LastGreeks.Charm)) {
+            if (LastGreeks == null || float.IsNaN(LastGreeks.Delta) || float.IsNaN(LastGreeks.Charm)) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
-            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta Heston: {LastGreeks.DeltaHeston:f3}, Delta BLS: {LastGreeks.DeltaBLS:f3},Theta: {LastGreeks.ThetaHeston:f3}");
+            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.Delta:f3}, Theta: {LastGreeks.Theta:f3}");
 
-            // Output overvalued options in reverse order
-            /*
-            if (LastGreeks.OvervaluedPositions != null && LastGreeks.OvervaluedPositions.Count > 0) {
-                foreach (var option in LastGreeks.OvervaluedPositions) {
-                    _logger.LogInformation($"  {option.Key} o: {option.Value}");
-                }
-            }
-            */
-
-            if (MathF.Abs(LastGreeks.DeltaHeston) < _configuration.Delta) {
-                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHeston:f3}) < {_configuration.Delta}. Delta: {LastGreeks.DeltaHeston:f3}. No hedging required.");
+            var deltaHedgeSize = 0 < LastGreeks.Delta ? -MathF.Floor(LastGreeks.Delta) : -MathF.Ceiling(LastGreeks.Delta);
+            if (MathF.Abs(LastGreeks.DeltaHedge - deltaHedgeSize) < _configuration.Delta) {
+                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.Delta:f3}) < {_configuration.Delta}. Delta: {LastGreeks.Delta:f3}. No hedging required.");
                 return;
             }
 
-            _logger.LogInformation($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta Abs({LastGreeks.DeltaHeston:f3}) exceeds threshold: {_configuration.Delta}. Delta: {LastGreeks.DeltaHeston:f3}, Executing hedge.");
+            _logger.LogInformation($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta Abs({LastGreeks.DeltaTotal:f3}) exceeds threshold: {_configuration.Delta}. Delta: {LastGreeks.Delta:f3}, Executing hedge.");
 
             // Round delta down to 0 in whole numbers
-            var deltaHedgeSize = 0 < LastGreeks.DeltaHeston ? MathF.Floor(_configuration.Delta - LastGreeks.DeltaHeston) : MathF.Ceiling(-_configuration.Delta - LastGreeks.DeltaHeston);
-            if (MathF.Abs(deltaHedgeSize) < _configuration.MinDeltaAdjustment ) {
-                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta hedge adjustment {deltaHedgeSize:f3} is below minimum adjustment {_configuration.MinDeltaAdjustment}. No hedging required.");
+            var deltaAdjustment = deltaHedgeSize - LastGreeks.DeltaHedge;
+            if (MathF.Abs(deltaAdjustment) < _configuration.MinDeltaAdjustment ) {
+                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta hedge adjustment {deltaAdjustment:f3} is below minimum adjustment {_configuration.MinDeltaAdjustment}. No hedging required.");
                 return;
             }
 
-            _logger.LogDebug($"Placing delta hedge size: {deltaHedgeSize} for {_underlyingPosition.Symbol}");
+            _logger.LogDebug($"Placing delta hedge size: {deltaAdjustment} for {_underlyingPosition.Symbol}");
             // Set a delay to prevent immediate re-hedging
             _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(2);
             _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
-            _broker.PlaceOrder(_accountId, _activeOrderId.Value, _underlyingPosition.FrontContract, deltaHedgeSize);
+            _broker.PlaceOrder(_accountId, _activeOrderId.Value, _underlyingPosition.FrontContract, deltaAdjustment);
         }
         finally
         {

@@ -11,18 +11,20 @@ namespace AppCore.Tests.Hedging;
 public sealed class DeltaHedgerTests
 {
     [TestMethod]
-    [DataRow(5000.0f, true, 5, 0.75f, -3)]
-    [DataRow(5000.0f, true, 1, 0.75f, -1)]
-    [DataRow(5000.0f, true, -1, 0.75f, 0)]
-    [DataRow(4900.0f, true, 5, 0.75f, -4)]
-    [DataRow(4900.0f, true, -1, 0.75f, 0)]
-    [DataRow(4900.0f, true, -2, 0.75f, 0)]
-    [DataRow(4900.0f, true, -3, 0.75f, 1)]
-    [DataRow(4900.0f, true, -10, 0.75f, 6)]
-    [DataRow(4900.0f, true, -10, 2.75f, 4)]
-    [DataRow(5000.0f, false, 1, 0.75f, 0)]
-    [DataRow(5000.0f, false, 2, 0.75f, 0)]
-    public void DeltaHedger_DeltaHedge(float strike, bool isCall, float optionSize, float delta, int expectedHedgeSize)
+    [DataRow(5300.0f, true, -5, 1, 1f, -1)]
+    [DataRow(5300.0f, true, 5, 1, 1f, -1)]
+    [DataRow(5300.0f, true, 5, -1, 1f, 1)]
+    [DataRow(5000.0f, true, 5, 1, 1f, -3)]
+    [DataRow(5000.0f, true, 1, 1, 1f, -1)]
+    [DataRow(5000.0f, true, -1, 1, 1f, -1)]
+    [DataRow(4900.0f, true, 5, 1, 1f, -4)]
+    [DataRow(4900.0f, true, -1, 1, 1f, -1)]
+    [DataRow(4900.0f, true, -2, 1, 1f, 0)]
+    [DataRow(4900.0f, true, -3, 1, 1f, 1)]
+    [DataRow(4900.0f, true, -10, 1, 1f, 6)]
+    [DataRow(5000.0f, false, 1, 1, 1f, -1)]
+    [DataRow(5000.0f, false, 2, 1, 1f, -1)]
+    public void DeltaHedger_DeltaHedge(float strike, bool isCall, float optionSize, int positionSize, float delta, int expectedHedgeSize)
     {
         // Arrange
         var contractFactory = new TestContractFactory();
@@ -39,7 +41,7 @@ public sealed class DeltaHedgerTests
         var esPosition = TestHelpers.CreatePosition(contractFactory, timeProvider, AssetClass.Future,
             underlyingPosition.FrontContract!.Id, underlyingPosition.FrontContract!.Id, esMarketPrice,
             new DateTimeOffset(2025, 6, 20, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
-            size: 1);
+            size: positionSize);
         positions.TryAdd(esPosition.Contract.Id, esPosition);
 
         // Option position

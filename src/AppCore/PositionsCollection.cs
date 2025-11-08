@@ -236,16 +236,13 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 }
 
                 if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
-                    greeks.DeltaBLS += position.Size;
-                    greeks.DeltaHeston += position.Size;
+                    greeks.DeltaHedge += position.Size;
                 }
                 else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
                     // Skip expired options
                     if (position.Contract.Expiration!.Value <= _timeProvider.EstNow()) {
                         continue;
                     }
-
-                    //greeks.Delta += position.Delta.Value * position.Size;
 
                     if (position.Underlying == null || position.UnderlyingContractId == null) {
                         _logger.LogWarning($"Position {position.Contract} has no underlying, unable to calculate Greeks.");
@@ -269,20 +266,6 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         }
                     }
 
-                    var heston = new HestonCalculator() {
-                        IntegrationMethod = HestonIntegrationMethod.Adaptive,
-                        StockPrice = underlyingContract.MarketPrice.Value,
-                        DaysLeft = daysLeft,
-                        Strike = position.Contract.Strike,
-                        CurrentVolatility = (float)realizedVol,
-                        LongTermVolatility = underlyingContract.LongTermVolatility,
-                        VolatilityMeanReversion = underlyingContract.VolatilityMeanReversion,
-                        VolatilityOfVolatility = underlyingContract.VolatilityOfVolatility,
-                        Correlation = underlyingContract.Correlation,
-                        UseRoughHeston = true,
-                    };
-                    heston.CalculateAll(skipVanna: true, skipCharm: true);
-
                     var bls = new BlackNScholesCalculator() {
                         StockPrice = underlyingContract.MarketPrice.Value,
                         DaysLeft = (float)daysLeft,
@@ -295,71 +278,32 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     bls.ImpliedVolatility = (float)realizedVol;
                     bls.CalculateAll();
 
-                    // Calculate cheapness/richness
-                    if (addOvervaluedOptions) { 
-                        if (position.Contract.IsCall) {
-                            if (position.Size > 0) {
-                                if (heston.CallValue < position.Contract.MarketPrice.Value) {
-                                    greeks.OvervaluedPositions.Add(position.Contract.MarketPrice.Value - heston.CallValue, position);
-                                }
-                            }
-                            else {
-                                if (heston.CallValue > position.Contract.MarketPrice.Value) {
-                                    greeks.OvervaluedPositions.Add(heston.CallValue - position.Contract.MarketPrice.Value, position);
-                                }
-                            }
-                        }
-                        else {
-                            if (position.Size > 0) {
-                                if (heston.PutValue < position.Contract.MarketPrice.Value) {
-                                    greeks.OvervaluedPositions.Add(position.Contract.MarketPrice.Value - heston.PutValue, position);
-                                }
-                            }
-                            else {
-                                if (heston.PutValue > position.Contract.MarketPrice.Value) {
-                                    greeks.OvervaluedPositions.Add(heston.PutValue - position.Contract.MarketPrice.Value, position);
-                                }
-                            }
-                        }                    
-                    }
-
                     var charm = (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut);
                     var thetaBLS = (position.Contract.IsCall ? bls.ThetaCall : bls.ThetaPut);
-                    var thetaHeston = (position.Contract.IsCall ? heston.ThetaCall : heston.ThetaPut);
                     // If the position is close to expiration, charm can go to infinity. Estimate it as diff from delta.
                     if (bls.DaysLeft <= 1) {
                         if (position.Contract.IsCall) {
                             charm = bls.DeltaCall > 0.5 ? 1 - bls.DeltaCall : -bls.DeltaCall;
                             thetaBLS = bls.DeltaCall > 0.5 ? -bls.PutValue : -bls.CallValue;
-                            thetaHeston = bls.DeltaCall > 0.5 ? -heston.PutValue : -heston.CallValue;
                         }
                         else {
                             charm = bls.DeltaPut < -0.5 ? 1 + bls.DeltaPut : -bls.DeltaPut;
                             thetaBLS = bls.DeltaPut < -0.5 ? -bls.CallValue : -bls.PutValue;
-                            thetaHeston = bls.DeltaPut < -0.5 ? -heston.CallValue : -heston.PutValue;
                         }
                     }
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
                     var deltaBls = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
-                    greeks.DeltaBLS += deltaBls * position.Size;
+                    greeks.Delta += deltaBls * position.Size;
 
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
 
-                    greeks.ThetaBLS += thetaBLS * position.Size * position.Contract.Multiplier;
+                    greeks.Theta += thetaBLS * position.Size * position.Contract.Multiplier;
 
                     greeks.Vanna += (position.Contract.IsCall ? bls.VannaCall * 0.01f : bls.VannaPut * 0.01f) * position.Size;
                     greeks.Charm += charm * position.Size;
-
-                    var hestonIV = position.Contract.IsCall ? bls.GetCallIVFast(heston.CallValue) : bls.GetPutIVFast(heston.PutValue);
-                    bls.ImpliedVolatility = (float)hestonIV;
-                    bls.CalculateAll();
-
-                    var deltaHeston = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
-                    greeks.DeltaHeston += deltaHeston * position.Size;
-                    greeks.ThetaHeston += thetaHeston * position.Size * position.Contract.Multiplier;
-                    _logger.LogInformation($"{position} is using IV: {hestonIV:f3} rv:{realizedVol:f3} p:{(position.Contract.IsCall ? heston.CallValue : heston.PutValue):f2} t:{daysLeft:f2} d:{deltaHeston:f2} t:{deltaHeston * position.Size:f2}");
+                    _logger.LogInformation($"{position} is using IV: rv:{realizedVol:f3} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} t:{deltaBls * position.Size:f2}");
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
