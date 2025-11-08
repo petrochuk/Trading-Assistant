@@ -14,7 +14,7 @@ public class VarianceGammaCalculatorTests
     [DataRow(5000.0f, 3000.0f)]
     [DataRow(5000.0f, 7000.0f)]
     public void VarianceGammaCalculator_Should_Approximate_BlackScholes(float stockPrice, float strike) {
-        var blackScholes = new BlackNScholesCaculator {
+        var blackScholes = new BlackNScholesCalculator {
             StockPrice = stockPrice,
             Strike = strike,
             RiskFreeInterestRate = 0.0f,

@@ -283,7 +283,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     };
                     heston.CalculateAll(skipVanna: true, skipCharm: true);
 
-                    var bls = new BlackNScholesCaculator() {
+                    var bls = new BlackNScholesCalculator() {
                         StockPrice = underlyingContract.MarketPrice.Value,
                         DaysLeft = (float)daysLeft,
                         Strike = position.Contract.Strike,
@@ -397,7 +397,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
     private float? CalculatePL(string underlyingSymbol, DateTimeOffset currentTime, TimeSpan lookaheadSpan, float currentMove) {
 
-        var bls = new BlackNScholesCaculator();
+        var bls = new BlackNScholesCalculator();
         float totalPL = 0;
         float positionPL = 0;
         foreach (var position in Values) {
@@ -441,7 +441,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         return totalPL;
     }
 
-    private float? CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCaculator bls, Position position) {
+    private float? CalculateOptionPrice(TimeSpan lookaheadSpan, float midPrice, DateTimeOffset currentTime, float currentPrice, BlackNScholesCalculator bls, Position position) {
         if (!position.Contract.MarketPrice.HasValue) {
             _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate option price.");
             return null;

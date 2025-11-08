@@ -34,12 +34,12 @@ public class Contract
     }
 
     public bool IsDataStreaming { get; set; } = false;
-    public float LongTermVolatility { get; internal set; }
-    public float Correlation { get; internal set; }
-    public float VolatilityOfVolatility { get; internal set; }
-    public float VolatilityMeanReversion { get; internal set; }
-    public float VarianceGammaDrift { get; internal set; }
-    public string OHLCHistoryFilePath { get; internal set; } = string.Empty;
+    public float LongTermVolatility { get; set; }
+    public float Correlation { get; set; }
+    public float VolatilityOfVolatility { get; set; }
+    public float VolatilityMeanReversion { get; set; }
+    public float VarianceGammaDrift { get; set; }
+    public string OHLCHistoryFilePath { get; set; } = string.Empty;
 
     public override string ToString() {
         var sb = new System.Text.StringBuilder();

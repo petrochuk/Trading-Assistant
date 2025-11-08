@@ -19,6 +19,9 @@ namespace Simulation
             {
                 switch (args[0])
                 {
+                    case "--help":
+                        ShowHelp();
+                        return;
                     case "--calibrate":
                         await RunCalibrationAsync();
                         return;
@@ -28,15 +31,12 @@ namespace Simulation
                     case "--gamma-fit":
                         await RunGammaFitAsync();
                         return;
-                    case "--help":
-                        ShowHelp();
+                    case "--gamma-scalping":
+                        var simulation = new GammaScalping();
+                        simulation.Run();
                         return;
                 }
             }
-
-            // Default simulation
-            var simulation = new GammaScalping();
-            simulation.Run();
         }
 
         private static async Task RunCalibrationAsync()

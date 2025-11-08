@@ -5,11 +5,11 @@ namespace AppCore.Options;
 /// <summary>
 /// Black-Scholes model for option pricing.
 /// </summary>
-public class BlackNScholesCaculator
+public class BlackNScholesCalculator
 {
     #region Constructor
 
-    public BlackNScholesCaculator() {
+    public BlackNScholesCalculator() {
     }
 
     #endregion
@@ -483,7 +483,7 @@ public class BlackNScholesCaculator
         float sigmaLow = 1e-5f;
         float sigmaHigh = 0.3f;
 
- var blackNScholesCaculator = new BlackNScholesCaculator {
+ var blackNScholesCaculator = new BlackNScholesCalculator {
  ExpiryTime = time,
  RiskFreeInterestRate = interestRate,
  StockPrice = spot,
@@ -545,7 +545,7 @@ public class BlackNScholesCaculator
         float sigmaLow = 1e-5f;
         float sigmaHigh = 0.3f;
 
- var blackNScholesCaculator = new BlackNScholesCaculator {
+ var blackNScholesCaculator = new BlackNScholesCalculator {
  ExpiryTime = time,
  RiskFreeInterestRate = interestRate,
  StockPrice = spot,
@@ -609,7 +609,7 @@ public class BlackNScholesCaculator
         if (sigma < 0.001f) sigma = 0.2f;
         if (sigma > 5.0f) sigma = 0.5f;
 
- var blackNScholesCaculator = new BlackNScholesCaculator {
+ var blackNScholesCaculator = new BlackNScholesCalculator {
  ExpiryTime = time,
  RiskFreeInterestRate = interestRate,
  StockPrice = spot,
@@ -684,7 +684,7 @@ public class BlackNScholesCaculator
         if (sigma < 0.001f) sigma = 0.2f;
         if (sigma > 5.0f) sigma = 0.5f;
 
- var blackNScholesCaculator = new BlackNScholesCaculator {
+ var blackNScholesCaculator = new BlackNScholesCalculator {
  ExpiryTime = time,
  RiskFreeInterestRate = interestRate,
  StockPrice = spot,

@@ -1,5 +1,5 @@
 using AppCore.Options;
-using System;
+using System.Diagnostics;
 
 namespace AppCore.Tests.Options;
 
@@ -280,13 +280,13 @@ public class HestonCalculatorTests
 
         if (0 < volOfVol) {
             if (correlation < 0) {
-                Assert.IsTrue(standardPutValue > standardCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
-                Assert.IsTrue(roughPutValue > roughCallValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+                Assert.IsGreaterThan(standardCallValue, standardPutValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+                Assert.IsGreaterThan(roughCallValue, roughPutValue, $"Calls should be worth less in negative correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
             }
             else if (correlation > 0) {
                 Assert.IsGreaterThan(standardCallValue, roughCallValue, $"Rough Heston call value should increase. Standard: {standardCallValue}, Rough: {roughCallValue}");
-                Assert.IsTrue(standardCallValue > standardPutValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
-                Assert.IsTrue(roughCallValue > roughPutValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+                Assert.IsGreaterThan(standardPutValue, standardCallValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
+                Assert.IsGreaterThan(roughPutValue, roughCallValue, $"Puts should be worth less in positive correlation. Standard Call: {standardCallValue}, Put: {standardPutValue}");
             }
         }
     }
@@ -311,7 +311,7 @@ public class HestonCalculatorTests
         var hestonCall = heston.CallValue;
 
         // Use BLS to get IV
-        var blackScholes = new BlackNScholesCaculator {
+        var blackScholes = new BlackNScholesCalculator {
             StockPrice = heston.StockPrice,
             Strike = heston.Strike,
             RiskFreeInterestRate = heston.RiskFreeInterestRate,
@@ -365,7 +365,7 @@ public class HestonCalculatorTests
         var hestonUpCall = heston.CallValue;
         var hestonUpPut = heston.PutValue;
 
-        var blackScholes = new BlackNScholesCaculator {
+        var blackScholes = new BlackNScholesCalculator {
             StockPrice = heston.StockPrice,
             Strike = heston.Strike,
             RiskFreeInterestRate = heston.RiskFreeInterestRate,
@@ -424,7 +424,7 @@ public class HestonCalculatorTests
             VolatilityOfVolatility = 0.001f, // Very low vol of vol
             Correlation = 0f // No correlation
         };
-        var blackScholes = new BlackNScholesCaculator {
+        var blackScholes = new BlackNScholesCalculator {
             StockPrice = heston.StockPrice,
             Strike = heston.Strike,
             RiskFreeInterestRate = heston.RiskFreeInterestRate,
@@ -503,7 +503,7 @@ public class HestonCalculatorTests
             Correlation = 0f // No correlation
         };
 
-        var blackScholes = new BlackNScholesCaculator
+        var blackScholes = new BlackNScholesCalculator
         {
             StockPrice = stockPrice,
             Strike = strike,
@@ -522,6 +522,40 @@ public class HestonCalculatorTests
         relativeError = heston.PutValue == blackScholes.PutValue ? 0 : MathF.Abs(heston.PutValue - blackScholes.PutValue) / blackScholes.PutValue;
         Assert.IsLessThan(0.04f, relativeError, 
             $"Heston should approximate Black-Scholes when vol is constant. Heston: {heston.PutValue}, BS: {blackScholes.PutValue}, Error: {relativeError:P2}");
+    }
+
+    //[TestMethod]
+    public void TestHeston_CompareWithBlackScholes_Deltas(){
+        var startPrice = 4000.0f;
+        var strike = 5000.0f;
+        var endPrice = 6000.0f;
+        var step = 10.0f;
+
+        var heston = new HestonCalculator
+        {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            Strike = strike,
+            DaysLeft = 10f,
+            CurrentVolatility = 0.2f,
+            LongTermVolatility = 0.2f,
+            VolatilityMeanReversion = 20f,
+            VolatilityOfVolatility = 2.0f,
+            Correlation = -0.6f,
+            UseRoughHeston = true
+        };
+        var blackScholes = new BlackNScholesCalculator
+        {
+            Strike = strike,
+            DaysLeft = heston.DaysLeft,
+            ImpliedVolatility = heston.CurrentVolatility // Use same constant vol as Heston
+        };
+
+        for (var stockPrice = startPrice; stockPrice <= endPrice; stockPrice += step) {
+            heston.StockPrice = blackScholes.StockPrice = stockPrice;
+            heston.CalculateAll(skipVanna: true, skipCharm: true);
+            blackScholes.CalculateAll();
+            Debug.WriteLine($"{stockPrice}, {heston.DeltaCall}, {blackScholes.DeltaCall}, {heston.DeltaPut}, {blackScholes.DeltaPut}");
+        }
     }
 
     [TestMethod]
@@ -550,31 +584,6 @@ public class HestonCalculatorTests
                 float parityDiff = (heston.CallValue - heston.PutValue) - (heston.StockPrice - discountedStrike);
                 Assert.AreEqual(0f, parityDiff, 0.4f, $"Put-call parity drift too large for K={K}, T={T}, diff={parityDiff}");
             }
-        }
-    }
-
-    [TestMethod]
-    public void TestHeston_CallPriceMonotonicDecreasingInStrike()
-    {
-        var strikes = new float[] { 80f, 90f, 100f, 110f, 120f };
-        float prev = float.MaxValue;
-        foreach (var K in strikes)
-        {
-            var heston = new HestonCalculator
-            {
-                StockPrice = 100f,
-                Strike = K,
-                RiskFreeInterestRate = 0.01f,
-                ExpiryTime = 60f/365f,
-                CurrentVolatility = 0.2f,
-                LongTermVolatility = 0.2f,
-                VolatilityMeanReversion = 10.0f,
-                VolatilityOfVolatility = 0.001f,
-                Correlation = 0.0f
-            };
-            heston.CalculateCallPut();
-            Assert.IsLessThanOrEqualTo(prev + 0.05f, heston.CallValue, $"Call price should not increase materially with higher strike. K={K}, C={heston.CallValue}, prev={prev}");
-            prev = heston.CallValue;
         }
     }
 

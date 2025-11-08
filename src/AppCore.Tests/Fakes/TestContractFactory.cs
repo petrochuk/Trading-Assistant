@@ -9,6 +9,14 @@ internal class TestContractFactory : IContractFactory
 
     public int NextContractId => _nextContractId++;
 
+    public float VolatilityMeanReversion { get; set; } = 0f;
+
+    public float VolatilityOfVolatility { get; set; } = 0f;
+
+    public float LongTermVolatility { get; set; } = 0f;
+
+    public float Correlation { get; set; } = 0f;
+
     public Contract Create(IPosition position) {
         throw new NotImplementedException();
     }
@@ -31,7 +39,11 @@ internal class TestContractFactory : IContractFactory
             },
             Strike = strike ?? 0,
             IsCall = isCall ?? false,
-            Expiration = expiration
+            Expiration = expiration,
+            VolatilityMeanReversion = VolatilityMeanReversion,
+            VolatilityOfVolatility = VolatilityOfVolatility,
+            LongTermVolatility = LongTermVolatility,
+            Correlation = Correlation,
         };
 
         return contract;

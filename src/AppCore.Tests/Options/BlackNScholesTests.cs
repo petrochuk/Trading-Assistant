@@ -13,7 +13,7 @@ public class BlackNScholesTests
     [DataRow(5401.25f, 5450f, 62.75f, 0.277f)]
     [DataRow(5401.25f, 5400f, 88f, 0.286f)]
     public void TestBlackNScholes_CallRoundtrip(float stockPrice, float strikePrice, float optionPrice, float expectedIV) {
-        var bls = new BlackNScholesCaculator();
+        var bls = new BlackNScholesCalculator();
         bls.StockPrice = stockPrice;
         bls.Strike = strikePrice;
         bls.DaysLeft = 7.3f;
@@ -30,7 +30,7 @@ public class BlackNScholesTests
     [TestMethod]
     [DataRow(6263.5f, 6175f, 7f, 0.188f, -0.15f)]
     public void TestBlackNScholes_PutDelta(float stockPrice, float strikePrice, float optionPrice, float expectedIV, float expectedDelta) {
-        var bls = new BlackNScholesCaculator {
+        var bls = new BlackNScholesCalculator {
             StockPrice = stockPrice,
             Strike = strikePrice
         };
@@ -45,7 +45,7 @@ public class BlackNScholesTests
     [DataRow(5000f, 5100f, 30f, 0.25f, -2.315f)]
     [DataRow(5000f, 5100f, 10f, 0.25f, -3.716f)]
     public void TestBlackNScholes_CallTheta(float stockPrice, float strikePrice, float daysLeft, float iv, float expectedTheta) {
-        var bls = new BlackNScholesCaculator {
+        var bls = new BlackNScholesCalculator {
             StockPrice = stockPrice,
             Strike = strikePrice
         };
@@ -64,7 +64,7 @@ public class BlackNScholesTests
     [DataRow(6895f, 5925f, 5.33f, 19f, 0.346f)]
     public void TestBlackNScholes_PutRoundtrip(float stockPrice, float strikePrice, float optionPrice, float daysLeft,
         float expectedIV) {
-        var bls = new BlackNScholesCaculator();
+        var bls = new BlackNScholesCalculator();
         bls.StockPrice = stockPrice;
         bls.Strike = strikePrice;
         bls.DaysLeft = daysLeft;
@@ -84,7 +84,7 @@ public class BlackNScholesTests
     [DataRow(6100f, 6000f, 3, 0.25f, 0.2364f, -0.0381f)]
     [DataRow(6100f, 6000f, 2, 0.25f, 0.1884f, -0.0609f)]
     public void TestBlackNScholes_CallCharm(float strike, float stockPrice, float daysLeft, float iv, float expectedDelta, float expectedCharm) {
-        var bls = new BlackNScholesCaculator {
+        var bls = new BlackNScholesCalculator {
             StockPrice = stockPrice,
             Strike = strike,
             DaysLeft = daysLeft,
@@ -97,7 +97,7 @@ public class BlackNScholesTests
 
     [TestMethod]
     public void TestBlackNScholes_Vega() {
-        var bls = new BlackNScholesCaculator {
+        var bls = new BlackNScholesCalculator {
             StockPrice = 5000f,
             Strike = 5100f,
             DaysLeft = 30f,
