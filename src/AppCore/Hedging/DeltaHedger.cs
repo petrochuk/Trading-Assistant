@@ -120,19 +120,21 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                 _logger.LogDebug($"Vol of Vol: N/A for {_underlyingPosition.Symbol}");
 
             LastGreeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true);
-            if (LastGreeks == null || float.IsNaN(LastGreeks.Delta) || float.IsNaN(LastGreeks.Charm)) {
+            if (LastGreeks == null || !LastGreeks.IsDeltaValid) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
-            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.Delta:f3}, Theta: {LastGreeks.Theta:f3}");
+            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.DeltaTotal:f3}, Theta: {LastGreeks.Theta:f3}");
 
-            var deltaHedgeSize = 0 < LastGreeks.Delta ? -MathF.Floor(LastGreeks.Delta) : -MathF.Ceiling(LastGreeks.Delta);
+            var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Floor(LastGreeks.DeltaOTM) : -MathF.Ceiling(LastGreeks.DeltaOTM);
+            var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Ceiling(LastGreeks.DeltaITM) : -MathF.Floor(LastGreeks.DeltaITM);
+            var deltaHedgeSize = deltaOTMHedgeSize + deltaITMHedgeSize;
             if (MathF.Abs(LastGreeks.DeltaHedge - deltaHedgeSize) < _configuration.Delta) {
-                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.Delta:f3}) < {_configuration.Delta}. Delta: {LastGreeks.Delta:f3}. No hedging required.");
+                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");
                 return;
             }
 
-            _logger.LogInformation($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta Abs({LastGreeks.DeltaTotal:f3}) exceeds threshold: {_configuration.Delta}. Delta: {LastGreeks.Delta:f3}, Executing hedge.");
+            _logger.LogInformation($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta Abs({LastGreeks.DeltaTotal:f3}) exceeds threshold: {_configuration.Delta}. OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}, Executing hedge.");
 
             // Round delta down to 0 in whole numbers
             var deltaAdjustment = deltaHedgeSize - LastGreeks.DeltaHedge;

@@ -293,8 +293,19 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
-                    var deltaBls = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
-                    greeks.Delta += deltaBls * position.Size;
+                    float deltaBls = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
+                    if (position.Contract.IsCall) {
+                        if (bls.DeltaCall >= 0.5)
+                            greeks.DeltaITM += bls.DeltaCall * position.Size;
+                        else
+                            greeks.DeltaOTM += bls.DeltaCall * position.Size;
+                    }
+                    else {
+                        if (bls.DeltaPut <= -0.5)
+                            greeks.DeltaITM += bls.DeltaPut * position.Size;
+                        else
+                            greeks.DeltaOTM += bls.DeltaPut * position.Size;
+                    }
 
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
                     greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
