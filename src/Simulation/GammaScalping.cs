@@ -11,7 +11,6 @@ internal class GammaScalping : ISimulation
     {
         Console.WriteLine("Running Gamma Scalping simulation...");
 
-        var bnsCalc = new BlackNScholesCalculator();
         var startTime = new DateTime(2025, 1, 1, 9, 30, 0);
         var endTime = new DateTime(2025, 3, 31, 16, 0, 0);
         var timeStep = TimeSpan.FromMinutes(5);
@@ -20,13 +19,32 @@ internal class GammaScalping : ISimulation
         var startingPrice = 5000.0f;
         var numberOfPaths = 10000;
 
-        var totalPL = 0.0;
+        double totalPL = 0.0;
+#if DEBUG
+        // Keep sequential loop in Debug for easier debugging / determinism
         for (int i = 0; i < numberOfPaths; i++)
         {
             var account = RunPath(startTime, endTime, timeStep, startingPrice);
-            // Close the position
             totalPL += account.Cash;
         }
+#else
+        // Run paths in parallel in Release for performance
+        object sync = new();
+        Parallel.For(0, numberOfPaths,
+            () => 0.0, // thread-local accumulator
+            (i, state, localSum) =>
+            {
+                var account = RunPath(startTime, endTime, timeStep, startingPrice);
+                return localSum + account.Cash;
+            },
+            localSum =>
+            {
+                lock (sync)
+                {
+                    totalPL += localSum;
+                }
+            });
+#endif
 
         var averagePL = totalPL / numberOfPaths;
         Console.WriteLine($"Average P/L: {averagePL:0.00}");
@@ -36,7 +54,7 @@ internal class GammaScalping : ISimulation
 
         var account = new SimulationAccount();
         var rvOvernight = 0.10f;
-        var rvIntraday = 0.50f;
+        var rvIntraday = 0.30f;
         var rvFullDay = System.Math.Sqrt((16 - 9.5f) / 24f * rvIntraday * rvIntraday + (1 - (16 - 9.5f) / 24f) * rvOvernight * rvOvernight);
         var rv = new RVwithSubsampling(timeStep, 1);
         var distOvernight = new Normal(0, rvOvernight / System.Math.Sqrt(TimeExtensions.DaysPerYear / timeStep.TotalDays));
@@ -44,7 +62,7 @@ internal class GammaScalping : ISimulation
 
         // Buy 10 options at the start
         // with 1% out-of-the-money strike
-        var quantity = 10;
+        var quantity = 20;
         var symbol = "TEST";
         var bnsCalc = new BlackNScholesCalculator();
         bnsCalc.ImpliedVolatility = (float)rvFullDay * 1.0f;
