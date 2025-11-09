@@ -131,7 +131,10 @@ public static class TimeExtensions
         return true;
     }
 
-    public static bool IsHoliday(this DateTimeOffset date, bool ignoreGoodFriday = false) {
+    public static bool IsHoliday(this DateTimeOffset date, bool ignoreGoodFriday = false, bool includeWeekend = false) {
+        if (includeWeekend && (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday))
+            return true;
+
         var dateTicks = (date.Ticks / TimeSpan.TicksPerDay) * TimeSpan.TicksPerDay;
         if (!Holidays.TryGetValue(dateTicks, out var holiday))
             return false;

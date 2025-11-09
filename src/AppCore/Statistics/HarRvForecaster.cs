@@ -480,12 +480,26 @@ public sealed class HarRvForecaster : IVolForecaster
 		double persistence,
 		double horizonDays)
 	{
-		// For short horizons, compute a weighted forecast based on horizon length
-		// Use a simpler approach: blend between 1-day forecast and component averages
+		// For log-variance models, we need to work in log-space for proper forecasting
+		// For linear models, we can work directly with variances
 		
-		// Weight factors for different components based on horizon
+		if (_useLogVariance)
+		{
+			// Log-variance model: interpolate in log-space, then transform
+			var logOneDayAhead = System.Math.Log(System.Math.Max(oneDayAhead, _minVariance));
+			var logUnconditionalMean = System.Math.Log(System.Math.Max(unconditionalMean, _minVariance));
+			
+			// Decay toward unconditional mean in log-space
+			var decayRate = System.Math.Pow(persistence, horizonDays / WeeklyWindow);
+			var logForecast = logUnconditionalMean + (logOneDayAhead - logUnconditionalMean) * decayRate;
+			
+			// Transform back to variance space
+			var varianceForecast = System.Math.Exp(logForecast);
+			return System.Math.Max(varianceForecast, _minVariance);
+		}
+		
+		// Linear model: use component-weighted approach
 		double componentForecast = 0.0;
-		double totalWeight = 0.0;
 		
 		// Start with intercept
 		componentForecast = Beta0;
@@ -495,7 +509,6 @@ public sealed class HarRvForecaster : IVolForecaster
 		{
 			var weight = System.Math.Exp(-horizonDays / 2.5);
 			componentForecast += Beta1 * weight * dailyRv;
-			totalWeight += Beta1 * weight;
 		}
 		
 		// Short-term component (3-day)
@@ -503,7 +516,6 @@ public sealed class HarRvForecaster : IVolForecaster
 		{
 			var weight = System.Math.Exp(-System.Math.Abs(horizonDays - ShortWindow) / 3.0);
 			componentForecast += BetaShortTerm * weight * shortRv;
-			totalWeight += BetaShortTerm * weight;
 		}
 		
 		// Weekly component - increasingly relevant as horizon approaches 5 days
@@ -511,7 +523,6 @@ public sealed class HarRvForecaster : IVolForecaster
 		{
 			var weight = horizonDays >= 3.0 ? 1.0 : horizonDays / 3.0;
 			componentForecast += Beta2 * weight * weeklyRv;
-			totalWeight += Beta2 * weight;
 		}
 		
 		// Bi-weekly component - relevant for horizons 5-10
@@ -519,7 +530,6 @@ public sealed class HarRvForecaster : IVolForecaster
 		{
 			var weight = System.Math.Min((horizonDays - 4.0) / 6.0, 1.0);
 			componentForecast += BetaBiWeekly * weight * biWeeklyRv;
-			totalWeight += BetaBiWeekly * weight;
 		}
 		
 		// Monthly component - minimal influence on short horizons
@@ -527,7 +537,6 @@ public sealed class HarRvForecaster : IVolForecaster
 		{
 			var weight = System.Math.Min((horizonDays - 8.0) / 14.0, 0.5);
 			componentForecast += Beta3 * weight * monthlyRv;
-			totalWeight += Beta3 * weight;
 		}
 		
 		// Ensure we have a valid forecast
