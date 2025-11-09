@@ -243,12 +243,12 @@ public sealed partial class RiskGraph : UserControl
         }
 
         // For now assume expiration is at 16:00
-        var estNom = TimeProvider.System.EstNow();
-        if (estNom.Hour >= 16) {
-            estNom = estNom.AddBusinessDays(1);
+        var estNow = TimeProvider.System.EstNow();
+        if (estNow.Hour >= 16 || estNow.IsHoliday(includeWeekend: true)) {
+            estNow = estNow.AddBusinessDays(1);
         }
-        var estExpiration = new DateTimeOffset(estNom.Year, estNom.Month, estNom.Day, 16, 0, 0, TimeSpan.FromHours(-5));
-        _expirationCurve.TimeSpan = estExpiration - TimeProvider.System.EstNow();
+        var estExpiration = new DateTimeOffset(estNow.Year, estNow.Month, estNow.Day, 16, 0, 0, TimeSpan.FromHours(-5));
+        _expirationCurve.TimeSpan = TimeSpan.FromDays(TimeProvider.System.EstNow().BusinessDaysTo(estExpiration));
 
         var underlyingSymbol = Account.Positions.SelectedPosition.Symbol;
         var minMove = 0.97f;

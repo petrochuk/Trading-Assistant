@@ -1,4 +1,5 @@
-﻿using AppCore.Options;
+﻿using AppCore.Extenstions;
+using AppCore.Options;
 using AppCore.Statistics;
 using System.Text;
 
@@ -94,8 +95,14 @@ namespace Simulation
                 includeLeverageEffect: true);
             forecaster3.LoadFromFileWithRollingRV(@"c:\temp\spx.csv", skipLines: 1);
             PrintResults(forecaster3);
-            forecaster3.SetIntradayVolatilityEstimate(0.1375, isAnnualized: true);
-            var forecast = forecaster3.Forecast(3);
+            forecaster3.SetIntradayVolatilityEstimate(0.30, isAnnualized: true);
+
+            var now = TimeProvider.System.EstNow();
+            for (int day = 1; day <= 20; day++) {
+                var nextBusinessDay = TimeExtensions.AddBusinessDays(now.Date, day);
+                var nextClosingTime = new DateTimeOffset(nextBusinessDay.Year, nextBusinessDay.Month, nextBusinessDay.Day, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(nextBusinessDay));
+                Console.WriteLine($"{day}-day {nextBusinessDay:d} forecast: {forecaster3.ForecastBetween(now, nextClosingTime, scaleToTradingYear: true):p4}");
+            }
         }
 
         private static void PrintResults(HarRvForecaster forecaster) {

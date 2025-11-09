@@ -9,7 +9,7 @@ public interface IVolForecaster
     void SetIntradayVolatilityEstimate(double volatility, bool isAnnualized = false, double? currentLogReturn = null);
 
 
-    double Forecast(double forecastHorizonDays, bool useIterativeForecast = true);
+    double Forecast(double forecastHorizonDays);
 
     string Symbol { get; set; }
 }

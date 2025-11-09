@@ -73,26 +73,24 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             return;
         }
 
-        if (_volForecaster != null && !_volForecaster.IsCalibrated) {
-            _logger.LogInformation($"Vol forecaster not calibrated. Calibrating from file for {_underlyingPosition.Symbol}.");
-            _volForecaster.CalibrateFromFile(_underlyingPosition.FrontContract.OHLCHistoryFilePath);
-            _volForecaster.Symbol = _underlyingPosition.FrontContract.OHLCHistoryFilePath;
-        }
-
         if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value)
         {
             _logger.LogDebug($"Hedge execution delayed for {_underlyingPosition.Symbol}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.GetUtcNow():hh\\:mm\\:ss}.");
             return;
         }
 
-        // Check blackout periods
-        var now = _timeProvider.EstNow().TimeOfDay;
+        // Check blackout periods and holidays
+        var now = _timeProvider.EstNow();
+        if (!now.IsOpen()) {
+            _logger.LogDebug($"Market is closed. Skipping hedge for {_underlyingPosition.Symbol}.");
+            return;
+        }
         if (_configuration.BlackOutStart != null && _configuration.BlackOutEnd != null)
         {
             // Normal case: blackout period does not cross midnight
             if (_configuration.BlackOutStart < _configuration.BlackOutEnd)
             {
-                if (now >= _configuration.BlackOutStart && now <= _configuration.BlackOutEnd)
+                if (now.TimeOfDay >= _configuration.BlackOutStart && now.TimeOfDay <= _configuration.BlackOutEnd)
                 {
                     _logger.LogDebug($"Current time {now} is within blackout period {_configuration.BlackOutStart} - {_configuration.BlackOutEnd} for {_underlyingPosition.Symbol}. Skipping hedge.");
                     return;
@@ -109,6 +107,17 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
         try
         {
+            if (_volForecaster != null && !_volForecaster.IsCalibrated) {
+                _logger.LogInformation($"Vol forecaster not calibrated. Calibrating from file for {_underlyingPosition.Symbol}.");
+                _volForecaster.CalibrateFromFile(_underlyingPosition.FrontContract.OHLCHistoryFilePath);
+                _volForecaster.Symbol = _underlyingPosition.FrontContract.OHLCHistoryFilePath;
+                _logger.LogInformation($"Forecasting vol 1 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(1):p}.");
+                _logger.LogInformation($"Forecasting vol 2 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(2):p}.");
+                _logger.LogInformation($"Forecasting vol 3 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(3):p}.");
+                _logger.LogInformation($"Forecasting vol 4 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(4):p}.");
+                _logger.LogInformation($"Forecasting vol 5 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(5):p}.");
+            }
+
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
             if (_underlyingPosition.RealizedVol != null) {
                 if (_underlyingPosition.RealizedVol.TryGetValue(out var realizedVol))

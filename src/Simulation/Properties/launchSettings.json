@@ -6,7 +6,7 @@
     },
     "calibrate": {
       "commandName": "Project",
-      "commandLineArgs": "--calibrate"
+      "commandLineArgs": "--calibrate-har-rv"
     }
   }
 }
