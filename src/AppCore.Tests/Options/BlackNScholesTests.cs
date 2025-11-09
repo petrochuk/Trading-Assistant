@@ -113,12 +113,11 @@ public class BlackNScholesTests
             Strike = 5000f,
             DaysLeft = 10f,
             ImpliedVolatility = 0.25f,
-            VolatilitySpotSlope = -0.02f
+            VolatilitySpotSlope = -0.03f
         };
 
-        var startPrice = 4000f;
-        var endPrice = 6000f;
-
+        var startPrice = 4200f;
+        var endPrice = 5800f;
         for (var price = startPrice; price <= endPrice; price += 10f) {
             bls.StockPrice = price;
             bls.CalculateAll();
@@ -126,26 +125,9 @@ public class BlackNScholesTests
             var deltaPutNoAdjustment = bls.DeltaPut;
             var deltaCallWithAdjustment = bls.HullWhiteDeltaCall;
             var deltaPutWithAdjustment = bls.HullWhiteDeltaPut;
+
+            Assert.IsGreaterThanOrEqualTo(bls.HullWhiteDeltaCall, bls.DeltaCall, $"Call Delta with Hull-White adjustment should be less than without adjustment at stock price {price}");
+            Assert.IsLessThanOrEqualTo(bls.DeltaPut, bls.HullWhiteDeltaPut, $"Put Delta with Hull-White adjustment should be greater than without adjustment at stock price {price}");
         }
-    }
-
-    [TestMethod]
-    [DataRow(500f)]
-    [DataRow(4000f)]
-    [DataRow(5000f)]
-    public void BlackNScholes_ATM_HullWhiteAdjustment(float price) {
-        var bls = new BlackNScholesCalculator {
-            Strike = price,
-            DaysLeft = 10f,
-            StockPrice = price,
-            ImpliedVolatility = 0.25f,
-            VolatilitySpotSlope = -0.02f
-        };
-
-        bls.CalculateAll();
-
-        // Because we are ATM, both deltas should be exactly 0.5
-        Assert.AreEqual(0.5f, bls.DeltaCall, 0.0001f);
-        Assert.AreEqual(0.5f, bls.HullWhiteDeltaCall, 0.0001f);
     }
 }

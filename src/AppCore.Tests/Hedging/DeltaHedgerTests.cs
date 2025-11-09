@@ -30,7 +30,7 @@ public sealed class DeltaHedgerTests
     {
         // Arrange
         var contractFactory = new TestContractFactory();
-        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 18, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset));
         var positions = new PositionsCollection(NullLogger<PositionsCollection>.Instance, timeProvider, new ExpirationCalendar(), contractFactory);
         var testRealizedVol = new TestRealizedVol { TestValue = 0.2 };
 
