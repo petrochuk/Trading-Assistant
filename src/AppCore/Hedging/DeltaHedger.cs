@@ -77,6 +77,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogInformation($"Vol forecaster not calibrated. Calibrating from file for {_underlyingPosition.Symbol}.");
             _volForecaster.CalibrateFromFile(_underlyingPosition.FrontContract.OHLCHistoryFilePath);
             _volForecaster.Symbol = _underlyingPosition.FrontContract.OHLCHistoryFilePath;
+            _logger.LogInformation($"Forecasting vol 1 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(1)}.");
+            _logger.LogInformation($"Forecasting vol 2 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(2)}.");
+            _logger.LogInformation($"Forecasting vol 3 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(3)}.");
+            _logger.LogInformation($"Forecasting vol 4 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(4)}.");
+            _logger.LogInformation($"Forecasting vol 5 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(5)}.");
         }
 
         if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value)
