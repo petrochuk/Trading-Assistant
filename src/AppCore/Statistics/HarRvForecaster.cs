@@ -114,6 +114,40 @@ public sealed class HarRvForecaster : IVolForecaster
 	}
 
 	/// <summary>
+	/// Forecast volatility for a holding period expressed in calendar days (can be fractional).
+	/// Example: From Friday close to Monday close there are 3 calendar days; pass start/end dates to account for weekend days.
+	/// By default each calendar day is treated as one trading day equivalent so weekends add extra days as requested.
+	/// Optionally convert calendar days to trading-day equivalents using the 252/365 scaling (continuous-time assumption).
+	/// </summary>
+	/// <param name="calendarDays">Positive number of calendar days (e.g. 3.0 for Friday->Monday close).</param>
+	/// <param name="scaleToTradingYear">If true, converts calendar days to trading-day equivalents via (calendarDays * 252/365). If false (default) treats each calendar day as a full trading day equivalent.</param>
+	public double ForecastCalendarDays(double calendarDays, bool scaleToTradingYear = false)
+	{
+		if (calendarDays <= 0) throw new ArgumentOutOfRangeException(nameof(calendarDays));
+		var effectiveTradingDays = scaleToTradingYear ? calendarDays * (252.0 / 365.0) : calendarDays;
+		return Forecast(effectiveTradingDays);
+	}
+
+	/// <summary>
+	/// Forecast volatility between two DateTime values using calendar-day difference.
+	/// Time-of-day is respected (partial days allowed). Friday close to Monday close: ~3.0 calendar days.
+	/// </summary>
+	/// <param name="start">Start timestamp.</param>
+	/// <param name="end">End timestamp (must be after start).</param>
+	/// <param name="scaleToTradingYear">If true applies 252/365 scaling to convert calendar to trading-day equivalents; else weekend days count fully.</param>
+	public double ForecastBetween(DateTimeOffset start, DateTimeOffset end, bool scaleToTradingYear = false)
+	{
+		if (end <= start) throw new ArgumentException("End must be after start.", nameof(end));
+		var calendarDays = (end - start).TotalDays;
+		return ForecastCalendarDays(calendarDays, scaleToTradingYear);
+	}
+
+	/// <summary>
+	/// Convenience method: forecast from now to a future DateTime using calendar-day logic.
+	/// </summary>
+	public double ForecastTo(DateTime future, bool scaleToTradingYear = false) => ForecastBetween(DateTime.UtcNow, future, scaleToTradingYear);
+
+	/// <summary>
 	/// Calibrates the HAR-RV coefficients using the currently stored returns.
 	/// </summary>
 	public void Calibrate()

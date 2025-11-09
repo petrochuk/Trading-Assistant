@@ -1,4 +1,5 @@
-﻿using AppCore.Options;
+﻿using AppCore.Extenstions;
+using AppCore.Options;
 using AppCore.Statistics;
 using System.Text;
 
@@ -95,13 +96,13 @@ namespace Simulation
             forecaster3.LoadFromFileWithRollingRV(@"c:\temp\spx.csv", skipLines: 1);
             PrintResults(forecaster3);
             forecaster3.SetIntradayVolatilityEstimate(0.30, isAnnualized: true);
-            Console.WriteLine($"\n1-day forecast with intraday vol estimate: {forecaster3.Forecast(1):p4}");
-            Console.WriteLine($"\n2-day forecast with intraday vol estimate: {forecaster3.Forecast(2):p4}");
-            Console.WriteLine($"\n3-day forecast with intraday vol estimate: {forecaster3.Forecast(3):p4}");
-            Console.WriteLine($"\n4-day forecast with intraday vol estimate: {forecaster3.Forecast(4):p4}");
-            Console.WriteLine($"\n5-day forecast with intraday vol estimate: {forecaster3.Forecast(5):p4}");
-            Console.WriteLine($"\n6-day forecast with intraday vol estimate: {forecaster3.Forecast(6):p4}");
-            Console.WriteLine($"\n7-day forecast with intraday vol estimate: {forecaster3.Forecast(7):p4}");
+
+            var now = TimeProvider.System.EstNow();
+            for (int day = 1; day <= 20; day++) {
+                var nextBusinessDay = TimeExtensions.AddBusinessDays(now.Date, day);
+                var nextClosingTime = new DateTimeOffset(nextBusinessDay.Year, nextBusinessDay.Month, nextBusinessDay.Day, 16, 0, 0, TimeExtensions.EasternStandardTimeZone.GetUtcOffset(nextBusinessDay));
+                Console.WriteLine($"{day}-day {nextBusinessDay:d} forecast: {forecaster3.ForecastBetween(now, nextClosingTime, scaleToTradingYear: true):p4}");
+            }
         }
 
         private static void PrintResults(HarRvForecaster forecaster) {
