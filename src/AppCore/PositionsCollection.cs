@@ -260,7 +260,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     var daysLeft = _timeProvider.EstNow().BusinessDaysTo(position.Contract.Expiration.Value);
                     if (volForecaster != null) {
                         // Forecast volatility to option expiration
-                        realizedVol = volForecaster.Forecast(daysLeft, useIterativeForecast: true);
+                        realizedVol = volForecaster.Forecast(daysLeft);
                         if (realizedVol < minIV) {
                             realizedVol = minIV;
                         }

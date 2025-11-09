@@ -266,12 +266,11 @@ public sealed class HarRvForecaster : IVolForecaster
 	/// Generates a volatility forecast for a specified horizon (in days) and returns annualized volatility.
 	/// When intraday overrides are available and the horizon is less than one day, the realized intraday estimate is
 	/// blended with the model-implied variance so partial-day requests respond to the intraday signal. For horizons > 1 day,
-	/// uses iterative multi-step forecasting or simple scaling.
+	/// uses direct multi-step forecasting based on HAR-RV structure.
 	/// </summary>
 	/// <param name="forecastHorizonDays">Forecast horizon in trading days (e.g., 1.0, 3.5, 4.16)</param>
-	/// <param name="useIterativeForecast">If true, uses iterative multi-step forecasting for horizons > 1 day. If false, uses simple sqrt(h) scaling.</param>
 	/// <returns>Annualized volatility forecast</returns>
-	public double Forecast(double forecastHorizonDays, bool useIterativeForecast = true)
+	public double Forecast(double forecastHorizonDays)
 	{
 		if (!_isCalibrated || _coefficients == null)
 			throw new InvalidOperationException("Model must be calibrated before forecasting.");
@@ -282,9 +281,15 @@ public sealed class HarRvForecaster : IVolForecaster
 		EnsureRealizedVarianceConsistency();
 		var realizedVariance = _realizedVariances.ToList();
 
+		// For multi-day forecasts with intraday override, use historical data for features
+		// but incorporate the intraday info in the forecast calculation
 		var effectiveVarianceSeries = new List<double>(realizedVariance);
 		double leverageReturn = 0.0;
-		if (_intradayVarianceOverride.HasValue)
+		
+		// Only add intraday variance to series for single-day forecasts or intraday-blended forecasts
+		bool useIntradayInFeatures = _intradayVarianceOverride.HasValue && forecastHorizonDays <= 1.0;
+		
+		if (useIntradayInFeatures)
 		{
 			var clamped = ClampVariance(_intradayVarianceOverride.Value);
 			effectiveVarianceSeries.Add(clamped);
@@ -309,8 +314,8 @@ public sealed class HarRvForecaster : IVolForecaster
 		if (availableObservations < requiredObservations)
 			throw new InvalidOperationException($"Not enough data to compute HAR-RV features for forecasting. Need at least {requiredObservations} returns.");
 
-		// For horizon <= 1 day or when multi-step is disabled, use single-step prediction (with optional intraday blending)
-		if (forecastHorizonDays <= 1.0 || !useIterativeForecast)
+		// For horizon <= 1 day, use single-step prediction (with optional intraday blending)
+		if (forecastHorizonDays <= 1.0)
 		{
 			var dailyRv = effectiveVarianceSeries[^1];
 			var shortRv = _includeShortTerm ? effectiveVarianceSeries.TakeLast(ShortWindow).Average() : 0.0;
@@ -339,60 +344,216 @@ public sealed class HarRvForecaster : IVolForecaster
 			return System.Math.Sqrt(predictedVariance * 252.0);
 		}
 		
-		// Multi-step iterative forecast for longer horizons
-		return ForecastMultiStep(effectiveVarianceSeries, forecastHorizonDays, leverageReturn);
+		// For multi-day forecasts, use historical variance series (without intraday override)
+		// but adjust the 1-day ahead baseline if intraday info is available
+		return ForecastMultiStep(realizedVariance, forecastHorizonDays, leverageReturn, _intradayVarianceOverride);
 	}
 
 	/// <summary>
-	/// Performs multi-step ahead forecast by iteratively predicting one day ahead.
+	/// Performs multi-step ahead forecast using direct h-step formulas based on HAR-RV structure.
+	/// For h-day ahead forecasts, uses a combination of short-term dynamics and long-run convergence.
 	/// Returns the average annualized volatility over the forecast horizon.
 	/// </summary>
-	private double ForecastMultiStep(List<double> initialRv, double horizonDays, double leverageReturn)
+	private double ForecastMultiStep(List<double> initialRv, double horizonDays, double leverageReturn, double? intradayVariance = null)
 	{
-		var horizon = (int)System.Math.Ceiling(horizonDays);
-		var currentRv = new List<double>(initialRv);
-		var forecasts = new List<double>();
-
-		for (int step = 0; step < horizon; step++)
+		// For multi-step forecasts, we use direct h-step ahead predictions
+		// The HAR-RV model naturally provides different dynamics based on horizon:
+		// - Short horizons (1-5 days): Use recent variance components with full model
+		// - Medium horizons (5-20 days): Blend between recent dynamics and long-run mean
+		// - Long horizons (>20 days): Converge to unconditional mean implied by model
+		
+		var dailyRv = initialRv[^1];
+		var shortRv = _includeShortTerm ? initialRv.TakeLast(ShortWindow).Average() : 0.0;
+		var weeklyRv = _includeWeekly ? initialRv.TakeLast(WeeklyWindow).Average() : 0.0;
+		var biWeeklyRv = _includeBiWeekly ? initialRv.TakeLast(BiWeeklyWindow).Average() : 0.0;
+		var monthlyRv = _includeMonthly ? initialRv.TakeLast(MonthlyWindow).Average() : 0.0;
+		
+		// Calculate 1-step ahead baseline using historical data
+		var features = CreateFeatureVector(dailyRv, shortRv, weeklyRv, biWeeklyRv, monthlyRv, leverageReturn);
+		var oneDayAhead = Dot(_coefficients, features);
+		
+		if (_useLogVariance)
+			oneDayAhead = System.Math.Exp(oneDayAhead + 0.5 * _logResidualVariance);
+		
+		oneDayAhead = System.Math.Max(oneDayAhead, _minVariance);
+		
+		// If we have intraday variance info, adjust the starting point for short-term forecasts
+		// The intraday signal should decay over the forecast horizon
+		if (intradayVariance.HasValue)
 		{
-			var dailyRv = currentRv[^1];
-			var shortRv = _includeShortTerm ? currentRv.TakeLast(ShortWindow).Average() : 0.0;
-			var weeklyRv = _includeWeekly ? currentRv.TakeLast(WeeklyWindow).Average() : 0.0;
-			var biWeeklyRv = _includeBiWeekly ? currentRv.TakeLast(BiWeeklyWindow).Average() : 0.0;
-			var monthlyRv = _includeMonthly ? currentRv.TakeLast(MonthlyWindow).Average() : 0.0;
-			var lastReturn = step == 0 ? leverageReturn : 0.0;
-			var features = CreateFeatureVector(dailyRv, shortRv, weeklyRv, biWeeklyRv, monthlyRv, lastReturn);
-
-			var predictedVariance = Dot(_coefficients, features);
-			
-			if (_useLogVariance)
-				predictedVariance = System.Math.Exp(predictedVariance + 0.5 * _logResidualVariance);
-			
-			if (predictedVariance < _minVariance)
-				predictedVariance = _minVariance;
-
-			forecasts.Add(predictedVariance);
-			currentRv.Add(predictedVariance); // Add forecast to history for next iteration
+			// Blend intraday estimate with model forecast for the first day
+			// This gives us a better starting point that incorporates current market conditions
+			var intradayWeight = System.Math.Exp(-horizonDays / 2.0); // Decays with horizon
+			oneDayAhead = oneDayAhead * (1.0 - intradayWeight) + intradayVariance.Value * intradayWeight;
 		}
-
-		// For fractional days, weight the last forecast
-		double totalVariance;
-		if (horizonDays % 1.0 > 0.001)
+		
+		// Calculate unconditional mean variance (long-run equilibrium)
+		// E[RV] = β₀ / (1 - β₁ - β₂ - β₃ - ...)
+		var persistence = 0.0;
+		if (_includeDaily) persistence += Beta1;
+		if (_includeShortTerm) persistence += BetaShortTerm;
+		if (_includeWeekly) persistence += Beta2;
+		if (_includeBiWeekly) persistence += BetaBiWeekly;
+		if (_includeMonthly) persistence += Beta3;
+		
+		// Ensure stationarity and handle edge cases
+		persistence = System.Math.Max(0.0, System.Math.Min(persistence, 0.999));
+		
+		double unconditionalMean;
+		if (_useLogVariance)
 		{
-			var fullDays = (int)horizonDays;
-			var fraction = horizonDays - fullDays;
-			totalVariance = forecasts.Take(fullDays).Sum() + forecasts[fullDays] * fraction;
+			// For log-variance models, the unconditional mean requires special handling
+			// E[log(RV)] = β₀ / (1 - persistence) in log-space
+			// Then transform to variance space
+			var logUnconditionalMean = Beta0 / (1.0 - persistence);
+			unconditionalMean = System.Math.Exp(logUnconditionalMean + 0.5 * _logResidualVariance);
 		}
 		else
 		{
-			totalVariance = forecasts.Take(horizon).Sum();
+			// For linear models
+			if (persistence < 0.999)
+			{
+				unconditionalMean = Beta0 / (1.0 - persistence);
+			}
+			else
+			{
+				// If persistence is very high, use current level as proxy
+				unconditionalMean = oneDayAhead;
+			}
 		}
-
-		// Return annualized volatility (average daily variance scaled to annual)
-		var avgDailyVariance = totalVariance / horizonDays;
-		return System.Math.Sqrt(avgDailyVariance * 252.0);
+		
+		// Ensure unconditional mean is valid
+		if (!double.IsFinite(unconditionalMean) || unconditionalMean <= 0)
+		{
+			unconditionalMean = oneDayAhead;
+		}
+		
+		unconditionalMean = System.Math.Max(unconditionalMean, _minVariance);
+		
+		// Use geometric decay to blend between current forecast and long-run mean
+		// The decay rate depends on the persistence of the model
+		double avgVariance;
+		
+		if (horizonDays <= BiWeeklyWindow) // Extend short horizon treatment to 10 days
+		{
+			// Short horizon: Use weighted average of component-specific forecasts
+			avgVariance = ComputeShortHorizonForecast(
+				oneDayAhead, dailyRv, shortRv, weeklyRv, biWeeklyRv, monthlyRv, 
+				unconditionalMean, persistence, horizonDays);
+		}
+		else if (horizonDays <= MonthlyWindow)
+		{
+			// Medium horizon: Exponential decay from current to unconditional mean
+			var decayRate = System.Math.Pow(persistence, horizonDays / BiWeeklyWindow);
+			avgVariance = unconditionalMean + (oneDayAhead - unconditionalMean) * decayRate;
+		}
+		else
+		{
+			// Long horizon: Mostly converged to unconditional mean, but retain some short-term info
+			var decayRate = System.Math.Pow(persistence, horizonDays / MonthlyWindow);
+			avgVariance = unconditionalMean + (oneDayAhead - unconditionalMean) * decayRate;
+		}
+		
+		// Ensure result is valid
+		if (!double.IsFinite(avgVariance) || avgVariance <= 0)
+		{
+			avgVariance = oneDayAhead;
+		}
+		
+		avgVariance = System.Math.Max(avgVariance, _minVariance);
+		
+		// Return annualized volatility
+		return System.Math.Sqrt(avgVariance * 252.0);
 	}
 
+	/// <summary>
+	/// Computes forecast for short horizons (1-10 days) using component-specific dynamics.
+	/// </summary>
+	private double ComputeShortHorizonForecast(
+		double oneDayAhead,
+		double dailyRv, 
+		double shortRv, 
+		double weeklyRv, 
+		double biWeeklyRv,
+		double monthlyRv,
+		double unconditionalMean,
+		double persistence,
+		double horizonDays)
+	{
+		// For short horizons, compute a weighted forecast based on horizon length
+		// Use a simpler approach: blend between 1-day forecast and component averages
+		
+		// Weight factors for different components based on horizon
+		double componentForecast = 0.0;
+		double totalWeight = 0.0;
+		
+		// Start with intercept
+		componentForecast = Beta0;
+		
+		// Daily component - most relevant for very short horizons
+		if (_includeDaily && Beta1 > 0)
+		{
+			var weight = System.Math.Exp(-horizonDays / 2.5);
+			componentForecast += Beta1 * weight * dailyRv;
+			totalWeight += Beta1 * weight;
+		}
+		
+		// Short-term component (3-day)
+		if (_includeShortTerm && BetaShortTerm > 0)
+		{
+			var weight = System.Math.Exp(-System.Math.Abs(horizonDays - ShortWindow) / 3.0);
+			componentForecast += BetaShortTerm * weight * shortRv;
+			totalWeight += BetaShortTerm * weight;
+		}
+		
+		// Weekly component - increasingly relevant as horizon approaches 5 days
+		if (_includeWeekly && Beta2 > 0)
+		{
+			var weight = horizonDays >= 3.0 ? 1.0 : horizonDays / 3.0;
+			componentForecast += Beta2 * weight * weeklyRv;
+			totalWeight += Beta2 * weight;
+		}
+		
+		// Bi-weekly component - relevant for horizons 5-10
+		if (_includeBiWeekly && BetaBiWeekly > 0 && horizonDays >= 5.0)
+		{
+			var weight = System.Math.Min((horizonDays - 4.0) / 6.0, 1.0);
+			componentForecast += BetaBiWeekly * weight * biWeeklyRv;
+			totalWeight += BetaBiWeekly * weight;
+		}
+		
+		// Monthly component - minimal influence on short horizons
+		if (_includeMonthly && Beta3 > 0 && horizonDays >= 8.0)
+		{
+			var weight = System.Math.Min((horizonDays - 8.0) / 14.0, 0.5);
+			componentForecast += Beta3 * weight * monthlyRv;
+			totalWeight += Beta3 * weight;
+		}
+		
+		// Ensure we have a valid forecast
+		if (!double.IsFinite(componentForecast) || componentForecast <= 0)
+		{
+			return oneDayAhead;
+		}
+		
+		// For very short horizons, stay close to 1-day ahead
+		// For longer short horizons, allow more deviation but blend toward unconditional mean
+		var blendToOneDayAhead = System.Math.Exp(-horizonDays / 4.0);
+		var blendToUnconditional = horizonDays > BiWeeklyWindow ? 0.2 : 0.0;
+		
+		var result = componentForecast * (1.0 - blendToOneDayAhead - blendToUnconditional) 
+		             + oneDayAhead * blendToOneDayAhead
+		             + unconditionalMean * blendToUnconditional;
+		
+		// Final validation
+		if (!double.IsFinite(result) || result <= 0)
+		{
+			return oneDayAhead;
+		}
+		
+		return System.Math.Max(result, _minVariance);
+	}
+ 
 	/// <summary>
 	/// Applies an intraday realized variance estimate (in daily variance units) for the current trading day.
 	/// The estimate is appended to the historical series for forecasting without requiring model recalibration.
