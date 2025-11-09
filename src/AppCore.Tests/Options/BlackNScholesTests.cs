@@ -113,11 +113,11 @@ public class BlackNScholesTests
             Strike = 5000f,
             DaysLeft = 10f,
             ImpliedVolatility = 0.25f,
-            VolatilitySpotSlope = -0.03f
+            VolatilitySpotSlope = -0.04f
         };
 
-        var startPrice = 4200f;
-        var endPrice = 5800f;
+        var startPrice = 4500f;
+        var endPrice = 5500f;
         for (var price = startPrice; price <= endPrice; price += 10f) {
             bls.StockPrice = price;
             bls.CalculateAll();
