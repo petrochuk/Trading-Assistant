@@ -36,6 +36,7 @@ public class Contract
     public bool IsDataStreaming { get; set; } = false;
     public float LongTermVolatility { get; set; }
     public float Correlation { get; set; }
+    public float VolatilitySpotSlope { get; set; }
     public float VolatilityOfVolatility { get; set; }
     public float VolatilityMeanReversion { get; set; }
     public float VarianceGammaDrift { get; set; }

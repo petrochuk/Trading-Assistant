@@ -68,6 +68,7 @@ public class ContractFactory : IContractFactory
         if (_contractConfigurations.TryGetValue(contract.Symbol, out var config)) {
             contract.LongTermVolatility = config.LongTermVolatility;
             contract.Correlation = config.Correlation;
+            contract.VolatilitySpotSlope = config.VolatilitySpotSlope;
             contract.VolatilityOfVolatility = config.VolatilityOfVolatility;
             contract.VolatilityMeanReversion = config.VolatilityMeanReversion;
             contract.VarianceGammaDrift = config.VarianceGammaDrift;

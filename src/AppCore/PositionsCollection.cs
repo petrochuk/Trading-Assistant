@@ -270,6 +270,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         StockPrice = underlyingContract.MarketPrice.Value,
                         DaysLeft = (float)daysLeft,
                         Strike = position.Contract.Strike,
+                        VolatilitySpotSlope = underlyingContract.VolatilitySpotSlope,
                     };
 
                     // Market implied vol

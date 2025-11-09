@@ -4,6 +4,8 @@ public class ContractConfiguration
 {
     public string Symbol { get; set; } = string.Empty;
 
+    public float VolatilitySpotSlope { get; set; } = 0.0f;
+
     public float LongTermVolatility { get; set; } = 0.2f;
 
     public float VolatilityMeanReversion { get; set; } = 10f;
