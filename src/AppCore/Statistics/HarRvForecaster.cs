@@ -281,9 +281,10 @@ public sealed class HarRvForecaster : IVolForecaster
 	/// <summary>
 	/// Loads prices or returns from a file, computes daily log returns when needed and calibrates the model.
 	/// </summary>
-	public void CalibrateFromFile(string filePath, int skipLines = 0)
+	public void CalibrateFromFile(string symbol, string filePath, int skipLines = 0)
 	{
-		LoadReturnsFromFile(filePath, skipLines);
+        Symbol = symbol;
+        LoadReturnsFromFile(filePath, skipLines);
 		Calibrate();
 	}
 

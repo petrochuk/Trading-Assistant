@@ -40,7 +40,6 @@ public class Contract
     public float VolatilityOfVolatility { get; set; }
     public float VolatilityMeanReversion { get; set; }
     public float VarianceGammaDrift { get; set; }
-    public string OHLCHistoryFilePath { get; set; } = string.Empty;
 
     public override string ToString() {
         var sb = new System.Text.StringBuilder();

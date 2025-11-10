@@ -30,6 +30,11 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
             throw new ArgumentException($"No configuration found for symbol {underlying.Symbol}", nameof(configuration));
 
         var volForecaster = ServiceProvider.Instance != null ? ServiceProvider.Instance.GetService<IVolForecaster?>() : null;
+        if (volForecaster != null && !string.IsNullOrEmpty(symbolConfiguration.OHLCHistoryFilePath)) {
+            _logger.LogInformation($"Vol forecaster not calibrated. Calibrating from file for {symbolConfiguration.OHLCHistoryFilePath}.");
+            volForecaster.CalibrateFromFile(underlying.Symbol, symbolConfiguration.OHLCHistoryFilePath);
+        }
+
         return new DeltaHedger(_logger, _timeProvider, broker, accountId, underlying, 
             positions, symbolConfiguration, volForecaster, _soundPlayer);
     }

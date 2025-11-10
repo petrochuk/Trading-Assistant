@@ -2,7 +2,7 @@
 
 public interface IVolForecaster
 {
-    void CalibrateFromFile(string filePath, int skipLines = 0);
+    void CalibrateFromFile(string symbol, string filePath, int skipLines = 0);
 
     bool IsCalibrated { get; }
 

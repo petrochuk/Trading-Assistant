@@ -35,4 +35,6 @@ public class DeltaHedgerSymbolConfiguration
     public TimeSpan? BlackOutStart { get; set; }
 
     public TimeSpan? BlackOutEnd { get; set; }
+
+    public string OHLCHistoryFilePath { get; set; } = string.Empty;
 }

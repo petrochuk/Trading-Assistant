@@ -52,7 +52,6 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         _soundPlayer = soundPlayer; 
 
         _broker.OnOrderPlaced += Broker_OnOrderPlaced;
-
     }
 
     #endregion
@@ -73,16 +72,6 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         }
 
         try {
-            if (_volForecaster != null && !_volForecaster.IsCalibrated) {
-                _logger.LogInformation($"Vol forecaster not calibrated. Calibrating from file for {_underlyingPosition.Symbol}.");
-                _volForecaster.CalibrateFromFile(_underlyingPosition.FrontContract.OHLCHistoryFilePath);
-                _volForecaster.Symbol = _underlyingPosition.FrontContract.OHLCHistoryFilePath;
-                _logger.LogInformation($"Forecasting vol 1 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(1):p}.");
-                _logger.LogInformation($"Forecasting vol 2 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(2):p}.");
-                _logger.LogInformation($"Forecasting vol 3 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(3):p}.");
-                _logger.LogInformation($"Forecasting vol 4 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(4):p}.");
-                _logger.LogInformation($"Forecasting vol 5 day {_underlyingPosition.Symbol} {_volForecaster.Forecast(5):p}.");
-            }
 
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
             if (_underlyingPosition.RealizedVol != null) {
@@ -93,7 +82,6 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             } else
                 _logger.LogDebug($"Vol of Vol: N/A for {_underlyingPosition.Symbol}");
 
-            LastGreeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true);
             if (LastGreeks == null || !LastGreeks.IsDeltaValid) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
@@ -131,13 +119,15 @@ public class DeltaHedger : IDeltaHedger, IDisposable
         if (_disposed)
             throw new ObjectDisposedException(nameof(DeltaHedger), "Cannot hedge after the hedger has been disposed.");
 
-        if (_activeOrderId.HasValue) {
-            _logger.LogDebug($"Hedge order already in progress for {_underlyingPosition.Symbol}. Skipping.");
+        if (_underlyingPosition.FrontContract == null) {
+            _logger.LogWarning($"No front contract available for {_underlyingPosition.Symbol}. Cannot hedge.");
             return false;
         }
 
-        if (_underlyingPosition.FrontContract == null) {
-            _logger.LogWarning($"No front contract available for {_underlyingPosition.Symbol}. Cannot hedge.");
+        LastGreeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true);
+
+        if (_activeOrderId.HasValue) {
+            _logger.LogDebug($"Hedge order already in progress for {_underlyingPosition.Symbol}. Skipping.");
             return false;
         }
 
