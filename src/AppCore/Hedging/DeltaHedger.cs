@@ -101,10 +101,10 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.DeltaTotal:f3}, Theta: {LastGreeks.Theta:f3}");
 
             var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Floor(LastGreeks.DeltaOTM) : -MathF.Ceiling(LastGreeks.DeltaOTM);
-            var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Ceiling(LastGreeks.DeltaITM) : -MathF.Floor(LastGreeks.DeltaITM);
+            var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Round(LastGreeks.DeltaITM) : -MathF.Round(LastGreeks.DeltaITM);
             var deltaHedgeSize = deltaOTMHedgeSize + deltaITMHedgeSize;
             if (MathF.Abs(LastGreeks.DeltaHedge - deltaHedgeSize) < _configuration.Delta) {
-                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");
+                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. Total:{LastGreeks.DeltaTotal} OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");
                 return;
             }
 
@@ -175,13 +175,13 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     {
         if (e.AccountId != _accountId || _underlyingPosition.FrontContract == null || e.Contract.Id != _underlyingPosition.FrontContract.Id)
         {
-            _logger.LogDebug($"Order placed for different account or contract. Ignoring: AccountId={e.AccountId}, ContractId={e.Contract.Id}");
+            _logger.LogTrace($"Order placed for different account or contract. Ignoring: AccountId={e.AccountId}, ContractId={e.Contract.Id}");
             return;
         }
 
         if (e.OrderId != _activeOrderId)
         {
-            _logger.LogDebug($"Order placed with different ID. Ignoring: Expected={_activeOrderId}, Actual={e.OrderId}");
+            _logger.LogTrace($"Order placed with different ID. Ignoring: Expected={_activeOrderId}, Actual={e.OrderId}");
             return;
         }
 
