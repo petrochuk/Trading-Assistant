@@ -7,4 +7,6 @@ internal class TestOrder
     public required Contract Contract { get; set; }
 
     public required float Size { get; set; }
+
+    public required float TotalSize { get; set; }
 }

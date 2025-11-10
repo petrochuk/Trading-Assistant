@@ -81,6 +81,6 @@ public sealed class DeltaHedgerTests
         Assert.HasCount(1, testBroker.PlacedOrders, $"Expected 1 order to be placed for delta hedging.");
         var order = testBroker.PlacedOrders[0];
         Assert.AreEqual(underlyingPosition.Symbol, order.Contract.Symbol, "Order should be for the underlying contract.");
-        Assert.AreEqual(expectedHedgeSize, order.Size, "Order quantity should match the delta hedge requirement.");
+        Assert.AreEqual(expectedHedgeSize, order.TotalSize, "Order quantity should match the delta hedge requirement.");
     }
 }

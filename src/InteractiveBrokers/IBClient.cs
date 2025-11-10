@@ -330,7 +330,7 @@ public class IBClient : IBroker
 
     #region IBroker
 
-    public void PlaceOrder(string accountId, Guid orderId, Contract contract, float size) {
+    public void PlaceOrder(string accountId, Guid orderId, Contract contract, float size, float totalSize) {
         _logger.LogInformation($"Placing order for {size} {contract}");
 
         var request = new Requests.PlaceOrder(accountId, orderId, contract, size, _brokerConfiguration.APIOperator, OnOrderPlaced, BearerToken) {

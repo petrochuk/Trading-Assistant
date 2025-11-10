@@ -121,7 +121,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             // Set a delay to prevent immediate re-hedging
             _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(2);
             _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
-            _broker.PlaceOrder(_accountId, _activeOrderId.Value, _underlyingPosition.FrontContract, deltaAdjustment);
+            _broker.PlaceOrder(_accountId, _activeOrderId.Value, _underlyingPosition.FrontContract, 1, deltaAdjustment);
         } finally {
             _hedgeSemaphore.Release();
         }
