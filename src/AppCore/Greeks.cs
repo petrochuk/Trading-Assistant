@@ -21,7 +21,8 @@ public class Greeks
     /// This properly accounts for variance exposure (σ²) weighted by vega, 
     /// making it directly comparable to realized variance for VRP measurement.
     /// </summary>
-    public float VarianceWeightedIV;
+    public float VarianceWeightedIVShort;
+    public float VarianceWeightedIVLong;
 
     public SortedList<float, Position> OvervaluedPositions = new(new DuplicateKeyComparer<float>());
 
@@ -30,6 +31,6 @@ public class Greeks
     }
     override public string ToString()
     {
-        return $"D: {DeltaTotal}, H:{DeltaHedge}, Gamma: {Gamma}, Theta: {Theta}, Vega: {Vega}, Vanna: {Vanna}, Charm: {Charm}, VW-IV: {VarianceWeightedIV:F3}";
+        return $"D: {DeltaTotal}, H:{DeltaHedge}, Gamma: {Gamma}, Theta: {Theta}, Vega: {Vega}, Vanna: {Vanna}, Charm: {Charm}";
     }
 }

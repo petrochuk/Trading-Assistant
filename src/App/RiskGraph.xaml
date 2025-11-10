@@ -33,25 +33,28 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Grid.Row="0" Text="RV" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="0" Grid.Row="1" Text="-" x:Name="RVText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="1" Grid.Row="0" Text="IV" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="1" Grid.Row="1" Text="-" x:Name="IVText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="2" Grid.Row="0" Text="Delta Total" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="2" Grid.Row="1" Text="-" x:Name="DeltaTotalText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="3" Grid.Row="0" Text="Delta Hedge" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="3" Grid.Row="1" Text="-" x:Name="DeltaHedgeText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="4" Grid.Row="0" Text="Charm" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="4" Grid.Row="1" Text="-" x:Name="CharmText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="5" Grid.Row="0" Text="Vanna" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="5" Grid.Row="1" Text="-" x:Name="VannaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="6" Grid.Row="0" Text="Gamma" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="6" Grid.Row="1" Text="-" x:Name="GammaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="7" Grid.Row="0" Text="Vega" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="7" Grid.Row="1" Text="-" x:Name="VegaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="8" Grid.Row="0" Text="Theta" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
-            <TextBlock Grid.Column="8" Grid.Row="1" Text="-" x:Name="ThetaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="0" Grid.Row="0" Text="IV Long" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="0" Grid.Row="1" Text="-" x:Name="IVLongText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="1" Grid.Row="0" Text="RV" FontSize="14" FontWeight="Bold" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="1" Grid.Row="1" Text="-" x:Name="RVText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="2" Grid.Row="0" Text="IV Short" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="2" Grid.Row="1" Text="-" x:Name="IVShortText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="3" Grid.Row="0" Text="Delta Total" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="3" Grid.Row="1" Text="-" x:Name="DeltaTotalText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="4" Grid.Row="0" Text="Delta Hedge" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="4" Grid.Row="1" Text="-" x:Name="DeltaHedgeText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="5" Grid.Row="0" Text="Charm" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="5" Grid.Row="1" Text="-" x:Name="CharmText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="6" Grid.Row="0" Text="Vanna" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="6" Grid.Row="1" Text="-" x:Name="VannaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="7" Grid.Row="0" Text="Gamma" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="7" Grid.Row="1" Text="-" x:Name="GammaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="8" Grid.Row="0" Text="Vega" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="8" Grid.Row="1" Text="-" x:Name="VegaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="9" Grid.Row="0" Text="Theta" FontSize="14" FontWeight="Normal" Margin="4" HorizontalTextAlignment="Center"/>
+            <TextBlock Grid.Column="9" Grid.Row="1" Text="-" x:Name="ThetaText" FontSize="15" Margin="4" HorizontalTextAlignment="Center"/>
         </Grid>
         <Canvas x:Name="Canvas" Grid.Column="0" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
         </Canvas>

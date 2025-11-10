@@ -212,7 +212,8 @@ public sealed partial class RiskGraph : UserControl
             }
         }
 
-        IVText.Text = $"{(greeks.VarianceWeightedIV):P2}";
+        IVLongText.Text = $"{(greeks.VarianceWeightedIVLong):P2}";
+        IVShortText.Text = $"{(greeks.VarianceWeightedIVShort):P2}";
         DeltaTotalText.Text = $"{(greeks.DeltaTotal):N2}";
         DeltaHedgeText.Text = $"{(greeks.DeltaHedge):N2}";
         GammaText.Text = $"{greeks.Gamma:N4}";
@@ -225,8 +226,9 @@ public sealed partial class RiskGraph : UserControl
     }
 
     private void ClearGreeks() {
+        IVLongText.Text = "-";
         RVText.Text = "-";
-        IVText.Text = "-";
+        IVShortText.Text = "-";
         DeltaTotalText.Text = "-";
         DeltaHedgeText.Text = "-";
         GammaText.Text = "-";

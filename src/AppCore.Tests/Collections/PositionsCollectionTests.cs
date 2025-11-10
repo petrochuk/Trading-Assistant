@@ -46,6 +46,7 @@ public class PositionsCollectionTests
         var greeks = positions.CalculateGreeks(minIV: 0, underlyingPosition);
 
         Assert.IsNotNull(greeks);
-        Assert.AreEqual(0.1989f, greeks.VarianceWeightedIV, 0.01f);
+        Assert.AreEqual(0.1989f, greeks.VarianceWeightedIVLong, 0.01f);
+        Assert.AreEqual(0f, greeks.VarianceWeightedIVShort, 0.01f);
     }
 }

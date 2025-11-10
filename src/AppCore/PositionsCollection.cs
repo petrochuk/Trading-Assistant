@@ -221,9 +221,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
         stopWatch.Start();
         var greeks = new Greeks();
-        float totalVegaWeightedVariance = 0f;
-        float totalVega = 0f;
-        
+        float totalVegaWeightedVarianceShort = 0f;
+        float totalVegaShort = 0f;
+        float totalVegaWeightedVarianceLong = 0f;
+        float totalVegaLong = 0f;
+
         _rwLock.EnterReadLock();
         try {
             foreach (var position in Values) {
@@ -325,8 +327,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     // Variance = σ², so we weight by variance (IV²) * vega to get proper variance exposure
                     var absVega = MathF.Abs(positionVega);
                     var variance = marketIV * marketIV; // Convert IV to variance
-                    totalVegaWeightedVariance += variance * absVega;
-                    totalVega += absVega;
+                    if (position.Size < 0) {
+                        totalVegaWeightedVarianceShort += variance * absVega;
+                        totalVegaShort += absVega;
+                    }
+                    else {
+                        totalVegaWeightedVarianceLong += variance * absVega;
+                        totalVegaLong += absVega;
+                    }
                     
                     _logger.LogInformation($"{position} is using IV: rv:{realizedVol:f3} miv:{marketIV:f3} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} t:{deltaBls * position.Size:f2}");
                 }
@@ -338,8 +346,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             
             // Calculate variance-weighted IV (convert back from variance to volatility)
             // VarianceWeightedIV = sqrt( Σ(σ² * |Vega|) / Σ|Vega| )
-            if (totalVega > 0) {
-                greeks.VarianceWeightedIV = MathF.Sqrt(totalVegaWeightedVariance / totalVega);
+            if (totalVegaShort > 0) {
+                greeks.VarianceWeightedIVShort = MathF.Sqrt(totalVegaWeightedVarianceShort / totalVegaShort);
+            }
+            if (totalVegaLong > 0) {
+                greeks.VarianceWeightedIVLong = MathF.Sqrt(totalVegaWeightedVarianceLong / totalVegaLong);
             }
         }
         finally {
@@ -347,7 +358,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
 
         stopWatch.Stop();
-        _logger.LogInformation($"Calculated Greeks for {underlyingPosition.Symbol} in {stopWatch.ElapsedMilliseconds} ms - Variance-Weighted IV: {greeks.VarianceWeightedIV:F3}");
+        _logger.LogInformation($"Calculated Greeks for {underlyingPosition.Symbol} in {stopWatch.ElapsedMilliseconds} ms");
 
         return greeks;
     }
