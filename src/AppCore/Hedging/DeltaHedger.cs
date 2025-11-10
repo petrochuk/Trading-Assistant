@@ -14,6 +14,8 @@ namespace AppCore.Hedging;
 [DebuggerDisplay("{Contract}")]
 public class DeltaHedger : IDeltaHedger, IDisposable
 {
+    #region Fields & Constructor
+
     private readonly ILogger<DeltaHedger> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly IBroker _broker;
@@ -53,60 +55,24 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
     }
 
+    #endregion
+
+    #region Properties
+
     public UnderlyingPosition UnderlyingPosition => _underlyingPosition;
 
     public DeltaHedgerSymbolConfiguration Configuration => _configuration;
 
     public Greeks? LastGreeks { get; private set; }
 
+    #endregion
+
     public void Hedge() {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(DeltaHedger), "Cannot hedge after the hedger has been disposed.");
-
-        if (_activeOrderId.HasValue) {
-            _logger.LogDebug($"Hedge order already in progress for {_underlyingPosition.Symbol}. Skipping.");
+        if (!IsHedgeExecutionAllowed()) {
             return;
         }
 
-        if (_underlyingPosition.FrontContract == null) {
-            _logger.LogWarning($"No front contract available for {_underlyingPosition.Symbol}. Cannot hedge.");
-            return;
-        }
-
-        if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value)
-        {
-            _logger.LogDebug($"Hedge execution delayed for {_underlyingPosition.Symbol}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.GetUtcNow():hh\\:mm\\:ss}.");
-            return;
-        }
-
-        // Check blackout periods and holidays
-        var now = _timeProvider.EstNow();
-        if (!now.IsOpen()) {
-            _logger.LogDebug($"Market is closed. Skipping hedge for {_underlyingPosition.Symbol}.");
-            return;
-        }
-        if (_configuration.BlackOutStart != null && _configuration.BlackOutEnd != null)
-        {
-            // Normal case: blackout period does not cross midnight
-            if (_configuration.BlackOutStart < _configuration.BlackOutEnd)
-            {
-                if (now.TimeOfDay >= _configuration.BlackOutStart && now.TimeOfDay <= _configuration.BlackOutEnd)
-                {
-                    _logger.LogDebug($"Current time {now} is within blackout period {_configuration.BlackOutStart} - {_configuration.BlackOutEnd} for {_underlyingPosition.Symbol}. Skipping hedge.");
-                    return;
-                }
-            }
-        }
-
-        // Try to acquire the semaphore without blocking
-        if (!_hedgeSemaphore.Wait(0))
-        {
-            _logger.LogDebug($"Hedging in progress for {_underlyingPosition.Symbol}. Skipping overlapping execution.");
-            return;
-        }
-
-        try
-        {
+        try {
             if (_volForecaster != null && !_volForecaster.IsCalibrated) {
                 _logger.LogInformation($"Vol forecaster not calibrated. Calibrating from file for {_underlyingPosition.Symbol}.");
                 _volForecaster.CalibrateFromFile(_underlyingPosition.FrontContract.OHLCHistoryFilePath);
@@ -124,8 +90,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                     _logger.LogDebug($"Realized Vol for {_underlyingPosition.Symbol}: {realizedVol:f4}");
                 if (_underlyingPosition.RealizedVol.TryGetVolatilityOfVolatility(out var volOfVol))
                     _logger.LogDebug($"Vol of Vol for {_underlyingPosition.Symbol}: {volOfVol:f4}");
-            }
-            else
+            } else
                 _logger.LogDebug($"Vol of Vol: N/A for {_underlyingPosition.Symbol}");
 
             LastGreeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true);
@@ -147,7 +112,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
             // Round delta down to 0 in whole numbers
             var deltaAdjustment = deltaHedgeSize - LastGreeks.DeltaHedge;
-            if (MathF.Abs(deltaAdjustment) < _configuration.MinDeltaAdjustment ) {
+            if (MathF.Abs(deltaAdjustment) < _configuration.MinDeltaAdjustment) {
                 _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta hedge adjustment {deltaAdjustment:f3} is below minimum adjustment {_configuration.MinDeltaAdjustment}. No hedging required.");
                 return;
             }
@@ -157,11 +122,53 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(2);
             _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
             _broker.PlaceOrder(_accountId, _activeOrderId.Value, _underlyingPosition.FrontContract, deltaAdjustment);
-        }
-        finally
-        {
+        } finally {
             _hedgeSemaphore.Release();
         }
+    }
+
+    private bool IsHedgeExecutionAllowed() {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(DeltaHedger), "Cannot hedge after the hedger has been disposed.");
+
+        if (_activeOrderId.HasValue) {
+            _logger.LogDebug($"Hedge order already in progress for {_underlyingPosition.Symbol}. Skipping.");
+            return false;
+        }
+
+        if (_underlyingPosition.FrontContract == null) {
+            _logger.LogWarning($"No front contract available for {_underlyingPosition.Symbol}. Cannot hedge.");
+            return false;
+        }
+
+        if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value) {
+            _logger.LogDebug($"Hedge execution delayed for {_underlyingPosition.Symbol}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.GetUtcNow():hh\\:mm\\:ss}.");
+            return false;
+        }
+
+        // Check blackout periods and holidays
+        var now = _timeProvider.EstNow();
+        if (!now.IsOpen()) {
+            _logger.LogDebug($"Market is closed. Skipping hedge for {_underlyingPosition.Symbol}.");
+            return false;
+        }
+        if (_configuration.BlackOutStart != null && _configuration.BlackOutEnd != null) {
+            // Normal case: blackout period does not cross midnight
+            if (_configuration.BlackOutStart < _configuration.BlackOutEnd) {
+                if (now.TimeOfDay >= _configuration.BlackOutStart && now.TimeOfDay <= _configuration.BlackOutEnd) {
+                    _logger.LogDebug($"Current time {now} is within blackout period {_configuration.BlackOutStart} - {_configuration.BlackOutEnd} for {_underlyingPosition.Symbol}. Skipping hedge.");
+                    return false;
+                }
+            }
+        }
+
+        // Try to acquire the semaphore without blocking
+        if (!_hedgeSemaphore.Wait(0)) {
+            _logger.LogDebug($"Hedging in progress for {_underlyingPosition.Symbol}. Skipping overlapping execution.");
+            return false;
+        }
+
+        return true;
     }
 
     private void Broker_OnOrderPlaced(object? sender, OrderPlacedArgs e)

@@ -221,6 +221,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
         stopWatch.Start();
         var greeks = new Greeks();
+        float totalVegaWeightedVariance = 0f;
+        float totalVega = 0f;
+        
         _rwLock.EnterReadLock();
         try {
             foreach (var position in Values) {
@@ -273,9 +276,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         VolatilitySpotSlope = underlyingContract.VolatilitySpotSlope,
                     };
 
-                    // Market implied vol
-                    // var marketIV = position.Contract.IsCall ? bls.GetCallIVBisections(position.Contract.MarketPrice.Value) : bls.GetPutIVBisections(position.Contract.MarketPrice.Value);
-                    // Actual realized vol
+                    // Calculate market implied vol for variance-weighted IV tracking
+                    var marketIV = position.Contract.IsCall ? bls.GetCallIVFast(position.Contract.MarketPrice.Value) : bls.GetPutIVFast(position.Contract.MarketPrice.Value);
+                    
+                    // Use realized vol for position Greeks calculation
                     bls.ImpliedVolatility = (float)realizedVol;
                     bls.CalculateAll();
 
@@ -308,19 +312,34 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                             greeks.DeltaOTM += bls.DeltaPut * position.Size;
                     }
 
+                    var positionVega = (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
                     greeks.Gamma += (position.Contract.IsCall ? bls.GamaCall : bls.GamaPut) * position.Size;
-                    greeks.Vega += (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
+                    greeks.Vega += positionVega;
 
                     greeks.Theta += thetaBLS * position.Size * position.Contract.Multiplier;
 
                     greeks.Vanna += (position.Contract.IsCall ? bls.VannaCall * 0.01f : bls.VannaPut * 0.01f) * position.Size;
                     greeks.Charm += charm * position.Size;
-                    _logger.LogInformation($"{position} is using IV: rv:{realizedVol:f3} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} t:{deltaBls * position.Size:f2}");
+                    
+                    // Accumulate variance-weighted IV for VRP tracking
+                    // Variance = σ², so we weight by variance (IV²) * vega to get proper variance exposure
+                    var absVega = MathF.Abs(positionVega);
+                    var variance = marketIV * marketIV; // Convert IV to variance
+                    totalVegaWeightedVariance += variance * absVega;
+                    totalVega += absVega;
+                    
+                    _logger.LogInformation($"{position} is using IV: rv:{realizedVol:f3} miv:{marketIV:f3} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} t:{deltaBls * position.Size:f2}");
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
                     continue;
                 }
+            }
+            
+            // Calculate variance-weighted IV (convert back from variance to volatility)
+            // VarianceWeightedIV = sqrt( Σ(σ² * |Vega|) / Σ|Vega| )
+            if (totalVega > 0) {
+                greeks.VarianceWeightedIV = MathF.Sqrt(totalVegaWeightedVariance / totalVega);
             }
         }
         finally {
@@ -328,7 +347,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
 
         stopWatch.Stop();
-        _logger.LogInformation($"Calculated Greeks for {underlyingPosition.Symbol} in {stopWatch.ElapsedMilliseconds} ms");
+        _logger.LogInformation($"Calculated Greeks for {underlyingPosition.Symbol} in {stopWatch.ElapsedMilliseconds} ms - Variance-Weighted IV: {greeks.VarianceWeightedIV:F3}");
 
         return greeks;
     }

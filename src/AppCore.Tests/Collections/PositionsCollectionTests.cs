@@ -39,9 +39,13 @@ public class PositionsCollectionTests
             new DateTimeOffset(2025, 6, 20, 9, 30, 0, TimeExtensions.EasternStandardTimeZone.BaseUtcOffset),
             strike, isCall, size: (int)optionSize);
         optionPosition.Underlying = underlyingPosition;
+        optionPosition.Contract.MarketPrice = 24.791f;
         positions.TryAdd(optionPosition.Contract.Id, optionPosition);
 
         // Act
         var greeks = positions.CalculateGreeks(minIV: 0, underlyingPosition);
+
+        Assert.IsNotNull(greeks);
+        Assert.AreEqual(0.1989f, greeks.VarianceWeightedIV, 0.01f);
     }
 }
