@@ -119,7 +119,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
             _logger.LogDebug($"Placing delta hedge size: {deltaAdjustment} for {_underlyingPosition.Symbol}");
             // Set a delay to prevent immediate re-hedging
-            _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(2);
+            _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(5);
             _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
             _broker.PlaceOrder(_accountId, _activeOrderId.Value, _underlyingPosition.FrontContract, 0 < deltaAdjustment ? 1 : -1, deltaAdjustment);
         } finally {
