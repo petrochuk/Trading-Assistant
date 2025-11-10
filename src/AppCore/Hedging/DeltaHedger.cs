@@ -88,7 +88,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             }
             _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.DeltaTotal:f3}, Theta: {LastGreeks.Theta:f3}");
 
-            var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Floor(LastGreeks.DeltaOTM) : -MathF.Ceiling(LastGreeks.DeltaOTM);
+            var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Round(LastGreeks.DeltaOTM) : -MathF.Round(LastGreeks.DeltaOTM);
             var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Round(LastGreeks.DeltaITM) : -MathF.Round(LastGreeks.DeltaITM);
             var deltaHedgeSize = deltaOTMHedgeSize + deltaITMHedgeSize;
             if (MathF.Abs(LastGreeks.DeltaHedge - deltaHedgeSize) < _configuration.Delta) {
