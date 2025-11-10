@@ -40,9 +40,11 @@ internal class TestBroker : IBroker
     public void Dispose() {
     }
 
-    public void PlaceOrder(string accountId, Guid orderId, Contract contract, float size) {
+    public void PlaceOrder(string accountId, Guid orderId, Contract contract, float size, float totalSize) {
         PlacedOrders.Add(new TestOrder { 
-            Contract = contract, Size = size 
+            Contract = contract, 
+            Size = size,
+            TotalSize = totalSize
         });
     }
 

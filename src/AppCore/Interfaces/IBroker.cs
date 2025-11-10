@@ -9,7 +9,7 @@ public interface IBroker : IDisposable
     void Disconnect();
     void StartTickle();
     void StopTickle();
-    void PlaceOrder(string accountId, Guid orderId, Contract contract, float size);
+    void PlaceOrder(string accountId, Guid orderId, Contract contract, float size, float totalSize);
     void FindContracts(string symbol, AssetClass assetClass);
     void SuppressWarnings();
 
