@@ -300,18 +300,18 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
-                    float deltaBls = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
+                    float deltaBls = position.Contract.IsCall ? bls.HullWhiteDeltaCall : bls.HullWhiteDeltaPut;
                     if (position.Contract.IsCall) {
-                        if (bls.DeltaCall >= 0.5)
-                            greeks.DeltaITM += bls.DeltaCall * position.Size;
+                        if (bls.HullWhiteDeltaCall >= 0.5)
+                            greeks.DeltaITM += bls.HullWhiteDeltaCall * position.Size;
                         else
-                            greeks.DeltaOTM += bls.DeltaCall * position.Size;
+                            greeks.DeltaOTM += bls.HullWhiteDeltaCall * position.Size;
                     }
                     else {
-                        if (bls.DeltaPut <= -0.5)
-                            greeks.DeltaITM += bls.DeltaPut * position.Size;
+                        if (bls.HullWhiteDeltaPut <= -0.5)
+                            greeks.DeltaITM += bls.HullWhiteDeltaPut * position.Size;
                         else
-                            greeks.DeltaOTM += bls.DeltaPut * position.Size;
+                            greeks.DeltaOTM += bls.HullWhiteDeltaPut * position.Size;
                     }
 
                     var positionVega = (position.Contract.IsCall ? bls.VegaCall : bls.VegaPut) * position.Size * position.Contract.Multiplier;
@@ -336,7 +336,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         totalVegaLong += absVega;
                     }
                     
-                    _logger.LogInformation($"{position} is using IV: rv:{realizedVol:f3} miv:{marketIV:f3} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} t:{deltaBls * position.Size:f2}");
+                    _logger.LogTrace($"{position} is using IV: rv:{realizedVol:f3} miv:{marketIV:f3} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} t:{deltaBls * position.Size:f2}");
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");

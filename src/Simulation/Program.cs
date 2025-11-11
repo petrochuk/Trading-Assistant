@@ -95,7 +95,7 @@ namespace Simulation
                 includeLeverageEffect: true);
             forecaster3.LoadFromFileWithRollingRV(@"c:\temp\spx.csv", skipLines: 1);
             PrintResults(forecaster3);
-            forecaster3.SetIntradayVolatilityEstimate(0.30, isAnnualized: true);
+            //forecaster3.SetIntradayVolatilityEstimate(0.30, isAnnualized: true);
 
             var now = TimeProvider.System.EstNow();
             for (int day = 1; day <= 20; day++) {
