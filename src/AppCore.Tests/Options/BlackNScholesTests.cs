@@ -130,4 +130,29 @@ public class BlackNScholesTests
             Assert.IsLessThanOrEqualTo(bls.DeltaPut, bls.HullWhiteDeltaPut, $"Put Delta with Hull-White adjustment should be greater than without adjustment at stock price {price}");
         }
     }
+
+    [TestMethod]
+    [DataRow(5000, 0.02f)]
+    public void BlackNScholes_Deltas_with_HullWhiteAdjustment_Slope(float price, float movePct) {
+        var bls = new BlackNScholesCalculator {
+            Strike = price,
+            DaysLeft = 10f,
+            ImpliedVolatility = 0.25f,
+            VolatilitySpotSlope = -0.04f
+        };
+
+        bls.StockPrice = price;
+        bls.CalculateAll();
+        var deltaCallAtm = bls.HullWhiteDeltaCall;
+
+        var priceUp = price * (1 + movePct);
+        bls.StockPrice = priceUp;
+        bls.CalculateAll();
+        var deltaCallUp = bls.HullWhiteDeltaCall;
+
+        var priceDown = price * (1 - movePct);
+        bls.StockPrice = priceDown;
+        bls.CalculateAll();
+        var deltaCallDown = bls.HullWhiteDeltaCall;
+    }
 }

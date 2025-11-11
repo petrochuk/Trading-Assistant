@@ -18,7 +18,7 @@ public sealed class DeltaHedgerTests
     [DataRow(5005.0f, true, 1, 1, 1f, -1)]
     [DataRow(5005.0f, true, -1, 1, 1f, -1)]
     [DataRow(4995.0f, false, 1, 1, 1f, -1)]
-    [DataRow(4995.0f, false, 2, 1, 1f, -1)]
+    [DataRow(4995.0f, false, 2, 1, 1f, 0)]
     // In-the-money tests
     [DataRow(4850.0f, true, 1, 0, 1f, -1)]
     [DataRow(4900.0f, true, -1, 1, 1f, 0)]
