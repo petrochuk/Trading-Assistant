@@ -156,8 +156,18 @@ public sealed partial class RiskGraph : UserControl
 
     #endregion
 
+    Account? _account;
     [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
-    public Account? Account { get; set; }
+    public Account? Account 
+    { 
+        get => _account;
+        set {
+            if (_account != value) {
+                _account = value;
+                Redraw();
+            }
+        }
+    }
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e) {
         Redraw();
