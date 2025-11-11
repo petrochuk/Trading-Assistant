@@ -1,15 +1,15 @@
 <Project>
   <PropertyGroup>
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
-    <LangVersion>13.0</LangVersion>
+    <LangVersion>14.0</LangVersion>
   </PropertyGroup>
   
   <!-- Package Versions -->
   <PropertyGroup Label="Package Versions">
-    <MicrosoftNETTestSdkVersion>18.0.0</MicrosoftNETTestSdkVersion>
-    <MSTestVersion>4.0.1</MSTestVersion>
-    <MicrosoftExtensionsVersion>9.0.10</MicrosoftExtensionsVersion>
-    <MicrosoftWindowsSDKVersion>10.0.26100.6584</MicrosoftWindowsSDKVersion>
+    <MicrosoftNETTestSdkVersion>18.0.1</MicrosoftNETTestSdkVersion>
+    <MSTestVersion>4.0.2</MSTestVersion>
+    <MicrosoftExtensionsVersion>10.0.0</MicrosoftExtensionsVersion>
+    <MicrosoftWindowsSDKVersion>10.0.26100.6901</MicrosoftWindowsSDKVersion>
     <MicrosoftWindowsAppSDK>1.8.251003001</MicrosoftWindowsAppSDK>
   </PropertyGroup>
 </Project>
