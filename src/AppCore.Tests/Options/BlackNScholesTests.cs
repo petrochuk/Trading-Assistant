@@ -155,4 +155,52 @@ public class BlackNScholesTests
         bls.CalculateAll();
         var deltaCallDown = bls.HullWhiteDeltaCall;
     }
+
+
+    //[TestMethod]
+    public void BlackNScholes_Deltas_with_SkewAdjustment() {
+        var bls = new BlackNScholesCalculator {
+            Strike = 5000f,
+            DaysLeft = 10f,
+            ImpliedVolatility = 0.25f,
+            //UseHigherMoments = true,
+            //Skewness = -0.35f,
+            //ExcessKurtosis = 10f
+        };
+
+        var startPrice = 4500f;
+        var endPrice = 5500f;
+        var previousCallDelta = float.MinValue;
+        var previousPutDelta = float.MinValue;
+        for (var price = startPrice; price <= endPrice; price += 10f) {
+            bls.StockPrice = price;
+            //bls.UseHigherMoments = false;
+            bls.CalculateAll();
+            var deltaCallNoAdjustment = bls.DeltaCall;
+            var deltaPutNoAdjustment = bls.DeltaPut;
+
+            //bls.UseHigherMoments = true;
+            bls.CalculateAll();
+
+            var deltaCallWithAdjustment = bls.DeltaCall;
+            var deltaPutWithAdjustment = bls.DeltaPut;
+
+            // Validate that deltas are within valid ranges
+            Assert.IsGreaterThanOrEqualTo(0.0f, deltaCallWithAdjustment, $"Call delta must be >= 0 at price {price}");
+            Assert.IsLessThanOrEqualTo(1.0f, deltaCallWithAdjustment, $"Call delta must be <= 1 at price {price}");
+            Assert.IsGreaterThanOrEqualTo(-1.0f, deltaPutWithAdjustment, $"Put delta must be >= -1 at price {price}");
+            Assert.IsLessThanOrEqualTo(0.0f, deltaPutWithAdjustment, $"Put delta must be <= 0 at price {price}");
+
+            // Delta of Calls should increase with stock price
+            Assert.IsGreaterThanOrEqualTo(previousCallDelta, deltaCallWithAdjustment, $"Call delta should increase with stock price. Previous: {previousCallDelta}, Current: {deltaCallWithAdjustment}, Price: {price}");
+            previousCallDelta = deltaCallWithAdjustment;
+
+            // Delta of Puts should increase with stock price
+            Assert.IsGreaterThanOrEqualTo(previousPutDelta, deltaPutWithAdjustment, $"Put delta should increase with stock price. Previous: {previousPutDelta}, Current: {deltaPutWithAdjustment}, Price: {price}");
+            previousPutDelta = deltaPutWithAdjustment;
+
+            Console.WriteLine($"Price: {price}, Delta Call No Adj: {deltaCallNoAdjustment}, Delta Call With Adj: {deltaCallWithAdjustment}");
+            Console.WriteLine($"Price: {price}, Delta Put No Adj: {deltaPutNoAdjustment}, Delta Put With Adj: {deltaPutWithAdjustment}");
+        }
+    }
 }

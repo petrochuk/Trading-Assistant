@@ -796,11 +796,13 @@ public class HestonCalculator
     }
 
     /// <summary>
-    /// Calculate delta using finite difference method with analytical fallbacks
+    /// Calculate delta analytically using the Heston characteristic function.
+    /// For Heston model: Delta_Call = P?, Delta_Put = P? - 1
+    /// where P? is the first probability from the characteristic function integration.
+    /// This is much more accurate and efficient than finite differences.
     /// </summary>
     private void CalculateDelta() {
-        float originalPrice = StockPrice;
-
+        // Handle extreme moneyness cases
         float moneyness = StockPrice / Strike;
         if (moneyness > 100.0f) {
             DeltaCall = 1.0f;
@@ -812,6 +814,71 @@ public class HestonCalculator
             return;
         }
 
+        // Handle expiry
+        if (ExpiryTime <= 1e-6f) {
+            if (StockPrice > Strike) {
+                DeltaCall = 1.0f;
+                DeltaPut = 0.0f;
+            } else if (StockPrice < Strike) {
+                DeltaCall = 0.0f;
+                DeltaPut = -1.0f;
+            } else {
+                DeltaCall = 0.5f;
+                DeltaPut = -0.5f;
+            }
+            return;
+        }
+
+        // Route to Rough Heston delta if enabled
+        if (UseRoughHeston) {
+            CalculateDeltaFiniteDifference(); // Rough Heston doesn't have closed-form delta
+            return;
+        }
+
+        try {
+            ValidateAndAdjustParameters();
+
+            double S = StockPrice, K = Strike, r = RiskFreeInterestRate, T = ExpiryTime;
+            double v0 = CurrentVolatility * CurrentVolatility;
+            double theta = LongTermVolatility * LongTermVolatility;
+            double kappa = VolatilityMeanReversion;
+            double sigma = VolatilityOfVolatility;
+            double rho = Correlation;
+
+            // Calculate P1 probability directly - this IS the call delta in Heston
+            var (p1, _) = CalculateHestonProbabilities(S, K, r, T, v0, theta, kappa, sigma, rho);
+
+            DeltaCall = (float)p1;
+            DeltaPut = DeltaCall - 1.0f;
+
+            // Validate and clamp to valid ranges
+            if (float.IsNaN(DeltaCall) || float.IsInfinity(DeltaCall)) {
+                CalculateDeltaFallbackBlackScholes();
+                return;
+            }
+
+            // Clamp to theoretical bounds
+            DeltaCall = MathF.Max(0.0f, MathF.Min(1.0f, DeltaCall));
+            DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
+
+            // Verify put-call delta parity: Delta_Call - Delta_Put = 1
+            float combinedDelta = DeltaCall - DeltaPut;
+            if (MathF.Abs(combinedDelta - 1.0f) > 0.05f) {
+                // Re-enforce parity if drift is significant
+                DeltaPut = DeltaCall - 1.0f;
+                DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
+            }
+        } catch {
+            // Fallback to Black-Scholes approximation on any error
+            CalculateDeltaFallbackBlackScholes();
+        }
+    }
+
+    /// <summary>
+    /// Finite-difference delta calculation for Rough Heston or as fallback when analytical fails
+    /// </summary>
+    private void CalculateDeltaFiniteDifference() {
+        float originalPrice = StockPrice;
         float deltaBump = MathF.Max(0.01f, 0.001f * StockPrice);
 
         StockPrice = originalPrice + deltaBump;
@@ -824,58 +891,28 @@ public class HestonCalculator
         float callDown = CallValue;
         float putDown = PutValue;
 
+        StockPrice = originalPrice;
+        CalculateCallPut();
+
         DeltaCall = (callUp - callDown) / (2.0f * deltaBump);
         DeltaPut = (putUp - putDown) / (2.0f * deltaBump);
 
+        // Validate and clamp
         if (float.IsNaN(DeltaCall) || float.IsInfinity(DeltaCall) ||
             float.IsNaN(DeltaPut) || float.IsInfinity(DeltaPut)) {
             CalculateDeltaFallbackBlackScholes();
-            StockPrice = originalPrice;
-            CalculateCallPut();
             return;
         }
 
-        float callPriceDiff = MathF.Abs(callUp - callDown);
-        float putPriceDiff = MathF.Abs(putUp - putDown);
-        if (callPriceDiff < 0.001f || putPriceDiff < 0.001f) {
-            CalculateDeltaFallbackBlackScholes();
-            StockPrice = originalPrice;
-            CalculateCallPut();
-            return;
-        }
+        DeltaCall = MathF.Max(0.0f, MathF.Min(1.0f, DeltaCall));
+        DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
 
-        if (DeltaCall > 1.5f || DeltaCall < -0.5f || DeltaPut > 0.5f || DeltaPut < -1.5f) {
-            CalculateDeltaFallbackBlackScholes();
-            StockPrice = originalPrice;
-            CalculateCallPut();
-            return;
-        }
-
+        // Enforce put-call delta parity
         float combinedDelta = DeltaCall - DeltaPut;
-        if (MathF.Abs(combinedDelta - 1.0f) > 0.15f) {
-            CalculateDeltaFallbackBlackScholes();
-            StockPrice = originalPrice;
-            CalculateCallPut();
-            return;
-        }
-
-        // Preserve raw deltas; only enforce parity if drift outside tighter band
-        float rawCall = DeltaCall;
-        float rawPut = DeltaPut;
-
-        // Clamp independently first
-        DeltaCall = MathF.Max(0.0f, MathF.Min(1.0f, rawCall));
-        DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, rawPut));
-
-        // Enforce put-call parity only if combined delta deviates noticeably (> 0.05)
-        float combinedAfterClamp = DeltaCall - DeltaPut;
-        if (MathF.Abs(combinedAfterClamp - 1.0f) > 0.05f) {
+        if (MathF.Abs(combinedDelta - 1.0f) > 0.05f) {
             DeltaPut = DeltaCall - 1.0f;
             DeltaPut = MathF.Max(-1.0f, MathF.Min(0.0f, DeltaPut));
         }
-
-        StockPrice = originalPrice;
-        CalculateCallPut();
     }
 
     /// <summary>
