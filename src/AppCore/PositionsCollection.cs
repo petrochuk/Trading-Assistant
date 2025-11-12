@@ -271,6 +271,18 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         }
                     }
 
+                    var heston = new HestonCalculator() {
+                        StockPrice = underlyingContract.MarketPrice.Value,
+                        DaysLeft = (float)daysLeft,
+                        Strike = position.Contract.Strike,
+                        CurrentVolatility = (float)realizedVol,
+                        LongTermVolatility = underlyingContract.LongTermVolatility,
+                        VolatilityMeanReversion = underlyingContract.VolatilityMeanReversion,
+                        VolatilityOfVolatility = underlyingContract.VolatilityOfVolatility,
+                        Correlation = underlyingContract.Correlation,
+                    };
+                    heston.CalculateAll();
+
                     var bls = new BlackNScholesCalculator() {
                         StockPrice = underlyingContract.MarketPrice.Value,
                         DaysLeft = (float)daysLeft,
@@ -301,6 +313,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
                     float deltaBls = position.Contract.IsCall ? bls.HullWhiteDeltaCall : bls.HullWhiteDeltaPut;
+                    var hestonDelta = position.Contract.IsCall ? heston.DeltaCall : heston.DeltaPut;
+                    greeks.DeltaHeston += hestonDelta * position.Size;
                     if (position.Contract.IsCall) {
                         if (bls.HullWhiteDeltaCall >= 0.5)
                             greeks.DeltaITM += bls.HullWhiteDeltaCall * position.Size;

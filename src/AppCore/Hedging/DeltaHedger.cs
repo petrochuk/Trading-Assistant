@@ -93,11 +93,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             var deltaHedgeSize = 0 < LastGreeks.DeltaTotal ? -MathF.Round(LastGreeks.DeltaTotal) : -MathF.Round(LastGreeks.DeltaTotal);
             //var deltaHedgeSize = deltaOTMHedgeSize + deltaITMHedgeSize;
             if (MathF.Abs(deltaHedgeSize) < _configuration.Delta) {
-                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. Total:{LastGreeks.DeltaTotal} OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");
+                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. Total:{LastGreeks.DeltaTotal:f3} Total Heston:{LastGreeks.DeltaHestonTotal:f3} OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");
                 return;
             }
 
-            _logger.LogInformation($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta Abs({LastGreeks.DeltaTotal:f3}) exceeds threshold: {_configuration.Delta}. OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}, Executing hedge.");
+            _logger.LogInformation($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta total:{LastGreeks.DeltaTotal:f3} Total Heston:{LastGreeks.DeltaHestonTotal:f3} exceeds threshold: {_configuration.Delta}. OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}, Executing hedge.");
 
             // Round delta down to 0 in whole numbers
             var deltaAdjustment = deltaHedgeSize;// - LastGreeks.DeltaHedge;

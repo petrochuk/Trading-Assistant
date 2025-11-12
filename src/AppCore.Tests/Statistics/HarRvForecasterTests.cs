@@ -121,7 +121,6 @@ public class HarRvForecasterTests
 	public void Forecast_MultiStep_ShouldConvergeToLongRunMean()
 	{
 		// Arrange - Create a spike in volatility, then check if long-term forecast converges
-		const int numObservations = 100;
 		var forecaster = new HarRvForecaster(
 			treatInputAsPrices: false,
 			includeDaily: true,

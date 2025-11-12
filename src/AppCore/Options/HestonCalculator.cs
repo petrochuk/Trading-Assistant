@@ -391,7 +391,7 @@ public class HestonCalculator
             Complex drift = i * u * (lnS + r * T);
             Complex exponent = C + D * v0 + drift;
             // Updated clamp: allow deeper negative (down to -700) so far wings aren't artificially truncated.
-            double upperClamp = 300.0, lowerClamp = -700.0;
+            double upperClamp = 700.0, lowerClamp = -700.0;
             if (exponent.Real > upperClamp) exponent = new Complex(upperClamp, exponent.Imaginary);
             if (exponent.Real < lowerClamp) exponent = new Complex(lowerClamp, exponent.Imaginary);
             return Complex.Exp(exponent);

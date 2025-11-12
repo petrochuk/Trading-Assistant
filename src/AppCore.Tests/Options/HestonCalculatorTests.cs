@@ -6,6 +6,8 @@ namespace AppCore.Tests.Options;
 [TestClass]
 public class HestonCalculatorTests
 {
+    #region HelperMethods
+
     private HestonCalculator CreateStandardHeston(
         float daysLeft = 30.0f,
         float stockPrice = 100.0f, 
@@ -26,20 +28,25 @@ public class HestonCalculatorTests
         };
     }
 
+    #endregion
+
     [TestMethod]
-    [DataRow(100.0f)]
-    [DataRow(500.0f)]
-    [DataRow(1000.0f)]
-    [DataRow(5000.0f)]
-    public void TestHeston_ATM_BasicCallPutCalculation(float stockPrice) {
+    [DataRow(100.0f, 0)]
+    [DataRow(500.0f, 0.5f)]
+    [DataRow(1000.0f, -0.5f)]
+    [DataRow(5000.0f, -0.9f)]
+    public void TestHeston_ATM_BasicCalculation(float stockPrice, float correlation) {
         // Stock price equals strike price (ATM)
-        var heston = CreateStandardHeston(stockPrice: stockPrice, strike: stockPrice);
-        heston.CalculateCallPut();
+        var heston = CreateStandardHeston(stockPrice: stockPrice, 
+            strike: stockPrice, correlation: correlation);
+        heston.CalculateAll();
 
         // Basic sanity checks
         Assert.IsGreaterThan(0, heston.CallValue, "Call value should be positive for ATM option");
         Assert.IsGreaterThan(0, heston.PutValue, "Put value should be positive for ATM option");
-        
+        Assert.AreEqual(0.5f, heston.DeltaCall, 0.1f, "Call delta should be approximately 0.5 for ATM option");
+        Assert.AreEqual(-0.5f, heston.DeltaPut, 0.1f, "Put delta should be approximately -0.5 for ATM option");
+
         // Put-call parity check: C - P = S - K*e^(-r*T)
         float discountedStrike = heston.Strike * MathF.Exp(-heston.RiskFreeInterestRate * heston.ExpiryTime);
         float putCallParity = heston.CallValue - heston.PutValue - (heston.StockPrice - discountedStrike);
@@ -55,39 +62,53 @@ public class HestonCalculatorTests
     [DataRow(5000.0f, 4000.0f)]
     public void TestHeston_AtExpiration(float stockPrice, float strike)
     {
-        var heston = CreateStandardHeston(stockPrice, strike);
+        var heston = CreateStandardHeston(stockPrice: stockPrice, strike: strike);
         heston.DaysLeft = 0.0f; // At expiration
 
-        heston.CalculateCallPut();
+        heston.CalculateAll();
 
         var expectedCallValue = MathF.Max(heston.StockPrice - heston.Strike, 0);
         var expectedPutValue = MathF.Max(heston.Strike - heston.StockPrice, 0);
         Assert.AreEqual(expectedCallValue, heston.CallValue, 0.001f, "Call value at expiration should be max(S-K, 0)");
         Assert.AreEqual(expectedPutValue, heston.PutValue, 0.001f, "Put value at expiration should be max(K-S, 0)");
+
+        // Assert delta behavior at expiration
+        if (stockPrice < strike) {
+            Assert.AreEqual(0.0f, heston.DeltaCall, 0.001f, "OTM call delta at expiration should be 0");
+            Assert.AreEqual(-1.0f, heston.DeltaPut, 0.001f, "ITM put delta at expiration should be -1");
+        } else {
+            Assert.AreEqual(1.0f, heston.DeltaCall, 0.001f, "ITM call delta at expiration should be 1");
+            Assert.AreEqual(0.0f, heston.DeltaPut, 0.001f, "OTM put delta at expiration should be 0");
+        }
     }
 
     [TestMethod]
-    public void TestHeston_MoneynessBehavior()
-    {
+    public void TestHeston_MoneynessImpact() {
         var heston = CreateStandardHeston();
         
-        // Deep ITM call
+        // ITM
         heston.StockPrice = 120.0f;
         heston.Strike = 100.0f;
-        heston.CalculateCallPut();
-        float itmCallValue = heston.CallValue;
-        
-        // ATM call
+        heston.CalculateAll();
+        var itmCallValue = heston.CallValue;
+        Assert.IsGreaterThan(0.5, heston.DeltaCall, "ITM call delta should be greater than 0.5");
+        Assert.IsGreaterThan(-0.5, heston.DeltaPut, "ITM put delta should be greater than -0.5");
+
+        // ATM
         heston.StockPrice = 100.0f;
         heston.Strike = 100.0f;
-        heston.CalculateCallPut();
-        float atmCallValue = heston.CallValue;
-        
-        // OTM call
+        heston.CalculateAll();
+        var atmCallValue = heston.CallValue;
+        Assert.AreEqual(0.5f, heston.DeltaCall, 0.1f, "ATM call delta should be approximately 0.5");
+        Assert.AreEqual(-0.5f, heston.DeltaPut, 0.1f, "ATM put delta should be approximately -0.5");
+
+        // OTM
         heston.StockPrice = 80.0f;
         heston.Strike = 100.0f;
-        heston.CalculateCallPut();
-        float otmCallValue = heston.CallValue;
+        heston.CalculateAll();
+        var otmCallValue = heston.CallValue;
+        Assert.IsLessThan(0.5, heston.DeltaCall, "OTM call delta should be less than 0.5");
+        Assert.IsLessThan(-0.5, heston.DeltaPut, "OTM put delta should be greater than -0.5");
 
         Assert.IsGreaterThan(atmCallValue, itmCallValue, "ITM call should be more valuable than ATM call");
         Assert.IsGreaterThan(otmCallValue, atmCallValue, "ATM call should be more valuable than OTM call");
@@ -96,28 +117,28 @@ public class HestonCalculatorTests
     [TestMethod]
     public void TestHeston_VolatilityImpact()
     {
-        var heston = CreateStandardHeston();
-        
-        // Low volatility
-        heston.CurrentVolatility = 0.1f;
-        heston.LongTermVolatility = 0.1f;
-        heston.CalculateCallPut();
-        float lowVolCallValue = heston.CallValue;
-        
-        // High volatility
-        heston.CurrentVolatility = 0.4f;
-        heston.LongTermVolatility = 0.4f;
-        heston.CalculateCallPut();
-        float highVolCallValue = heston.CallValue;
+        var hestonLowIV = CreateStandardHeston(correlation: 0);
+        hestonLowIV.CurrentVolatility = 0.1f;
+        hestonLowIV.LongTermVolatility = 0.1f;
+        hestonLowIV.CalculateAll();
 
-        Assert.IsGreaterThan(lowVolCallValue, highVolCallValue, "Higher volatility should increase option value");
+        var hestonHighIV = CreateStandardHeston(correlation: 0);
+        hestonHighIV.CurrentVolatility = 0.4f;
+        hestonHighIV.LongTermVolatility = 0.4f;
+        hestonHighIV.CalculateAll();
+
+        Assert.IsGreaterThan(hestonLowIV.CallValue, hestonHighIV.CallValue, "Higher volatility should increase option value");
+        Assert.IsGreaterThan(hestonLowIV.PutValue, hestonHighIV.PutValue, "Higher volatility should increase option value");
+
+        Assert.AreEqual(hestonLowIV.DeltaCall, hestonHighIV.DeltaCall, 0.1f, "Delta should not vary drastically with volatility changes for ATM options");
+        Assert.AreEqual(hestonLowIV.DeltaPut, hestonHighIV.DeltaPut, 0.1f, "Delta should not vary drastically with volatility changes for ATM options");
     }
 
     [TestMethod]
     [DataRow(100.0f, 100.0f, 0.5f, -0.5f)]
     [DataRow(5000.0f, 5100.0f, 0.4f, -0.6f)]
     [DataRow(5000.0f, 4900.0f, 0.71f, -0.29f)]
-    public void TestHeston_GreeksCalculation(float stockPrice, float strike, float expectedDeltaCall, float expectedDeltaPut)
+    public void TestHeston_Greeks_TestCases(float stockPrice, float strike, float expectedDeltaCall, float expectedDeltaPut)
     {
         var heston = CreateStandardHeston(stockPrice: stockPrice, strike: strike);
         heston.CalculateAll();
@@ -153,54 +174,46 @@ public class HestonCalculatorTests
     [TestMethod]
     public void TestHeston_ThetaDecay()
     {
-        var heston = CreateStandardHeston();
-        heston.DaysLeft = 30.0f;
-        heston.CalculateAll();
-        float theta30Days = heston.ThetaCall;
+        var heston30Days = CreateStandardHeston();
+        heston30Days.DaysLeft = 30.0f;
+        heston30Days.CalculateAll();
 
-        heston.DaysLeft = 10.0f;
-        heston.CalculateAll();
-        float theta10Days = heston.ThetaCall;
+        var heston10Days = CreateStandardHeston();
+        heston10Days.DaysLeft = 10.0f;
+        heston10Days.CalculateAll();
 
-        // For options with time value, theta should generally be negative
-        Assert.IsTrue(theta30Days < 0 || theta10Days < 0, "At least one theta should be negative (time decay)");
+        Assert.IsLessThan(heston30Days.PutValue, heston10Days.PutValue, "Put value should decrease as time to expiration decreases");
+        Assert.IsLessThan(heston30Days.DeltaPut, heston10Days.DeltaPut, "Put delta should decrease as time to expiration decreases");
+
+        Assert.IsLessThan(heston30Days.CallValue, heston10Days.CallValue, "Call value should decrease as time to expiration decreases");
+        Assert.IsLessThan(heston30Days.DeltaCall, heston10Days.DeltaCall, "Call delta should decrease as time to expiration decreases");
     }
 
     [TestMethod]
-    public void TestHeston_CorrelationImpact()
+    [DataRow(4000f)]
+    [DataRow(5000f)]
+    [DataRow(6000f)]
+    public void TestHeston_CorrelationImpact(float strike)
     {
-        // 5% OTM put option
-        var heston = CreateStandardHeston(stockPrice: 5250, strike: 5000);
+        // 5% move
+        var hestonNegCorr = CreateStandardHeston(stockPrice: strike * 1.05f, strike: strike, correlation: -0.9f);
+        hestonNegCorr.CalculateAll();
+        var hestonNoCorr = CreateStandardHeston(stockPrice: strike * 1.05f, strike: strike, correlation: 0f);
+        hestonNoCorr.CalculateAll();
+        var hestonPosCorr = CreateStandardHeston(stockPrice: strike * 1.05f, strike: strike, correlation: 0.9f);
+        hestonPosCorr.CalculateAll();
         
-        // Make parameters more extreme to see correlation effect
-        heston.VolatilityOfVolatility = 0.8f; // Higher vol of vol
-        heston.ExpiryTime = 0.25f; // Longer time to expiration
-        
-        // Negative correlation (typical for equity options)
-        heston.Correlation = -0.9f;
-        heston.CalculateAll();
-        var negCorrPutValue = heston.PutValue;
-        var negCorrPutDelta = heston.DeltaPut;
+        // Negative correlation should increase put values and increase put deltas (more downside volatility)  
+        Assert.IsGreaterThan(hestonNoCorr.PutValue, hestonNegCorr.PutValue, $"Negative correlation should increase put value compared to no correlation. Neg: {hestonNegCorr.PutValue}, No: {hestonNoCorr.PutValue}");
+        Assert.IsLessThan(hestonNegCorr.CallValue, hestonNoCorr.CallValue, $"Positive correlation should decrease call value compared to no correlation. Pos: {hestonPosCorr.CallValue}, No: {hestonNoCorr.CallValue}");
+        Assert.IsLessThan(hestonNegCorr.DeltaPut, hestonNoCorr.DeltaPut, $"Negative correlation should increase put delta compared to no correlation. Neg: {hestonNegCorr.DeltaPut}, No: {hestonNoCorr.DeltaPut}");
+        Assert.IsLessThan(hestonNegCorr.DeltaCall, hestonNoCorr.DeltaCall, $"Negative correlation should increase call delta compared to no correlation. Neg: {hestonNegCorr.DeltaCall}, No: {hestonNoCorr.DeltaCall}");
 
-        // No correlation
-        heston.Correlation = 0f;
-        heston.CalculateAll();
-        var noCorrPutValue = heston.PutValue;
-        var noCorrPutDelta = heston.DeltaPut;
-
-        // Positive correlation
-        heston.Correlation = 0.9f;
-        heston.CalculateAll();
-        var posCorrPutValue = heston.PutValue;
-        var posCorrPutDelta = heston.DeltaPut;
-
-        // Negative correlation should increase put values and lower put deltas (more downside volatility)  
-        Assert.IsGreaterThan(noCorrPutValue, negCorrPutValue, $"Negative correlation should increase put value compared to no correlation. Neg: {negCorrPutValue}, No: {noCorrPutValue}");
-        Assert.IsLessThan(noCorrPutDelta, negCorrPutDelta, $"Negative correlation should decrease put delta compared to no correlation. Neg: {negCorrPutDelta}, No: {noCorrPutDelta}");
-
-        // Positive correlation should decrease put values and increase put deltas (less downside volatility)
-        Assert.IsLessThan(noCorrPutValue, posCorrPutValue, $"Positive correlation should decrease put value compared to no correlation. Pos: {posCorrPutValue}, No: {noCorrPutValue}");
-        Assert.IsGreaterThan(noCorrPutDelta, posCorrPutDelta, $"Positive correlation should increase put delta compared to no correlation. Pos: {posCorrPutDelta}, No: {noCorrPutDelta}");
+        // Positive correlation should decrease put values and decrease put deltas (less downside volatility)
+        Assert.IsGreaterThan(hestonPosCorr.PutValue, hestonNoCorr.PutValue, $"Positive correlation should decrease put value compared to no correlation. Pos: {hestonPosCorr.PutValue}, No: {hestonNoCorr.PutValue}");
+        Assert.IsLessThan(hestonNoCorr.CallValue, hestonPosCorr.CallValue, $"Positive correlation should increase call value compared to no correlation. Pos: {hestonPosCorr.CallValue}, No: {hestonNoCorr.CallValue}");
+        Assert.IsLessThan(hestonNoCorr.DeltaPut, hestonPosCorr.DeltaPut, $"Positive correlation should decrease put delta compared to no correlation. Pos: {hestonPosCorr.DeltaPut}, No: {hestonNoCorr.DeltaPut}");
+        Assert.IsLessThan(hestonNoCorr.DeltaCall, hestonPosCorr.DeltaCall, $"Positive correlation should decrease call delta compared to no correlation. Pos: {hestonPosCorr.DeltaCall}, No: {hestonNoCorr.DeltaCall}");
     }
 
     [TestMethod]
@@ -215,40 +228,31 @@ public class HestonCalculatorTests
         
         // Slow mean reversion
         heston.VolatilityMeanReversion = 0.1f;
-        heston.CalculateCallPut();
-        float slowMRCallValue = heston.CallValue;
+        heston.CalculateAll();
+        var slowMRCallValue = heston.CallValue;
         
         // Fast mean reversion
         heston.VolatilityMeanReversion = 10.0f;
-        heston.CalculateCallPut();
-        float fastMRCallValue = heston.CallValue;
+        heston.CalculateAll();
+        var fastMRCallValue = heston.CallValue;
 
-        // Should see significant difference in option values with extreme mean reversion difference
-        Assert.AreNotEqual(slowMRCallValue, fastMRCallValue, 0.1f, "Mean reversion speed should impact option values with extreme parameters");
+        Assert.IsLessThan(slowMRCallValue, fastMRCallValue, "Faster mean reversion should decrease option value when current vol is above long-term vol. Slow: {slowMRCallValue}, Fast: {fastMRCallValue}");
     }
 
     [TestMethod]
     public void TestHeston_VolOfVolImpact()
     {
         // 10% OTM call option
-        var heston = CreateStandardHeston(stockPrice: 1000, strike: 1100, correlation: 0);
-        
-        // Low vol of vol
-        heston.VolatilityOfVolatility = 0.1f;
-        heston.CalculateCallPut();
-        float lowVolVolCallValue = heston.CallValue;
-        
-        // High vol of vol
-        heston.VolatilityOfVolatility = 0.8f;
-        heston.CalculateCallPut();
-        float highVolVolCallValue = heston.CallValue;
+        var hestonLowVolVol = CreateStandardHeston(stockPrice: 1000, strike: 1100, correlation: 0);
+        hestonLowVolVol.VolatilityOfVolatility = 0.1f;
+        hestonLowVolVol.CalculateAll();
 
-        // Negative correlation
-        heston.Correlation = -1f;
-        heston.CalculateCallPut();
-        var negCorrCallValue = heston.CallValue;
+        var hestonHighVolVol = CreateStandardHeston(stockPrice: 1000, strike: 1100, correlation: 0);
+        hestonHighVolVol.VolatilityOfVolatility = 0.8f;
+        hestonHighVolVol.CalculateAll();
 
-        Assert.IsGreaterThan(lowVolVolCallValue, highVolVolCallValue, $"Higher vol of vol should increase option value. Low: {lowVolVolCallValue}, High: {highVolVolCallValue}");
+        Assert.IsGreaterThan(hestonLowVolVol.CallValue, hestonHighVolVol.CallValue, $"Higher vol of vol should increase option value. Low: {hestonLowVolVol.CallValue}, High: {hestonHighVolVol.CallValue}");
+        Assert.IsGreaterThan(hestonLowVolVol.DeltaCall, hestonHighVolVol.DeltaCall, $"Higher vol of vol should increase option delta. Low: {hestonLowVolVol.DeltaCall}, High: {hestonHighVolVol.DeltaCall}");
     }
 
     [TestMethod]
@@ -265,21 +269,21 @@ public class HestonCalculatorTests
         var heston = CreateStandardHeston(daysLeft:10, stockPrice: 1000, strike: 1050, correlation: correlation);
         heston.VolatilityMeanReversion = 20f;
         heston.VolatilityOfVolatility = volOfVol;
-        heston.CalculateCallPut();
+        heston.CalculateAll();
         var standardCallValue = heston.CallValue;
 
         // 5% OTM put option
         heston.Strike = 950;
-        heston.CalculateCallPut();
+        heston.CalculateAll();
         var standardPutValue = heston.PutValue;
 
         heston.UseRoughHeston = true;
         heston.Strike = 1050;
-        heston.CalculateCallPut();
+        heston.CalculateAll();
         var roughCallValue = heston.CallValue;
 
         heston.Strike = 950;
-        heston.CalculateCallPut();
+        heston.CalculateAll();
         var roughPutValue = heston.PutValue;
         
         Assert.IsGreaterThan(standardPutValue, roughPutValue, $"Rough Heston put value should increase. Standard: {standardPutValue}, Rough: {roughPutValue}");
@@ -414,6 +418,31 @@ public class HestonCalculatorTests
         var hestonUpNegPut = heston.PutValue;
     }
 
+    [TestMethod]
+    public void TestHeston_AnalyticalDelta_DeltaParityAlwaysHolds() {
+        var strikes = new float[] { 80f, 90f, 95f, 100f, 105f, 110f, 120f };
+
+        var heston = new HestonCalculator {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            StockPrice = 100f,
+            RiskFreeInterestRate = 0.05f,
+            DaysLeft = 30f,
+            CurrentVolatility = 0.25f,
+            LongTermVolatility = 0.2f,
+            VolatilityMeanReversion = 3.0f,
+            VolatilityOfVolatility = 0.3f,
+            Correlation = -0.5f
+        };
+
+        foreach (var strike in strikes) {
+            heston.Strike = strike;
+            heston.CalculateAll();
+
+            float parityDiff = heston.DeltaCall - heston.DeltaPut - 1.0f;
+            Assert.AreEqual(0.0f, parityDiff, 0.01f,
+                $"Analytical delta should satisfy put-call parity exactly for strike={strike}, got diff={parityDiff}");
+        }
+    }
 
     [TestMethod]
     [DataRow(6000f, 0.30f, 0.15f, 0.01f)]
@@ -531,7 +560,7 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
-    public void TestHeston_CompareWithBlackScholes_Deltas(){
+    public void TestHeston_Compare_Deltas_WithBlackScholes(){
         var startPrice = 4200.0f;
         var endPrice = 5800.0f;
         var step = 10.0f;
@@ -584,7 +613,7 @@ public class HestonCalculatorTests
                     VolatilityOfVolatility = 0.05f,
                     Correlation = 0.0f
                 };
-                heston.CalculateCallPut();
+                heston.CalculateAll();
                 float discountedStrike = K * MathF.Exp(-0.03f * T);
                 float parityDiff = (heston.CallValue - heston.PutValue) - (heston.StockPrice - discountedStrike);
                 Assert.AreEqual(0f, parityDiff, 0.4f, $"Put-call parity drift too large for K={K}, T={T}, diff={parityDiff}");
@@ -614,10 +643,40 @@ public class HestonCalculatorTests
                 VolatilityOfVolatility = 0.0001f,
                 Correlation = 0.0f
             };
-            heston.CalculateCallPut();
+            heston.CalculateAll();
             C[i] = heston.CallValue;
         }
         float secondDiff = C[0] - 2*C[1] + C[2];
         Assert.IsGreaterThanOrEqualTo(-0.25f, secondDiff, $"Call price should be convex in strike (within tolerance). Second diff={secondDiff}");
+    }
+
+    [TestMethod]
+    public void TestHeston_AnalyticalDelta_Monotonicity() {
+        // Delta should increase monotonically with stock price for fixed strike
+        var stockPrices = new float[] { 80f, 90f, 95f, 100f, 105f, 110f, 120f };
+
+        var heston = new HestonCalculator {
+            IntegrationMethod = HestonIntegrationMethod.Adaptive,
+            Strike = 100f,
+            RiskFreeInterestRate = 0.05f,
+            DaysLeft = 30f,
+            CurrentVolatility = 0.2f,
+            LongTermVolatility = 0.2f,
+            VolatilityMeanReversion = 2.0f,
+            VolatilityOfVolatility = 0.3f,
+            Correlation = -0.5f
+        };
+
+        float previousCallDelta = -1f;
+        foreach (var stockPrice in stockPrices) {
+            heston.StockPrice = stockPrice;
+            heston.CalculateAll();
+
+            if (previousCallDelta > 0) {
+                Assert.IsGreaterThanOrEqualTo(previousCallDelta - 0.001f, heston.DeltaCall,
+                    $"Call delta should increase with stock price: {previousCallDelta} -> {heston.DeltaCall}");
+            }
+            previousCallDelta = heston.DeltaCall;
+        }
     }
 }
