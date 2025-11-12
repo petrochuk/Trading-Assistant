@@ -149,10 +149,9 @@ public class HestonDeltaComparisonTests
         float posCorrCallDelta = heston.DeltaCall;
         float posCorrPutDelta = heston.DeltaPut;
 
-        // Delta values should be different with different correlation
-        Assert.AreNotEqual(negCorrCallDelta, posCorrCallDelta, 0.001f,
-            "Correlation should affect delta values");
-        
+        Assert.IsGreaterThan(negCorrPutDelta, posCorrPutDelta,
+            $"Put delta should be more negative (lower) with negative correlation. NegCorrPutDelta={negCorrPutDelta}, PosCorrPutDelta={posCorrPutDelta}");
+
         // Parity should still hold in both cases
         Assert.AreEqual(1.0f, negCorrCallDelta - negCorrPutDelta, 0.01f,
             "Parity should hold with negative correlation");
@@ -220,7 +219,7 @@ public class HestonDeltaComparisonTests
             
             if (previousCallDelta > 0)
             {
-                Assert.IsTrue(heston.DeltaCall >= previousCallDelta - 0.001f,
+                Assert.IsGreaterThanOrEqualTo(previousCallDelta - 0.001f, heston.DeltaCall,
                     $"Call delta should increase with stock price: {previousCallDelta} -> {heston.DeltaCall}");
             }
             previousCallDelta = heston.DeltaCall;

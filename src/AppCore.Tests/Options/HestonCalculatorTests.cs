@@ -169,8 +169,8 @@ public class HestonCalculatorTests
     [TestMethod]
     public void TestHeston_CorrelationImpact()
     {
-        // 10% OTM put option
-        var heston = CreateStandardHeston(stockPrice: 5100, strike: 5000);
+        // 5% OTM put option
+        var heston = CreateStandardHeston(stockPrice: 5250, strike: 5000);
         
         // Make parameters more extreme to see correlation effect
         heston.VolatilityOfVolatility = 0.8f; // Higher vol of vol
@@ -178,23 +178,29 @@ public class HestonCalculatorTests
         
         // Negative correlation (typical for equity options)
         heston.Correlation = -0.9f;
-        heston.CalculateCallPut();
+        heston.CalculateAll();
         var negCorrPutValue = heston.PutValue;
+        var negCorrPutDelta = heston.DeltaPut;
 
         // No correlation
         heston.Correlation = 0f;
-        heston.CalculateCallPut();
+        heston.CalculateAll();
         var noCorrPutValue = heston.PutValue;
+        var noCorrPutDelta = heston.DeltaPut;
 
         // Positive correlation
         heston.Correlation = 0.9f;
-        heston.CalculateCallPut();
+        heston.CalculateAll();
         var posCorrPutValue = heston.PutValue;
+        var posCorrPutDelta = heston.DeltaPut;
 
-        // Negative correlation should increase put values (more downside volatility)  
+        // Negative correlation should increase put values and lower put deltas (more downside volatility)  
         Assert.IsGreaterThan(noCorrPutValue, negCorrPutValue, $"Negative correlation should increase put value compared to no correlation. Neg: {negCorrPutValue}, No: {noCorrPutValue}");
+        Assert.IsLessThan(noCorrPutDelta, negCorrPutDelta, $"Negative correlation should decrease put delta compared to no correlation. Neg: {negCorrPutDelta}, No: {noCorrPutDelta}");
 
+        // Positive correlation should decrease put values and increase put deltas (less downside volatility)
         Assert.IsLessThan(noCorrPutValue, posCorrPutValue, $"Positive correlation should decrease put value compared to no correlation. Pos: {posCorrPutValue}, No: {noCorrPutValue}");
+        Assert.IsGreaterThan(noCorrPutDelta, posCorrPutDelta, $"Positive correlation should increase put delta compared to no correlation. Pos: {posCorrPutDelta}, No: {noCorrPutDelta}");
     }
 
     [TestMethod]
