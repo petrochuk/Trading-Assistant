@@ -524,37 +524,36 @@ public class HestonCalculatorTests
             $"Heston should approximate Black-Scholes when vol is constant. Heston: {heston.PutValue}, BS: {blackScholes.PutValue}, Error: {relativeError:P2}");
     }
 
-    //[TestMethod]
+    [TestMethod]
     public void TestHeston_CompareWithBlackScholes_Deltas(){
-        var startPrice = 4000.0f;
-        var strike = 5000.0f;
-        var endPrice = 6000.0f;
+        var startPrice = 4200.0f;
+        var endPrice = 5800.0f;
         var step = 10.0f;
 
         var heston = new HestonCalculator
         {
             IntegrationMethod = HestonIntegrationMethod.Adaptive,
-            Strike = strike,
+            StockPrice = 5000f,
             DaysLeft = 10f,
             CurrentVolatility = 0.2f,
             LongTermVolatility = 0.2f,
             VolatilityMeanReversion = 20f,
-            VolatilityOfVolatility = 2.0f,
-            Correlation = -0.6f,
-            UseRoughHeston = true
+            VolatilityOfVolatility = 2f,
+            Correlation = 0.6f,
         };
         var blackScholes = new BlackNScholesCalculator
         {
-            Strike = strike,
+            StockPrice = heston.StockPrice,
             DaysLeft = heston.DaysLeft,
-            ImpliedVolatility = heston.CurrentVolatility // Use same constant vol as Heston
+            ImpliedVolatility = heston.CurrentVolatility, // Use same constant vol as Heston
+            VolatilitySpotSlope = -0.03f,
         };
 
         for (var stockPrice = startPrice; stockPrice <= endPrice; stockPrice += step) {
-            heston.StockPrice = blackScholes.StockPrice = stockPrice;
+            heston.Strike = blackScholes.Strike = stockPrice;
             heston.CalculateAll(skipVanna: true, skipCharm: true);
             blackScholes.CalculateAll();
-            Debug.WriteLine($"{stockPrice}, {heston.DeltaCall}, {blackScholes.DeltaCall}, {heston.DeltaPut}, {blackScholes.DeltaPut}");
+            Debug.WriteLine($"{stockPrice}, {blackScholes.DeltaCall}, {heston.DeltaCall}, {blackScholes.HullWhiteDeltaCall}, {blackScholes.DeltaPut}, {heston.DeltaPut}, {blackScholes.HullWhiteDeltaPut}");
         }
     }
 
