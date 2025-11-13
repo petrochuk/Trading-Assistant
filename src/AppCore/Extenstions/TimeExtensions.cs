@@ -145,6 +145,7 @@ public static class TimeExtensions
         return true;
     }
 
+    private const int OpenBufferSeconds = 10;
     public static bool IsOpen(this DateTimeOffset date) {
         // Check weekend
         if (date.DayOfWeek == DayOfWeek.Saturday)
@@ -152,6 +153,7 @@ public static class TimeExtensions
         if (date.DayOfWeek == DayOfWeek.Sunday) {
             // Open after 6 PM EST on Sunday
             var sundayOpen = new DateTimeOffset(date.Year, date.Month, date.Day, 18, 0, 0, date.Offset);
+            sundayOpen.AddSeconds(OpenBufferSeconds);
             if (date < sundayOpen)
                 return false;
         }
@@ -162,6 +164,8 @@ public static class TimeExtensions
         // Daily close from 5 PM to 6 PM EST
         var dailyCloseStart = new DateTimeOffset(date.Year, date.Month, date.Day, 17, 0, 0, date.Offset);
         var dailyCloseEnd = new DateTimeOffset(date.Year, date.Month, date.Day, 18, 0, 0, date.Offset);
+        dailyCloseStart.AddSeconds(-OpenBufferSeconds);
+        dailyCloseEnd.AddSeconds(OpenBufferSeconds);
         if (date >= dailyCloseStart && date < dailyCloseEnd)
             return false;
 

@@ -86,11 +86,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
-            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.DeltaTotal:f3}, Theta: {LastGreeks.Theta:f3}");
+            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.DeltaTotal:f3}, Delta: {LastGreeks.DeltaHestonTotal:f3}, Theta: {LastGreeks.Theta:f3}");
 
             var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Round(LastGreeks.DeltaOTM) : -MathF.Round(LastGreeks.DeltaOTM);
             var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Round(LastGreeks.DeltaITM) : -MathF.Round(LastGreeks.DeltaITM);
-            var deltaHedgeSize = 0 < LastGreeks.DeltaTotal ? -MathF.Round(LastGreeks.DeltaTotal) : -MathF.Round(LastGreeks.DeltaTotal);
+            var deltaHedgeSize = 0 < LastGreeks.DeltaHestonTotal ? -MathF.Round(LastGreeks.DeltaHestonTotal) : -MathF.Round(LastGreeks.DeltaHestonTotal);
             //var deltaHedgeSize = deltaOTMHedgeSize + deltaITMHedgeSize;
             if (MathF.Abs(deltaHedgeSize) < _configuration.Delta) {
                 _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. Total:{LastGreeks.DeltaTotal:f3} Total Heston:{LastGreeks.DeltaHestonTotal:f3} OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");

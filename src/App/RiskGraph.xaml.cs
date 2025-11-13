@@ -224,7 +224,7 @@ public sealed partial class RiskGraph : UserControl
 
         IVLongText.Text = $"{(greeks.VarianceWeightedIVLong):P2}";
         IVShortText.Text = $"{(greeks.VarianceWeightedIVShort):P2}";
-        DeltaTotalText.Text = $"{(greeks.DeltaTotal):N2}";
+        DeltaTotalText.Text = $"{(greeks.DeltaHestonTotal):N2}";
         DeltaHedgeText.Text = $"{(greeks.DeltaHedge):N2}";
         GammaText.Text = $"{greeks.Gamma:N4}";
         CharmText.Text = $"{greeks.Charm:N2}";
