@@ -90,7 +90,8 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
             var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Round(LastGreeks.DeltaOTM) : -MathF.Round(LastGreeks.DeltaOTM);
             var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Round(LastGreeks.DeltaITM) : -MathF.Round(LastGreeks.DeltaITM);
-            var deltaHedgeSize = 0 < LastGreeks.DeltaHestonTotal ? -MathF.Round(LastGreeks.DeltaHestonTotal) : -MathF.Round(LastGreeks.DeltaHestonTotal);
+            var deltaBuffer = 0.15f;
+            var deltaHedgeSize = 0 < LastGreeks.DeltaHestonTotal ? -MathF.Round(LastGreeks.DeltaHestonTotal - deltaBuffer) : -MathF.Round(LastGreeks.DeltaHestonTotal + deltaBuffer);
             //var deltaHedgeSize = deltaOTMHedgeSize + deltaITMHedgeSize;
             if (MathF.Abs(deltaHedgeSize) < _configuration.Delta) {
                 _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. Total:{LastGreeks.DeltaTotal:f3} Total Heston:{LastGreeks.DeltaHestonTotal:f3} OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");

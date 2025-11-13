@@ -312,9 +312,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
-                    float deltaBls = position.Contract.IsCall ? bls.HullWhiteDeltaCall : bls.HullWhiteDeltaPut;
-                    var hestonDelta = position.Contract.IsCall ? heston.DeltaCall : heston.DeltaPut;
-                    greeks.DeltaHeston += hestonDelta * position.Size;
+                    float deltaBlsHW = position.Contract.IsCall ? bls.HullWhiteDeltaCall : bls.HullWhiteDeltaPut;
+                    float deltaBls = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
+                    var deltaHeston = position.Contract.IsCall ? heston.DeltaCall : heston.DeltaPut;
+                    greeks.DeltaHeston += deltaHeston * position.Size;
                     if (position.Contract.IsCall) {
                         if (bls.HullWhiteDeltaCall >= 0.5)
                             greeks.DeltaITM += bls.HullWhiteDeltaCall * position.Size;
@@ -350,7 +351,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         totalVegaLong += absVega;
                     }
                     
-                    _logger.LogTrace($"{position} is using IV: rv:{realizedVol:f3} miv:{marketIV:f3} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} t:{deltaBls * position.Size:f2}");
+                    _logger.LogTrace($"{position} is using IV: rv:{realizedVol:f3} miv:{marketIV:f3} up:{underlyingContract.MarketPrice.Value:f2} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} dwh:{deltaBlsHW:f2} dh:{deltaHeston:f2} t:{deltaBls * position.Size:f2}");
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
