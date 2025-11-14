@@ -2,6 +2,7 @@
 using AppCore.Interfaces;
 using AppCore.MachineLearning;
 using System.Globalization;
+using System.Linq;
 
 namespace AppCore.Statistics;
 
@@ -211,13 +212,14 @@ public class VolMlModel : IVolForecaster
         var totalSquaredError = 0.0;
         var epoch = 0;
         var random = new Random();
+        var indices = Enumerable.Range(0, _trainingData.Count).ToArray();
         while (true) {
             totalSquaredError = 0;
+            ShuffleIndices(indices, random);
 
-            // Pick random indexes to train in random order
-            for (int i = 0; i < _trainingData.Count; i++) {
-                int j = random.Next(i, _trainingData.Count);
-                var error = _network.Train(_trainingData[j].inputs, _trainingData[j].outputs);
+            for (int idx = 0; idx < indices.Length; idx++) {
+                var sample = _trainingData[indices[idx]];
+                var error = _network.Train(sample.inputs, sample.outputs);
                 totalSquaredError += error;
             }
 
@@ -345,5 +347,12 @@ public class VolMlModel : IVolForecaster
 
     public double Forecast(double forecastHorizonDays) {
         return Forecast(forecastHorizonDays, _returns.Count - 1);
+    }
+
+    private static void ShuffleIndices(int[] indices, Random random) {
+        for (int i = indices.Length - 1; i > 0; i--) {
+            int j = random.Next(i + 1);
+            (indices[i], indices[j]) = (indices[j], indices[i]);
+        }
     }
 }
