@@ -5,6 +5,8 @@ namespace AppCore.MachineLearning;
 public class Network
 {
     private const int FileFormatVersion = 2;
+    private const double MaxGradientMagnitude = 1e3;
+
     private readonly int _inputSize;
     private readonly int _outputSize;
     private readonly int _hiddenLayers;
@@ -28,6 +30,8 @@ public class Network
     private double[][] _zValues;   // [layer][neuron] - values before activation
     
     private readonly Random _random;
+    private bool _hasSpareGaussian;
+    private double _spareGaussian;
 
     [SetsRequiredMembers]
     public Network(
@@ -35,7 +39,7 @@ public class Network
         int outputSize,
         int hiddenLayers,
         int hiddenSize,
-        double learningRate = 0.5,
+        double learningRate = 0.001,
         bool enableAdaptiveLearning = true,
         double minLearningRateMultiplier = 0.1,
         double maxLearningRateMultiplier = 5.0,
@@ -110,11 +114,12 @@ public class Network
             for (int neuron = 0; neuron < _hiddenSize; neuron++)
             {
                 _weights[layer][neuron] = new double[prevLayerSize];
-                _biases[layer][neuron] = _random.NextDouble() * 2 - 1; // Random between -1 and 1
+                _biases[layer][neuron] = 0.0;
+                var stdDev = System.Math.Sqrt(2.0 / prevLayerSize);
 
                 for (int weight = 0; weight < prevLayerSize; weight++)
                 {
-                    _weights[layer][neuron][weight] = _random.NextDouble() * 2 - 1;
+                    _weights[layer][neuron][weight] = SampleGaussian(0.0, stdDev);
                 }
             }
         }
@@ -131,11 +136,12 @@ public class Network
         for (int neuron = 0; neuron < _outputSize; neuron++)
         {
             _weights[outputLayerIndex][neuron] = new double[prevSize];
-            _biases[outputLayerIndex][neuron] = _random.NextDouble() * 2 - 1;
+            _biases[outputLayerIndex][neuron] = 0.0;
+            var stdDev = System.Math.Sqrt(2.0 / prevSize);
 
             for (int weight = 0; weight < prevSize; weight++)
             {
-                _weights[outputLayerIndex][neuron][weight] = _random.NextDouble() * 2 - 1;
+                _weights[outputLayerIndex][neuron][weight] = SampleGaussian(0.0, stdDev);
             }
         }
     }
@@ -228,7 +234,14 @@ public class Network
 
             for (int neuron = 0; neuron < currentLayerSize; neuron++)
             {
-                var scaledDelta = _currentLearningRate * deltas[layer][neuron];
+                var delta = deltas[layer][neuron];
+                if (!double.IsFinite(delta)) {
+                    delta = delta >= 0 ? MaxGradientMagnitude : -MaxGradientMagnitude;
+                }
+
+                delta = System.Math.Clamp(delta, -MaxGradientMagnitude, MaxGradientMagnitude);
+                var scaledDelta = _currentLearningRate * delta;
+
                 // Update bias
                 _biases[layer][neuron] -= scaledDelta;
 
@@ -334,6 +347,26 @@ public class Network
 
     private static double ReLUDerivative(double x) {
         return x > 0 ? 1.0 : 0.0;
+    }
+
+    private double SampleGaussian(double mean, double stdDev) {
+        if (_hasSpareGaussian) {
+            _hasSpareGaussian = false;
+            return mean + stdDev * _spareGaussian;
+        }
+
+        double u1;
+        do {
+            u1 = _random.NextDouble();
+        } while (u1 <= double.Epsilon);
+
+        double u2 = _random.NextDouble();
+        double mag = System.Math.Sqrt(-2.0 * System.Math.Log(u1));
+        double z0 = mag * System.Math.Cos(2.0 * System.Math.PI * u2);
+        double z1 = mag * System.Math.Sin(2.0 * System.Math.PI * u2);
+        _spareGaussian = z1;
+        _hasSpareGaussian = true;
+        return mean + stdDev * z0;
     }
 
     private void NormalizeAdaptiveState()

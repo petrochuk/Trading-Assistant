@@ -11,7 +11,7 @@ public class VolMlModel : IVolForecaster
 
     private readonly List<DailyData> _returns = new();
     private Network _network = new Network(inputSize: VarianceLookbackDays + 5, 
-        outputSize: 1, hiddenLayers: 3, hiddenSize: 2 * (VarianceLookbackDays + 5), learningRate: 0.9);
+        outputSize: 1, hiddenLayers: 3, hiddenSize: 2 * (VarianceLookbackDays + 5), learningRate: 0.001);
     private List<(double[] inputs, double output)> _trainingData = new();
 
     record class DailyData(DateOnly Date, double dailyReturn, double dailyVariance);
