@@ -1,3 +1,4 @@
+using AppCore.Extenstions;
 using System.Numerics;
 
 namespace AppCore.Options;
@@ -207,13 +208,13 @@ public class HestonCalculator
     public float CharmPut { get; set; }
 
     /// <summary>
-    /// The number of days left until the option expired!
+    /// The number of business days left until the option expired!
     /// </summary>
     public float DaysLeft {
         get => _dayLeft;
         set {
             _dayLeft = value;
-            ExpiryTime = _dayLeft / 365.0f;
+            ExpiryTime = _dayLeft / TimeExtensions.BusinessDaysPerYear;
         }
     }
     private float _dayLeft;
