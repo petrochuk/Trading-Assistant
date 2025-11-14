@@ -213,10 +213,14 @@ public class VolMlModel : IVolForecaster
 
         var totalSquaredError = 0.0;
         var epoch = 0;
+        var random = new Random();
         while (true) {
             totalSquaredError = 0;
-            foreach (var data in _trainingData) {
-                var error = _network.Train(data.inputs, data.output);
+
+            // Pick random indexes to train in random order
+            for (int i = 0; i < _trainingData.Count; i++) {
+                int j = random.Next(i, _trainingData.Count);
+                var error = _network.Train(_trainingData[j].inputs, _trainingData[j].output);
                 totalSquaredError += error * error;
             }
 

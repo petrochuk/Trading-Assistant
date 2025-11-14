@@ -170,7 +170,7 @@ public class Network
                 if (isOutputLayer && _useLinearOutputLayer) {
                     _activations[layer + 1][neuron] = sum;
                 } else {
-                    _activations[layer + 1][neuron] = Sigmoid(sum);
+                    _activations[layer + 1][neuron] = ReLU(sum);
                 }
             }
         }
@@ -197,7 +197,7 @@ public class Network
         {
             double output = _activations[outputLayerIndex + 1][neuron];
             double error = output - expectedOutputs[neuron];
-            double derivative = _useLinearOutputLayer ? 1.0 : SigmoidDerivative(_zValues[outputLayerIndex][neuron]);
+            double derivative = _useLinearOutputLayer ? 1.0 : ReLUDerivative(_zValues[outputLayerIndex][neuron]);
             deltas[outputLayerIndex][neuron] = error * derivative;
         }
 
@@ -216,7 +216,7 @@ public class Network
                     error += deltas[layer + 1][nextNeuron] * _weights[layer + 1][nextNeuron][neuron];
                 }
                 
-                deltas[layer][neuron] = error * SigmoidDerivative(_zValues[layer][neuron]);
+                deltas[layer][neuron] = error * ReLUDerivative(_zValues[layer][neuron]);
             }
         }
 
@@ -326,6 +326,14 @@ public class Network
     {
         double sigmoid = Sigmoid(x);
         return sigmoid * (1 - sigmoid);
+    }
+
+    private static double ReLU(double x) {
+        return x > 0 ? x : 0.0;
+    }
+
+    private static double ReLUDerivative(double x) {
+        return x > 0 ? 1.0 : 0.0;
     }
 
     private void NormalizeAdaptiveState()

@@ -130,7 +130,6 @@ internal class Program
             Console.WriteLine($"{day}-day volatility forecast: {annualizedVol:p2}");
         }
         Console.WriteLine("Done.");
-        Console.ReadKey();
     }
 
     private static void RunTestVolModel(string symbol) {
