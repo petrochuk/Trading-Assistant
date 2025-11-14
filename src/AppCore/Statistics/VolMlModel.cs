@@ -11,7 +11,7 @@ public class VolMlModel : IVolForecaster
 
     private readonly List<DailyData> _returns = new();
     private Network _network = new Network(inputSize: VarianceLookbackDays + 5, 
-        outputSize: 1, hiddenLayers: 3, hiddenSize: 2 * (VarianceLookbackDays + 5), learningRate: 0.001);
+        outputSize: 1, hiddenLayers: 3, hiddenSize: 2 * (VarianceLookbackDays + 5), learningRate: 0.05);
     private List<(double[] inputs, double output)> _trainingData = new();
 
     record class DailyData(DateOnly Date, double dailyReturn, double dailyVariance);
@@ -167,7 +167,7 @@ public class VolMlModel : IVolForecaster
                     for (int k = 0; k < j; k++) {
                         daysBackVariance += _returns[i - 1 - k].dailyVariance;
                     }
-                    inputs[(int)Inputs.Variance0 + j - 1] = daysBackVariance;
+                    inputs[(int)Inputs.Variance0 + j - 1] = Annualize(daysBackVariance, j);
                 }
 
                 // 10 days back variance
@@ -175,34 +175,34 @@ public class VolMlModel : IVolForecaster
                 for (int j = 1; j <= 10; j++) {
                     daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
                 }
-                inputs[(int)Inputs.Variance10] = daysBackVariance;
+                inputs[(int)Inputs.Variance10] = Annualize(daysBackVariance, 10);
 
                 // 15 days back variance
                 daysBackVariance = 0.0;
                 for (int j = 1; j <= 15; j++) {
                     daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
                 }
-                inputs[(int)Inputs.Variance15] = daysBackVariance;
+                inputs[(int)Inputs.Variance15] = Annualize(daysBackVariance, 15);
 
                 // 25 days back variance
                 daysBackVariance = 0.0;
                 for (int j = 1; j <= 25; j++) {
                     daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
                 }
-                inputs[(int)Inputs.Variance25] = daysBackVariance;
+                inputs[(int)Inputs.Variance25] = Annualize(daysBackVariance, 25);
 
                 // 100 days back variance
                 daysBackVariance = 0.0;
                 for (int j = 1; j <= 100; j++) {
                     daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
                 }
-                inputs[(int)Inputs.Variance100] = daysBackVariance;
+                inputs[(int)Inputs.Variance100] = Annualize(daysBackVariance, 100);
 
                 var daysAheadVariance = 0.0;
                 for (int j = 0; j < daysAhead; j++) {
                     daysAheadVariance += _returns[i + j].dailyVariance;
                 }
-                _trainingData.Add((inputs, daysAheadVariance));
+                _trainingData.Add((inputs, Annualize(daysAheadVariance, daysAhead)));
             }
         }
     }
@@ -274,43 +274,43 @@ public class VolMlModel : IVolForecaster
 
         var inputs = new double[_network.InputSize];
         inputs[(int)Inputs.DaysAhead] = daysAhead;
-        inputs[(int)Inputs.Variance0] = _returns[dayNumber].dailyVariance;
-        inputs[(int)Inputs.Variance1] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance;
-        inputs[(int)Inputs.Variance3] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance;
-        inputs[(int)Inputs.Variance4] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance;
-        inputs[(int)Inputs.Variance5] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance + _returns[dayNumber - 4].dailyVariance;
+        inputs[(int)Inputs.Variance0] = Annualize(_returns[dayNumber].dailyVariance, 1);
+        inputs[(int)Inputs.Variance1] = Annualize(_returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance, 2);
+        inputs[(int)Inputs.Variance3] = Annualize(_returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance, 3);
+        inputs[(int)Inputs.Variance4] = Annualize(_returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance, 4);
+        inputs[(int)Inputs.Variance5] = Annualize(_returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance + _returns[dayNumber - 4].dailyVariance, 5);
 
         // Add 10 days back variance
         var daysBackVariance = 0.0;
         for (int j = 0; j < 10; j++) {
             daysBackVariance += _returns[dayNumber - j].dailyVariance;
         }
-        inputs[(int)Inputs.Variance10] = daysBackVariance;
+        inputs[(int)Inputs.Variance10] = Annualize(daysBackVariance, 10);
 
         // Add 15 days back variance
         daysBackVariance = 0.0;
         for (int j = 0; j < 15; j++) {
             daysBackVariance += _returns[dayNumber - j].dailyVariance;
         }
-        inputs[(int)Inputs.Variance15] = daysBackVariance;
+        inputs[(int)Inputs.Variance15] = Annualize(daysBackVariance, 15);
 
         // Add 25 days back variance
         daysBackVariance = 0.0;
         for (int j = 0; j < 25; j++) {
             daysBackVariance += _returns[dayNumber - j].dailyVariance;
         }
-        inputs[(int)Inputs.Variance25] = daysBackVariance;
+        inputs[(int)Inputs.Variance25] = Annualize(daysBackVariance, 25);
 
         // Add 100 days back variance
         daysBackVariance = 0.0;
         for (int j = 0; j < 100; j++) {
             daysBackVariance += _returns[dayNumber - j].dailyVariance;
         }
-        inputs[(int)Inputs.Variance100] = daysBackVariance;
+        inputs[(int)Inputs.Variance100] = Annualize(daysBackVariance, 100);
 
         var output = _network.Predict(inputs);
 
-        return System.Math.Max(0.0, output[0]);
+        return System.Math.Max(0.0, Unannualize(output[0], daysAhead));
     }
 
     private static double ComputeYangZhangVariance(double previousClose, double open, double high, double low, double close) {
@@ -340,5 +340,15 @@ public class VolMlModel : IVolForecaster
 
     public double Forecast(double forecastHorizonDays) {
         return Forecast(forecastHorizonDays, _returns.Count - 1);
+    }
+
+    private static double Annualize(double variance, double days = 1) {
+        if (variance <= 0)
+            return 0;
+        return variance * (TimeExtensions.BusinessDaysPerYear / days);
+    }
+
+    private static double Unannualize(double annualizedVariance, double days) {
+        return annualizedVariance * (days / TimeExtensions.BusinessDaysPerYear);
     }
 }
