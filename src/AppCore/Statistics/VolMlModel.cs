@@ -10,7 +10,7 @@ public class VolMlModel
 
     private readonly List<DailyData> _returns = new();
     private Network _network = new Network(inputSize: VarianceLookbackDays + 5, 
-        outputSize: 1, hiddenLayers: 4, hiddenSize: VarianceLookbackDays + 5, learningRate: 0.1);
+        outputSize: 1, hiddenLayers: 4, hiddenSize: VarianceLookbackDays + 5, learningRate: 0.9);
     private List<(double[] inputs, double output)> _trainingData = new();
 
     record class DailyData(DateOnly Date, double dailyReturn, double dailyVariance);
@@ -214,6 +214,7 @@ public class VolMlModel
                 totalSquaredError += error * error;
             }
 
+            _network.AdjustLearningRate(totalSquaredError);
             epoch++;
 
             // Print progress every 10 epochs

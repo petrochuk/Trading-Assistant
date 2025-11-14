@@ -4,12 +4,22 @@ namespace AppCore.MachineLearning;
 
 public class Network
 {
-    private const int FileFormatVersion = 1;
+    private const int FileFormatVersion = 2;
     private readonly int _inputSize;
     private readonly int _outputSize;
     private readonly int _hiddenLayers;
     private readonly int _hiddenSize;
     private readonly double _learningRate;
+    private double _currentLearningRate;
+    private bool _adaptiveLearningEnabled;
+    private double _minLearningRate;
+    private double _maxLearningRate;
+    private double _lrIncreaseFactor;
+    private double _lrDecreaseFactor;
+    private int _adaptPatience;
+    private double _improvementTolerance;
+    private double _bestEpochError = double.MaxValue;
+    private int _epochsSinceImprovement;
     
     private double[][][] _weights; // [layer][neuron][weight]
     private double[][] _biases;    // [layer][neuron]
@@ -19,7 +29,19 @@ public class Network
     private readonly Random _random;
 
     [SetsRequiredMembers]
-    public Network(int inputSize, int outputSize, int hiddenLayers, int hiddenSize, double learningRate = 0.5)
+    public Network(
+        int inputSize,
+        int outputSize,
+        int hiddenLayers,
+        int hiddenSize,
+        double learningRate = 0.5,
+        bool enableAdaptiveLearning = true,
+        double minLearningRateMultiplier = 0.1,
+        double maxLearningRateMultiplier = 5.0,
+        double lrIncreaseFactor = 1.02,
+        double lrDecreaseFactor = 0.5,
+        int adaptationPatience = 5,
+        double improvementTolerance = 1e-4)
     {
         _inputSize = inputSize;
         _outputSize = outputSize;
@@ -27,6 +49,35 @@ public class Network
         _hiddenSize = hiddenSize;
         _learningRate = learningRate;
         _random = new Random(42); // Fixed seed for reproducibility
+
+        if (minLearningRateMultiplier <= 0)
+            throw new ArgumentOutOfRangeException(nameof(minLearningRateMultiplier), "Minimum learning rate multiplier must be positive.");
+        if (maxLearningRateMultiplier <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxLearningRateMultiplier), "Maximum learning rate multiplier must be positive.");
+        if (lrIncreaseFactor <= 0)
+            throw new ArgumentOutOfRangeException(nameof(lrIncreaseFactor), "Increase factor must be positive.");
+        if (lrDecreaseFactor <= 0 || lrDecreaseFactor >= 1)
+            throw new ArgumentOutOfRangeException(nameof(lrDecreaseFactor), "Decrease factor must be in (0,1).");
+        if (adaptationPatience <= 0)
+            throw new ArgumentOutOfRangeException(nameof(adaptationPatience), "Adaptation patience must be positive.");
+        if (improvementTolerance <= 0)
+            throw new ArgumentOutOfRangeException(nameof(improvementTolerance), "Improvement tolerance must be positive.");
+
+        _adaptiveLearningEnabled = enableAdaptiveLearning;
+        _currentLearningRate = _learningRate;
+        _minLearningRate = System.Math.Max(minLearningRateMultiplier * _learningRate, 1e-6);
+        _maxLearningRate = System.Math.Max(_minLearningRate, maxLearningRateMultiplier * _learningRate);
+        _lrIncreaseFactor = lrIncreaseFactor;
+        _lrDecreaseFactor = lrDecreaseFactor;
+        _adaptPatience = adaptationPatience;
+        _improvementTolerance = improvementTolerance;
+
+        NormalizeAdaptiveState();
+
+        _weights = Array.Empty<double[][]>();
+        _biases = Array.Empty<double[]>();
+        _activations = Array.Empty<double[]>();
+        _zValues = Array.Empty<double[]>();
 
         InitializeNetwork();
     }
@@ -168,13 +219,14 @@ public class Network
 
             for (int neuron = 0; neuron < currentLayerSize; neuron++)
             {
+                var scaledDelta = _currentLearningRate * deltas[layer][neuron];
                 // Update bias
-                _biases[layer][neuron] -= _learningRate * deltas[layer][neuron];
+                _biases[layer][neuron] -= scaledDelta;
 
                 // Update weights
                 for (int prevNeuron = 0; prevNeuron < prevActivations.Length; prevNeuron++)
                 {
-                    _weights[layer][neuron][prevNeuron] -= _learningRate * deltas[layer][neuron] * prevActivations[prevNeuron];
+                    _weights[layer][neuron][prevNeuron] -= scaledDelta * prevActivations[prevNeuron];
                 }
             }
         }
@@ -196,6 +248,8 @@ public class Network
     {
         if (inputs.Length != expectedOutputs.Length)
             throw new ArgumentException("Input and output arrays must have the same length");
+        if (inputs.Length == 0)
+            throw new ArgumentException("Training data cannot be empty.");
 
         for (int epoch = 0; epoch < epochs; epoch++)
         {
@@ -214,11 +268,13 @@ public class Network
                 }
             }
 
+            double avgError = totalError / (inputs.Length * _outputSize);
+            AdjustLearningRate(avgError);
+
             // Print progress every 1000 epochs
             if (epoch % 1000 == 0)
             {
-                double avgError = totalError / (inputs.Length * _outputSize);
-                Console.WriteLine($"Epoch {epoch}, Average Error: {avgError:F6}");
+                Console.WriteLine($"Epoch {epoch}, Average Error: {avgError:F6}, Learning Rate: {_currentLearningRate:F6}");
             }
         }
     }
@@ -226,6 +282,30 @@ public class Network
     public double[] Predict(double[] inputs)
     {
         return Forward(inputs);
+    }
+
+    public double CurrentLearningRate => _currentLearningRate;
+
+    public void AdjustLearningRate(double epochError)
+    {
+        if (!_adaptiveLearningEnabled || !double.IsFinite(epochError))
+            return;
+
+        if (_bestEpochError - epochError > _improvementTolerance)
+        {
+            _bestEpochError = epochError;
+            _epochsSinceImprovement = 0;
+            _currentLearningRate = System.Math.Min(_currentLearningRate * _lrIncreaseFactor, _maxLearningRate);
+        }
+        else
+        {
+            _epochsSinceImprovement++;
+            if (_epochsSinceImprovement >= _adaptPatience)
+            {
+                _currentLearningRate = System.Math.Max(_currentLearningRate * _lrDecreaseFactor, _minLearningRate);
+                _epochsSinceImprovement = 0;
+            }
+        }
     }
 
     private static double Sigmoid(double x)
@@ -237,6 +317,54 @@ public class Network
     {
         double sigmoid = Sigmoid(x);
         return sigmoid * (1 - sigmoid);
+    }
+
+    private void NormalizeAdaptiveState()
+    {
+        if (!double.IsFinite(_minLearningRate) || _minLearningRate <= 0)
+            _minLearningRate = System.Math.Max(1e-6, 0.1 * _learningRate);
+
+        if (!double.IsFinite(_maxLearningRate) || _maxLearningRate < _minLearningRate)
+            _maxLearningRate = System.Math.Max(_minLearningRate, 5.0 * _learningRate);
+
+        if (!double.IsFinite(_currentLearningRate) || _currentLearningRate <= 0)
+            _currentLearningRate = _learningRate;
+
+        _currentLearningRate = System.Math.Min(System.Math.Max(_currentLearningRate, _minLearningRate), _maxLearningRate);
+
+        if (!double.IsFinite(_lrIncreaseFactor) || _lrIncreaseFactor <= 0)
+            _lrIncreaseFactor = 1.02;
+
+        if (!double.IsFinite(_lrDecreaseFactor) || _lrDecreaseFactor <= 0 || _lrDecreaseFactor >= 1)
+            _lrDecreaseFactor = 0.5;
+
+        if (_adaptPatience <= 0)
+            _adaptPatience = 5;
+
+        if (!double.IsFinite(_improvementTolerance) || _improvementTolerance <= 0)
+            _improvementTolerance = 1e-4;
+
+        if (!double.IsFinite(_bestEpochError) || _bestEpochError <= 0)
+            _bestEpochError = double.MaxValue;
+
+        if (_epochsSinceImprovement < 0)
+            _epochsSinceImprovement = 0;
+    }
+
+    private void ResetAdaptiveStateDefaults()
+    {
+        _adaptiveLearningEnabled = true;
+        _currentLearningRate = _learningRate;
+        _minLearningRate = System.Math.Max(0.1 * _learningRate, 1e-6);
+        _maxLearningRate = System.Math.Max(_minLearningRate, 5.0 * _learningRate);
+        _lrIncreaseFactor = 1.02;
+        _lrDecreaseFactor = 0.5;
+        _adaptPatience = 5;
+        _improvementTolerance = 1e-4;
+        _bestEpochError = double.MaxValue;
+        _epochsSinceImprovement = 0;
+
+        NormalizeAdaptiveState();
     }
 
     /// <summary>
@@ -281,6 +409,18 @@ public class Network
                 writer.Write(_biases[layer][neuron]);
             }
         }
+
+        // Write adaptive learning state (version 2+)
+        writer.Write(_adaptiveLearningEnabled);
+        writer.Write(_currentLearningRate);
+        writer.Write(_minLearningRate);
+        writer.Write(_maxLearningRate);
+        writer.Write(_lrIncreaseFactor);
+        writer.Write(_lrDecreaseFactor);
+        writer.Write(_adaptPatience);
+        writer.Write(_improvementTolerance);
+        writer.Write(_bestEpochError);
+        writer.Write(_epochsSinceImprovement);
     }
 
     /// <summary>
@@ -295,9 +435,9 @@ public class Network
 
         // Read and validate file format version
         int version = reader.ReadInt32();
-        if (version != FileFormatVersion)
+        if (version < 1 || version > FileFormatVersion)
         {
-            throw new InvalidOperationException($"Unsupported file format version: {version}. Expected version: {FileFormatVersion}");
+            throw new InvalidOperationException($"Unsupported file format version: {version}. Expected range: 1-{FileFormatVersion}");
         }
 
         // Read network architecture
@@ -347,6 +487,26 @@ public class Network
             {
                 network._biases[layer][neuron] = reader.ReadDouble();
             }
+        }
+
+        if (version >= 2)
+        {
+            network._adaptiveLearningEnabled = reader.ReadBoolean();
+            network._currentLearningRate = reader.ReadDouble();
+            network._minLearningRate = reader.ReadDouble();
+            network._maxLearningRate = reader.ReadDouble();
+            network._lrIncreaseFactor = reader.ReadDouble();
+            network._lrDecreaseFactor = reader.ReadDouble();
+            network._adaptPatience = reader.ReadInt32();
+            network._improvementTolerance = reader.ReadDouble();
+            network._bestEpochError = reader.ReadDouble();
+            network._epochsSinceImprovement = reader.ReadInt32();
+
+            network.NormalizeAdaptiveState();
+        }
+        else
+        {
+            network.ResetAdaptiveStateDefaults();
         }
 
         return network;

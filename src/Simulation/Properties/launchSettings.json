@@ -2,7 +2,7 @@
   "profiles": {
     "Simulation": {
       "commandName": "Project",
-      "commandLineArgs": "--gamma-scalping"
+      "commandLineArgs": "--train-vol-model"
     },
     "calibrate": {
       "commandName": "Project",
