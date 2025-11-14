@@ -151,7 +151,6 @@ internal class Program
             Console.WriteLine($"{day}-day Lts volatility forecast: {annualizedVol:p2}");
             Console.WriteLine();
         }
-        Console.ReadKey();
     }
 
     private static void PrintResults(HarRvForecaster forecaster) {

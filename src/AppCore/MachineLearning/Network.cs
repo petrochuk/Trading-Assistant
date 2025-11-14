@@ -10,6 +10,7 @@ public class Network
     private readonly int _hiddenLayers;
     private readonly int _hiddenSize;
     private readonly double _learningRate;
+    private readonly bool _useLinearOutputLayer = true;
     private double _currentLearningRate;
     private bool _adaptiveLearningEnabled;
     private double _minLearningRate;
@@ -41,13 +42,15 @@ public class Network
         double lrIncreaseFactor = 1.02,
         double lrDecreaseFactor = 0.5,
         int adaptationPatience = 5,
-        double improvementTolerance = 1e-4)
+        double improvementTolerance = 1e-4,
+        bool useLinearOutputLayer = true)
     {
         _inputSize = inputSize;
         _outputSize = outputSize;
         _hiddenLayers = hiddenLayers;
         _hiddenSize = hiddenSize;
         _learningRate = learningRate;
+        _useLinearOutputLayer = useLinearOutputLayer;
         _random = new Random();
 
         if (minLearningRateMultiplier <= 0)
@@ -163,7 +166,12 @@ public class Network
                 }
 
                 _zValues[layer][neuron] = sum;
-                _activations[layer + 1][neuron] = Sigmoid(sum);
+                bool isOutputLayer = layer == _hiddenLayers;
+                if (isOutputLayer && _useLinearOutputLayer) {
+                    _activations[layer + 1][neuron] = sum;
+                } else {
+                    _activations[layer + 1][neuron] = Sigmoid(sum);
+                }
             }
         }
 
@@ -189,7 +197,8 @@ public class Network
         {
             double output = _activations[outputLayerIndex + 1][neuron];
             double error = output - expectedOutputs[neuron];
-            deltas[outputLayerIndex][neuron] = error * SigmoidDerivative(_zValues[outputLayerIndex][neuron]);
+            double derivative = _useLinearOutputLayer ? 1.0 : SigmoidDerivative(_zValues[outputLayerIndex][neuron]);
+            deltas[outputLayerIndex][neuron] = error * derivative;
         }
 
         // Hidden layer deltas (backpropagation)
@@ -385,6 +394,7 @@ public class Network
         writer.Write(_hiddenLayers);
         writer.Write(_hiddenSize);
         writer.Write(_learningRate);
+        writer.Write(_useLinearOutputLayer);
 
         // Write weights
         for (int layer = 0; layer < _weights.Length; layer++)
@@ -446,9 +456,10 @@ public class Network
         int hiddenLayers = reader.ReadInt32();
         int hiddenSize = reader.ReadInt32();
         double learningRate = reader.ReadDouble();
+        bool useLinearOutputLayer = reader.ReadBoolean();
 
         // Create network with the loaded architecture
-        var network = new Network(inputSize, outputSize, hiddenLayers, hiddenSize, learningRate);
+        var network = new Network(inputSize, outputSize, hiddenLayers, hiddenSize, learningRate, useLinearOutputLayer: useLinearOutputLayer);
 
         // Read weights
         for (int layer = 0; layer < network._weights.Length; layer++)

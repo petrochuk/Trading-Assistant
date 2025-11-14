@@ -11,7 +11,7 @@ public class VolMlModel : IVolForecaster
 
     private readonly List<DailyData> _returns = new();
     private Network _network = new Network(inputSize: VarianceLookbackDays + 5, 
-        outputSize: 1, hiddenLayers: 4, hiddenSize: VarianceLookbackDays + 5, learningRate: 0.9);
+        outputSize: 1, hiddenLayers: 3, hiddenSize: 2 * (VarianceLookbackDays + 5), learningRate: 0.9);
     private List<(double[] inputs, double output)> _trainingData = new();
 
     record class DailyData(DateOnly Date, double dailyReturn, double dailyVariance);
@@ -246,7 +246,8 @@ public class VolMlModel : IVolForecaster
         int forecastCount = 0;
         for (int daysAhead = 1; daysAhead <= 20; daysAhead++) {
             for (int dayNumber = MinDaysHistory; dayNumber < _returns.Count - daysAhead; dayNumber++) {
-                var forecast = System.Math.Sqrt(Forecast(daysAhead, dayNumber)) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / daysAhead);
+                var forecast = System.Math.Max(0.0, Forecast(daysAhead, dayNumber));
+                forecast = System.Math.Sqrt(forecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / daysAhead);
                 var actualVariance = 0.0;
                 for (int j = 0; j < daysAhead; j++) {
                     actualVariance += _returns[dayNumber + 1 + j].dailyVariance;
@@ -305,7 +306,7 @@ public class VolMlModel : IVolForecaster
 
         var output = _network.Predict(inputs);
 
-        return output[0];
+        return System.Math.Max(0.0, output[0]);
     }
 
     private static double ComputeYangZhangVariance(double previousClose, double open, double high, double low, double close) {
