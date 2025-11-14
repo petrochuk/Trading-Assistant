@@ -6,7 +6,7 @@
     },
     "calibrate": {
       "commandName": "Project",
-      "commandLineArgs": "--calibrate-har-rv"
+      "commandLineArgs": "--train-vol-model"
     }
   }
 }

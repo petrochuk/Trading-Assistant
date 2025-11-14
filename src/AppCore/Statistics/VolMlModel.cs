@@ -1,0 +1,324 @@
+﻿using AppCore.Extenstions;
+using AppCore.MachineLearning;
+using System.Globalization;
+
+namespace AppCore.Statistics;
+
+public class VolMlModel
+{
+    private const double DefaultYangZhangK = 0.34 / (1.34 + (79.0 / 77.0));
+
+    private readonly List<DailyData> _returns = new();
+    private Network _network = new Network(inputSize: VarianceLookbackDays + 5, 
+        outputSize: 1, hiddenLayers: 4, hiddenSize: VarianceLookbackDays + 5, learningRate: 0.1);
+    private List<(double[] inputs, double output)> _trainingData = new();
+
+    record class DailyData(DateOnly Date, double dailyReturn, double dailyVariance);
+
+    enum Inputs {
+        DaysAhead = 0,
+        /// <summary>
+        /// Variance of returns over the last day
+        /// </summary>
+        Variance0 = 1,
+        /// <summary>
+        /// Total variance of returns for the last 2 days
+        /// </summary>
+        Variance1 = 2,
+        /// <summary>
+        /// Total variance of returns for the last 3 days
+        /// </summary>
+        Variance3 = 3,
+        /// <summary>
+        /// Total variance of returns for the last 4 days
+        /// </summary>
+        Variance4 = 4,
+        /// <summary>
+        /// Total variance of returns for the last 5 days
+        /// </summary>
+        Variance5 = 5,
+        /// <summary>
+        /// Total variance of returns for the last 10 days
+        /// </summary>
+        Variance10 = 6,
+        /// <summary>
+        /// Total variance of returns for the last 15 days
+        /// </summary>
+        Variance15 = 7,
+        /// <summary>
+        /// Total variance of returns for the last 25 days
+        /// </summary>
+        Variance25 = 8,
+        /// <summary>
+        /// Total variance of returns for the last 100 days
+        /// </summary>
+        Variance100 = 9,
+    }
+
+    const int VarianceLookbackDays = 5;
+    const int MinDaysHistory = VarianceLookbackDays + 100;
+
+    public void Load(string dateFilePath, string networkFile, bool forTraining = false) {
+        if (!File.Exists(dateFilePath))
+            throw new FileNotFoundException("Input file not found.", dateFilePath);
+
+        if (File.Exists(networkFile))
+            _network = Network.Load(networkFile);
+        _returns.Clear();
+
+        double? previousPrice = null;
+		int lineNumber = 0;
+		int dateIdx = 0, openIdx = 1, highIdx = 2, lowIdx = 3, closeIdx = 4;
+
+        foreach (var rawLine in File.ReadLines(dateFilePath)) {
+            lineNumber++;
+
+            var line = rawLine.Trim();
+            if (string.IsNullOrEmpty(line))
+                continue;
+
+            var colummns = line.Split([',', ';', '\t'], StringSplitOptions.RemoveEmptyEntries);
+            if (colummns.Length < 5)
+                continue;
+
+            // Trim optional double quotes from each column
+            for (int i = 0; i < colummns.Length; i++) {
+                colummns[i] = colummns[i].Trim('"');
+            }
+
+            // Parse header
+            if (lineNumber == 1) {
+                for (int i = 0; i < colummns.Length; i++) {
+                    switch (colummns[i].ToLowerInvariant()) {
+                        case "date":
+                            dateIdx = i;
+                            break;
+                        case "open":
+                            openIdx = i;
+                            break;
+                        case "high":
+                            highIdx = i;
+                            break;
+                        case "low":
+                            lowIdx = i;
+                            break;
+                        case "price":
+                        case "close":
+                            closeIdx = i;
+                            break;
+                    }
+                }
+                continue;
+            }
+
+            // Parse date
+            if (!DateOnly.TryParse(colummns[dateIdx], CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+                throw new FormatException($"Unable to parse date on line {lineNumber}: '{rawLine}'.");
+
+            if (!double.TryParse(colummns[closeIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var close))
+                throw new FormatException($"Unable to parse numeric value on line {lineNumber}: '{rawLine}'.");
+
+            if (colummns.Length < 5)
+                continue;
+
+            if (!double.TryParse(colummns[openIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var open) ||
+                !double.TryParse(colummns[highIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var high) ||
+                !double.TryParse(colummns[lowIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var low)) {
+                throw new FormatException($"Unable to parse OHLC values on line {lineNumber}: '{rawLine}'.");
+            }
+
+            if (open <= 0 || high <= 0 || low <= 0 || close <= 0)
+                throw new InvalidOperationException($"OHLC prices must be positive on line {lineNumber}.");
+
+            if (high < low)
+                throw new InvalidOperationException($"High must be greater than or equal to low on line {lineNumber}.");
+
+            if (previousPrice.HasValue) {
+                var closeToCloseReturn = System.Math.Log(close / previousPrice.Value);
+                var realizedVariance = ComputeYangZhangVariance(previousPrice.Value, open, high, low, close);
+                _returns.Add(new DailyData(date, closeToCloseReturn, realizedVariance));
+            }
+
+            previousPrice = close;
+        }
+
+        if (forTraining)
+            PrepareTrainingData();
+    }
+
+    private void PrepareTrainingData() {
+        _trainingData.Clear();
+
+        var maxDaysAhead = 20;
+        for (int i = MinDaysHistory; i < _returns.Count - maxDaysAhead; i++) {
+            
+            for (int daysAhead = 1; daysAhead <= maxDaysAhead; daysAhead++) {
+                var inputs = new double[_network.InputSize];
+                inputs[(int)Inputs.DaysAhead] = daysAhead;
+
+                var daysBackVariance = 0.0;
+                for (int j = 1; j <= VarianceLookbackDays; j++) {
+                    for (int k = 0; k < j; k++) {
+                        daysBackVariance += _returns[i - 1 - k].dailyVariance;
+                    }
+                    inputs[(int)Inputs.Variance0 + j - 1] = daysBackVariance;
+                }
+
+                // 10 days back variance
+                daysBackVariance = 0.0;
+                for (int j = 1; j <= 10; j++) {
+                    daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
+                }
+                inputs[(int)Inputs.Variance10] = daysBackVariance;
+
+                // 15 days back variance
+                daysBackVariance = 0.0;
+                for (int j = 1; j <= 15; j++) {
+                    daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
+                }
+                inputs[(int)Inputs.Variance15] = daysBackVariance;
+
+                // 25 days back variance
+                daysBackVariance = 0.0;
+                for (int j = 1; j <= 25; j++) {
+                    daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
+                }
+                inputs[(int)Inputs.Variance25] = daysBackVariance;
+
+                // 100 days back variance
+                daysBackVariance = 0.0;
+                for (int j = 1; j <= 100; j++) {
+                    daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
+                }
+                inputs[(int)Inputs.Variance100] = daysBackVariance;
+
+                var daysAheadVariance = 0.0;
+                for (int j = 0; j < daysAhead; j++) {
+                    daysAheadVariance += _returns[i + j].dailyVariance;
+                }
+                _trainingData.Add((inputs, daysAheadVariance));
+            }
+        }
+    }
+
+    public void Train(string networkFile) {
+        if (_trainingData.Count == 0)
+            throw new InvalidOperationException("No training data available. Load data with forTraining=true first.");
+
+        var totalSquaredError = 0.0;
+        var epoch = 0;
+        while (true) {
+            totalSquaredError = 0;
+            foreach (var data in _trainingData) {
+                var error = _network.Train(data.inputs, data.output);
+                totalSquaredError += error * error;
+            }
+
+            epoch++;
+
+            // Print progress every 10 epochs
+            if (epoch % 10 == 0) {
+                double avgError = totalSquaredError / _trainingData.Count;
+                Console.WriteLine($"Epoch {epoch}, Average Error: {avgError}");
+                _network.Save(networkFile);
+                if (Console.KeyAvailable) {
+                    var key = Console.ReadKey();
+                    if (key.Key == ConsoleKey.S) {
+                        Console.WriteLine("Training interrupted by user.");
+                        break;
+                    }
+                }
+            }
+        }
+
+        Console.WriteLine($"Training completed. RMSE on training data: {ForecastingError():F6}");
+    }
+
+    public double ForecastingError() {
+        var totalSquaredError = 0.0;
+        int forecastCount = 0;
+        for (int daysAhead = 1; daysAhead <= 20; daysAhead++) {
+            for (int dayNumber = MinDaysHistory; dayNumber < _returns.Count - daysAhead; dayNumber++) {
+                var forecast = System.Math.Sqrt(Forecast(daysAhead, dayNumber)) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / daysAhead);
+                var actualVariance = 0.0;
+                for (int j = 0; j < daysAhead; j++) {
+                    actualVariance += _returns[dayNumber + 1 + j].dailyVariance;
+                }
+                actualVariance = System.Math.Sqrt(actualVariance) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / daysAhead);
+                var error = forecast - actualVariance;
+                totalSquaredError += error * error;
+                forecastCount++;
+            }
+        }
+
+        return System.Math.Sqrt(totalSquaredError / forecastCount);
+    }
+
+    public double Forecast(double daysAhead, int dayNumber) {
+        if (_returns.Count < MinDaysHistory)
+            throw new InvalidOperationException("Not enough data for prediction.");
+        if (dayNumber < MinDaysHistory || _returns.Count < dayNumber)
+            throw new ArgumentOutOfRangeException(nameof(dayNumber), $"Invalid day number for prediction: {dayNumber}");
+
+        var inputs = new double[_network.InputSize];
+        inputs[(int)Inputs.DaysAhead] = daysAhead;
+        inputs[(int)Inputs.Variance0] = _returns[dayNumber].dailyVariance;
+        inputs[(int)Inputs.Variance1] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance;
+        inputs[(int)Inputs.Variance3] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance;
+        inputs[(int)Inputs.Variance4] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance;
+        inputs[(int)Inputs.Variance5] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance + _returns[dayNumber - 4].dailyVariance;
+
+        // Add 10 days back variance
+        var daysBackVariance = 0.0;
+        for (int j = 0; j < 10; j++) {
+            daysBackVariance += _returns[dayNumber - j].dailyVariance;
+        }
+        inputs[(int)Inputs.Variance10] = daysBackVariance;
+
+        // Add 15 days back variance
+        daysBackVariance = 0.0;
+        for (int j = 0; j < 15; j++) {
+            daysBackVariance += _returns[dayNumber - j].dailyVariance;
+        }
+        inputs[(int)Inputs.Variance15] = daysBackVariance;
+
+        // Add 25 days back variance
+        daysBackVariance = 0.0;
+        for (int j = 0; j < 25; j++) {
+            daysBackVariance += _returns[dayNumber - j].dailyVariance;
+        }
+        inputs[(int)Inputs.Variance25] = daysBackVariance;
+
+        // Add 100 days back variance
+        daysBackVariance = 0.0;
+        for (int j = 0; j < 100; j++) {
+            daysBackVariance += _returns[dayNumber - j].dailyVariance;
+        }
+        inputs[(int)Inputs.Variance100] = daysBackVariance;
+
+        var output = _network.Predict(inputs);
+
+        return output[0];
+    }
+
+    /// <summary>
+    /// Predicts the volatility for a specified number of days ahead using the most recent realized variances and a
+    /// trained neural network model.
+    /// </summary>
+    public double Forecast(int daysAhead) {
+        return Forecast(daysAhead, _returns.Count - 1);
+    }
+
+    private static double ComputeYangZhangVariance(double previousClose, double open, double high, double low, double close) {
+        var overnightReturn = System.Math.Log(open / previousClose);
+        var intradayReturn = System.Math.Log(close / open);
+        var logHighOpen = System.Math.Log(high / open);
+        var logLowOpen = System.Math.Log(low / open);
+
+        var rs = logHighOpen * (logHighOpen - intradayReturn) + logLowOpen * (logLowOpen - intradayReturn);
+        var variance = overnightReturn * overnightReturn + DefaultYangZhangK * intradayReturn * intradayReturn + (1.0 - DefaultYangZhangK) * rs;
+
+        return variance < 0 ? 0.0 : variance;
+    }
+
+}
