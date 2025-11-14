@@ -48,7 +48,7 @@ public class Network
         _hiddenLayers = hiddenLayers;
         _hiddenSize = hiddenSize;
         _learningRate = learningRate;
-        _random = new Random(42); // Fixed seed for reproducibility
+        _random = new Random();
 
         if (minLearningRateMultiplier <= 0)
             throw new ArgumentOutOfRangeException(nameof(minLearningRateMultiplier), "Minimum learning rate multiplier must be positive.");

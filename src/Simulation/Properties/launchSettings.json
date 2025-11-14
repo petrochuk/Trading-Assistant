@@ -6,7 +6,7 @@
     },
     "Train": {
       "commandName": "Project",
-      "commandLineArgs": "--train-vol-model"
+      "commandLineArgs": "--train-vol-model spx"
     }
   }
 }
