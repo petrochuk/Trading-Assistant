@@ -232,16 +232,16 @@ public class Network
         }
     }
 
-    internal double Train(double[] inputs, double output) {
+    internal double Train(double[] inputs, double expectedOutput) {
         if (inputs.Length != _inputSize)
             throw new ArgumentException($"Input size must be {_inputSize}");
         if (_outputSize != 1)
             throw new InvalidOperationException("This Train method only supports single output networks.");
 
         var outputs = Forward(inputs);
-        Backward([output]);
+        Backward([expectedOutput]);
 
-        return outputs[0] - output;
+        return outputs[0] - expectedOutput;
     }
 
     public void Train(double[][] inputs, double[][] expectedOutputs, int epochs)

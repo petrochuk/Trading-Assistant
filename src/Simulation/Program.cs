@@ -30,8 +30,8 @@ internal class Program
                     RunCalibrationHarRv();
                     return;
                 case "--train-vol-model":
-                    RunTrainVolModel();
-                    //RunTestVolModel();
+                    //RunTrainVolModel();
+                    RunTestVolModel();
                     return;
                 case "--gamma-fit":
                     await RunGammaFitAsync();

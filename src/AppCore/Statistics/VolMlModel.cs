@@ -1,10 +1,11 @@
 ﻿using AppCore.Extenstions;
+using AppCore.Interfaces;
 using AppCore.MachineLearning;
 using System.Globalization;
 
 namespace AppCore.Statistics;
 
-public class VolMlModel
+public class VolMlModel : IVolForecaster
 {
     private const double DefaultYangZhangK = 0.34 / (1.34 + (79.0 / 77.0));
 
@@ -57,6 +58,10 @@ public class VolMlModel
 
     const int VarianceLookbackDays = 5;
     const int MinDaysHistory = VarianceLookbackDays + 100;
+
+    public bool IsCalibrated => throw new NotImplementedException();
+
+    public string Symbol { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     public void Load(string dateFilePath, string networkFile, bool forTraining = false) {
         if (!File.Exists(dateFilePath))
@@ -158,6 +163,7 @@ public class VolMlModel
 
                 var daysBackVariance = 0.0;
                 for (int j = 1; j <= VarianceLookbackDays; j++) {
+                    daysBackVariance = 0;
                     for (int k = 0; k < j; k++) {
                         daysBackVariance += _returns[i - 1 - k].dailyVariance;
                     }
@@ -214,12 +220,12 @@ public class VolMlModel
                 totalSquaredError += error * error;
             }
 
-            _network.AdjustLearningRate(totalSquaredError);
+            var avgError = System.Math.Sqrt(totalSquaredError / _trainingData.Count);
+            _network.AdjustLearningRate(avgError);
             epoch++;
 
             // Print progress every 10 epochs
             if (epoch % 10 == 0) {
-                double avgError = totalSquaredError / _trainingData.Count;
                 Console.WriteLine($"Epoch {epoch}, Average Error: {avgError}");
                 _network.Save(networkFile);
                 if (Console.KeyAvailable) {
@@ -302,14 +308,6 @@ public class VolMlModel
         return output[0];
     }
 
-    /// <summary>
-    /// Predicts the volatility for a specified number of days ahead using the most recent realized variances and a
-    /// trained neural network model.
-    /// </summary>
-    public double Forecast(int daysAhead) {
-        return Forecast(daysAhead, _returns.Count - 1);
-    }
-
     private static double ComputeYangZhangVariance(double previousClose, double open, double high, double low, double close) {
         var overnightReturn = System.Math.Log(open / previousClose);
         var intradayReturn = System.Math.Log(close / open);
@@ -322,4 +320,20 @@ public class VolMlModel
         return variance < 0 ? 0.0 : variance;
     }
 
+    public void CalibrateFromFile(string symbol, string filePath, int skipLines = 0) {
+        // For network model change file extension to .nn
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Input file not found.", filePath);
+
+        var networkFile = Path.ChangeExtension(filePath, ".nn");
+
+        Load(filePath, networkFile, forTraining: false);
+    }
+
+    public void SetIntradayVolatilityEstimate(double volatility, bool isAnnualized = false, double? currentLogReturn = null) {
+    }
+
+    public double Forecast(double forecastHorizonDays) {
+        return Forecast(forecastHorizonDays, _returns.Count - 1);
+    }
 }

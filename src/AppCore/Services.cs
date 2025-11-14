@@ -12,13 +12,14 @@ public static class IServiceCollectionExtension
 
         services
             .AddTransient<IAccountFactory, AccountFactory>()
-            .AddTransient<IVolForecaster, HarRvForecaster>(f => 
-                new HarRvForecaster(
-                    includeDaily: true,
-                    includeWeekly: true,
-                    includeMonthly: true,
-                    useLogVariance: true,
-                    includeLeverageEffect: true))
+            //.AddTransient<IVolForecaster, HarRvForecaster>(f => 
+            //    new HarRvForecaster(
+            //        includeDaily: true,
+            //        includeWeekly: true,
+            //        includeMonthly: true,
+            //        useLogVariance: true,
+            //        includeLeverageEffect: true))
+            .AddTransient<IVolForecaster, VolMlModel>()
             .AddSingleton<IContractFactory, ContractFactory>()
             .AddSingleton<ExpirationCalendar>()
             .AddTransient<IDeltaHedgerFactory, DeltaHedgerFactory>()
