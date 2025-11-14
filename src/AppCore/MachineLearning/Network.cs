@@ -254,16 +254,23 @@ public class Network
         }
     }
 
-    internal double Train(double[] inputs, double expectedOutput) {
+    internal double Train(double[] inputs, double[] expectedOutputs) {
         if (inputs.Length != _inputSize)
-            throw new ArgumentException($"Input size must be {_inputSize}");
-        if (_outputSize != 1)
-            throw new InvalidOperationException("This Train method only supports single output networks.");
+            throw new ArgumentOutOfRangeException(nameof(inputs), $"Input size must be {_inputSize}");
+        if (expectedOutputs.Length != _outputSize)
+            throw new ArgumentOutOfRangeException(nameof(expectedOutputs), $"Expected output size must be {_outputSize}");
 
         var outputs = Forward(inputs);
-        Backward([expectedOutput]);
+        Backward(expectedOutputs);
 
-        return outputs[0] - expectedOutput;
+        // Calculate error for this sample
+        double totalError = 0;
+        for (int i = 0; i < outputs.Length; i++) {
+            double error = outputs[i] - expectedOutputs[i];
+            totalError += error * error;
+        }
+
+        return System.Math.Sqrt(totalError / outputs.Length);
     }
 
     public void Train(double[][] inputs, double[][] expectedOutputs, int epochs)

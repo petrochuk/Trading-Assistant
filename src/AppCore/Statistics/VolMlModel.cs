@@ -9,55 +9,56 @@ public class VolMlModel : IVolForecaster
 {
     private const double DefaultYangZhangK = 0.34 / (1.34 + (79.0 / 77.0));
 
+    private const int InputSize = 9;
     private readonly List<DailyData> _returns = new();
-    private Network _network = new Network(inputSize: VarianceLookbackDays + 5, 
-        outputSize: 1, hiddenLayers: 3, hiddenSize: 2 * (VarianceLookbackDays + 5), learningRate: 0.05);
-    private List<(double[] inputs, double output)> _trainingData = new();
+    private Network _network = new Network(inputSize: InputSize, 
+        outputSize: MaxDaysAhead, hiddenLayers: 3, hiddenSize: 2 * InputSize, learningRate: 0.05);
+    private List<(double[] inputs, double[] outputs)> _trainingData = new();
 
     record class DailyData(DateOnly Date, double dailyReturn, double dailyVariance);
 
     enum Inputs {
-        DaysAhead = 0,
         /// <summary>
         /// Variance of returns over the last day
         /// </summary>
-        Variance0 = 1,
+        Variance0 = 0,
         /// <summary>
         /// Total variance of returns for the last 2 days
         /// </summary>
-        Variance1 = 2,
+        Variance1 = 1,
         /// <summary>
         /// Total variance of returns for the last 3 days
         /// </summary>
-        Variance3 = 3,
+        Variance3 = 2,
         /// <summary>
         /// Total variance of returns for the last 4 days
         /// </summary>
-        Variance4 = 4,
+        Variance4 = 3,
         /// <summary>
         /// Total variance of returns for the last 5 days
         /// </summary>
-        Variance5 = 5,
+        Variance5 = 4,
         /// <summary>
         /// Total variance of returns for the last 10 days
         /// </summary>
-        Variance10 = 6,
+        Variance10 = 5,
         /// <summary>
         /// Total variance of returns for the last 15 days
         /// </summary>
-        Variance15 = 7,
+        Variance15 = 6,
         /// <summary>
         /// Total variance of returns for the last 25 days
         /// </summary>
-        Variance25 = 8,
+        Variance25 = 7,
         /// <summary>
         /// Total variance of returns for the last 100 days
         /// </summary>
-        Variance100 = 9,
+        Variance100 = 8,
     }
 
     const int VarianceLookbackDays = 5;
     const int MinDaysHistory = VarianceLookbackDays + 100;
+    const int MaxDaysAhead = 20;
 
     public bool IsCalibrated => throw new NotImplementedException();
 
@@ -154,56 +155,52 @@ public class VolMlModel : IVolForecaster
     private void PrepareTrainingData() {
         _trainingData.Clear();
 
-        var maxDaysAhead = 20;
-        for (int i = MinDaysHistory; i < _returns.Count - maxDaysAhead; i++) {
-            
-            for (int daysAhead = 1; daysAhead <= maxDaysAhead; daysAhead++) {
-                var inputs = new double[_network.InputSize];
-                inputs[(int)Inputs.DaysAhead] = daysAhead;
-
-                var daysBackVariance = 0.0;
-                for (int j = 1; j <= VarianceLookbackDays; j++) {
-                    daysBackVariance = 0;
-                    for (int k = 0; k < j; k++) {
-                        daysBackVariance += _returns[i - 1 - k].dailyVariance;
-                    }
-                    inputs[(int)Inputs.Variance0 + j - 1] = daysBackVariance;
+        for (int i = MinDaysHistory; i < _returns.Count - MaxDaysAhead; i++) {
+            var inputs = new double[_network.InputSize];
+            var daysBackVariance = 0.0;
+            for (int j = 1; j <= VarianceLookbackDays; j++) {
+                daysBackVariance = 0;
+                for (int k = 0; k < j; k++) {
+                    daysBackVariance += _returns[i - 1 - k].dailyVariance;
                 }
-
-                // 10 days back variance
-                daysBackVariance = 0.0;
-                for (int j = 1; j <= 10; j++) {
-                    daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
-                }
-                inputs[(int)Inputs.Variance10] = daysBackVariance;
-
-                // 15 days back variance
-                daysBackVariance = 0.0;
-                for (int j = 1; j <= 15; j++) {
-                    daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
-                }
-                inputs[(int)Inputs.Variance15] = daysBackVariance;
-
-                // 25 days back variance
-                daysBackVariance = 0.0;
-                for (int j = 1; j <= 25; j++) {
-                    daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
-                }
-                inputs[(int)Inputs.Variance25] = daysBackVariance;
-
-                // 100 days back variance
-                daysBackVariance = 0.0;
-                for (int j = 1; j <= 100; j++) {
-                    daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
-                }
-                inputs[(int)Inputs.Variance100] = daysBackVariance;
-
-                var daysAheadVariance = 0.0;
-                for (int j = 0; j < daysAhead; j++) {
-                    daysAheadVariance += _returns[i + j].dailyVariance;
-                }
-                _trainingData.Add((inputs, daysAheadVariance));
+                inputs[(int)Inputs.Variance0 + j - 1] = daysBackVariance;
             }
+
+            // 10 days back variance
+            daysBackVariance = 0.0;
+            for (int j = 1; j <= 10; j++) {
+                daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
+            }
+            inputs[(int)Inputs.Variance10] = daysBackVariance;
+
+            // 15 days back variance
+            daysBackVariance = 0.0;
+            for (int j = 1; j <= 15; j++) {
+                daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
+            }
+            inputs[(int)Inputs.Variance15] = daysBackVariance;
+
+            // 25 days back variance
+            daysBackVariance = 0.0;
+            for (int j = 1; j <= 25; j++) {
+                daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
+            }
+            inputs[(int)Inputs.Variance25] = daysBackVariance;
+
+            // 100 days back variance
+            daysBackVariance = 0.0;
+            for (int j = 1; j <= 100; j++) {
+                daysBackVariance += _returns[i - 1 - (j - 1)].dailyVariance;
+            }
+            inputs[(int)Inputs.Variance100] = daysBackVariance;
+
+            var outputs = new double[MaxDaysAhead];
+            var daysAheadVariance = 0.0;
+            for (int j = 0; j < MaxDaysAhead; j++) {
+                daysAheadVariance += _returns[i + j].dailyVariance;
+                outputs[j] = daysAheadVariance;
+            }
+            _trainingData.Add((inputs, outputs));
         }
     }
 
@@ -220,18 +217,23 @@ public class VolMlModel : IVolForecaster
             // Pick random indexes to train in random order
             for (int i = 0; i < _trainingData.Count; i++) {
                 int j = random.Next(i, _trainingData.Count);
-                var error = _network.Train(_trainingData[j].inputs, _trainingData[j].output);
-                totalSquaredError += error * error;
+                var error = _network.Train(_trainingData[j].inputs, _trainingData[j].outputs);
+                totalSquaredError += error;
             }
 
-            var avgError = System.Math.Sqrt(totalSquaredError / _trainingData.Count);
+            var avgError = totalSquaredError / _trainingData.Count;
             _network.AdjustLearningRate(avgError);
             epoch++;
 
             // Print progress every 10 epochs
             if (epoch % 10 == 0) {
                 Console.WriteLine($"Epoch {epoch}, Average Error: {avgError}");
-                _network.Save(networkFile);
+                try {
+                    _network.Save(networkFile);
+                }
+                catch (IOException ex) {
+                    Console.WriteLine($"Warning: Unable to save network to file: {ex.Message}");
+                }
                 if (Console.KeyAvailable) {
                     var key = Console.ReadKey();
                     if (key.Key == ConsoleKey.S) {
@@ -273,7 +275,6 @@ public class VolMlModel : IVolForecaster
             throw new ArgumentOutOfRangeException(nameof(dayNumber), $"Invalid day number for prediction: {dayNumber}");
 
         var inputs = new double[_network.InputSize];
-        inputs[(int)Inputs.DaysAhead] = daysAhead;
         inputs[(int)Inputs.Variance0] = _returns[dayNumber].dailyVariance;
         inputs[(int)Inputs.Variance1] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance;
         inputs[(int)Inputs.Variance3] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance;
@@ -308,9 +309,13 @@ public class VolMlModel : IVolForecaster
         }
         inputs[(int)Inputs.Variance100] = daysBackVariance;
 
+        var daysAheadInt = (int)daysAhead;
         var output = _network.Predict(inputs);
+        if (output.Length < daysAheadInt) { 
+            return System.Math.Max(0.0, output[^1]);
+        }
 
-        return System.Math.Max(0.0, output[0]);
+        return System.Math.Max(0.0, output[daysAheadInt-1]);
     }
 
     private static double ComputeYangZhangVariance(double previousClose, double open, double high, double low, double close) {
