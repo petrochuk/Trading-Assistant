@@ -133,22 +133,30 @@ internal class Program
     }
 
     private static void RunTestVolModel(string symbol) {
-        var volModelApr = new VolMlModel();
+        VolMlModel? volModelTest = null;
         var volModelLatest = new VolMlModel();
-        volModelApr.Load(@$"c:\temp\{symbol}_Apr.csv", @$"c:\temp\{symbol}.nn", forTraining: false);
+        var dataTestFile = @$"c:\temp\{symbol}_Test.csv";
+        if (!System.IO.File.Exists(dataTestFile)) {
+            Console.WriteLine($"Error: Test data file not found: {dataTestFile}");
+        } else {
+            volModelTest = new VolMlModel();
+            volModelTest.Load(dataTestFile, @$"c:\temp\{symbol}.nn", forTraining: false);
+            Console.WriteLine($"RMSE on Tst data: {volModelTest.ForecastingError():P6}");
+        }
         volModelLatest.Load(@$"c:\temp\{symbol}.csv", @$"c:\temp\{symbol}.nn", forTraining: false);
 
-        Console.WriteLine($"RMSE on Apr data: {volModelApr.ForecastingError():P6}");
         Console.WriteLine($"RMSE on training data: {volModelLatest.ForecastingError():P6}");
 
         for (int day = 1; day <= 20; day++) {
-            var volForecast = volModelApr.Forecast(day);
+            if (volModelTest != null) {
+                Console.WriteLine();
+                var volForecastTest = volModelTest.Forecast(day);
+                var annualizedVolTest = System.Math.Sqrt(volForecastTest) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / day);
+                Console.WriteLine($"{day}-day Tst forecast: {annualizedVolTest:p2}");
+            }
+            var volForecast = volModelLatest.Forecast(day);
             var annualizedVol = System.Math.Sqrt(volForecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / day);
-            Console.WriteLine($"{day}-day Apr volatility forecast: {annualizedVol:p2}");
-            volForecast = volModelLatest.Forecast(day);
-            annualizedVol = System.Math.Sqrt(volForecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / day);
-            Console.WriteLine($"{day}-day Lts volatility forecast: {annualizedVol:p2}");
-            Console.WriteLine();
+            Console.WriteLine($"{day}-day Lts forecast: {annualizedVol:p2}");
         }
     }
 
