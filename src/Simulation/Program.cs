@@ -126,8 +126,7 @@ internal class Program
 
         for (int day = 1; day <= 20; day++) {
             var volForecast = volModel.Forecast(day);
-            var annualizedVol = System.Math.Sqrt(volForecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / day);
-            Console.WriteLine($"{day}-day volatility forecast: {annualizedVol:p2}");
+            Console.WriteLine($"{day}-day volatility forecast: {volForecast:p2}");
         }
         Console.WriteLine("Done.");
     }
@@ -151,12 +150,10 @@ internal class Program
             if (volModelTest != null) {
                 Console.WriteLine();
                 var volForecastTest = volModelTest.Forecast(day);
-                var annualizedVolTest = System.Math.Sqrt(volForecastTest) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / day);
-                Console.WriteLine($"{day}-day Tst forecast: {annualizedVolTest:p2}");
+                Console.WriteLine($"{day}-day Tst forecast: {volForecastTest:p2}");
             }
             var volForecast = volModelLatest.Forecast(day);
-            var annualizedVol = System.Math.Sqrt(volForecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / day);
-            Console.WriteLine($"{day}-day Lts forecast: {annualizedVol:p2}");
+            Console.WriteLine($"{day}-day Lts forecast: {volForecast:p2}");
         }
     }
 

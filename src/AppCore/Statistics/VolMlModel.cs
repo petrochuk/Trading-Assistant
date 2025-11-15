@@ -318,13 +318,13 @@ public class VolMlModel : IVolForecaster
         }
         inputs[(int)Inputs.Variance100] = daysBackVariance;
 
-        var daysAheadInt = (int)daysAhead;
         var output = _network.Predict(inputs);
-        if (output.Length < daysAheadInt) { 
-            return System.Math.Max(0.0, output[^1]);
-        }
 
-        return System.Math.Max(0.0, output[daysAheadInt-1]);
+        var daysAheadInt = (int)System.Math.Clamp(System.Math.Round(daysAhead), 0, output.Length - 1);
+        var varianceForecast = System.Math.Max(0.0, output[daysAheadInt]);
+
+        // Return annualized volatility
+        return System.Math.Sqrt(varianceForecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / (daysAheadInt + 1));
     }
 
     private static double ComputeYangZhangVariance(double previousClose, double open, double high, double low, double close) {
@@ -350,6 +350,7 @@ public class VolMlModel : IVolForecaster
     }
 
     public void SetIntradayVolatilityEstimate(double volatility, bool isAnnualized = false, double? currentLogReturn = null) {
+        // Not used in this model
     }
 
     public double Forecast(double forecastHorizonDays) {
