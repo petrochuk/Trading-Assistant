@@ -137,8 +137,6 @@ public class VolMlModel : IVolForecaster
             if (!double.TryParse(colummns[closeIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var close))
                 throw new FormatException($"Unable to parse numeric value on line {lineNumber}: '{rawLine}'.");
 
-            if (colummns.Length < 5)
-                continue;
 
             if (!double.TryParse(colummns[openIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var open) ||
                 !double.TryParse(colummns[highIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var high) ||
