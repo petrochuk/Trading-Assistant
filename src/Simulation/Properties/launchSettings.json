@@ -1,12 +1,12 @@
 {
   "profiles": {
-    "Simulation": {
+    "Train": {
       "commandName": "Project",
-      "commandLineArgs": "--gamma-scalping"
+      "commandLineArgs": "--test-vol-model spx-2025"
     },
-    "calibrate": {
+    "Calibrate": {
       "commandName": "Project",
-      "commandLineArgs": "--calibrate-har-rv"
+      "commandLineArgs": "--calibrate"
     }
   }
 }

@@ -351,7 +351,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         totalVegaLong += absVega;
                     }
                     
-                    _logger.LogTrace($"{position} is using IV: rv:{realizedVol:f3} miv:{marketIV:f3} up:{underlyingContract.MarketPrice.Value:f2} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} dwh:{deltaBlsHW:f2} dh:{deltaHeston:f2} t:{deltaBls * position.Size:f2}");
+                    _logger.LogDebug($"{position} is using IV: rv:{realizedVol:f3} miv:{marketIV:f3} up:{underlyingContract.MarketPrice.Value:f2} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):f2} t:{daysLeft:f2} d:{deltaBls:f2} dwh:{deltaBlsHW:f2} dh:{deltaHeston:f2} t:{deltaBls * position.Size:f2}");
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
