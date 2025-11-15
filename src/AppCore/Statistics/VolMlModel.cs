@@ -70,7 +70,12 @@ public class VolMlModel : IVolForecaster
 
     public bool IsCalibrated => throw new NotImplementedException();
 
-    public string Symbol { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+    private string? _symbol;
+    public string Symbol
+    {
+        get => _symbol ?? string.Empty;
+        set => _symbol = value;
+    }
 
     public void Load(string dateFilePath, string networkFile, bool forTraining = false) {
         if (!File.Exists(dateFilePath))
