@@ -266,8 +266,7 @@ public class VolMlModel : IVolForecaster
         int forecastCount = 0;
         for (int daysAhead = 1; daysAhead <= 20; daysAhead++) {
             for (int dayNumber = MinDaysHistory; dayNumber < _returns.Count - daysAhead; dayNumber++) {
-                var forecastVariance = Forecast(daysAhead, dayNumber); // now cumulative variance
-                var forecastVol = System.Math.Sqrt(forecastVariance) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / daysAhead);
+                var forecastVol = Forecast(daysAhead, dayNumber);
                 var actualVariance = 0.0;
                 for (int j = 0; j < daysAhead; j++) {
                     actualVariance += _returns[dayNumber + 1 + j].dailyVariance;
