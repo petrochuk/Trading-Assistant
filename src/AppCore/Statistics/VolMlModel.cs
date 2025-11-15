@@ -283,7 +283,7 @@ public class VolMlModel : IVolForecaster
     public double Forecast(double daysAhead, int dayNumber) {
         if (_returns.Count < MinDaysHistory)
             throw new InvalidOperationException("Not enough data for prediction.");
-        if (dayNumber < MinDaysHistory || _returns.Count < dayNumber)
+        if (dayNumber < MinDaysHistory || dayNumber >= _returns.Count)
             throw new ArgumentOutOfRangeException(nameof(dayNumber), $"Invalid day number for prediction: {dayNumber}");
 
         var inputs = new double[_network.InputSize];
