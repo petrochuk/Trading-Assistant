@@ -425,7 +425,7 @@ public class Network
         var inner = GeluInner(x);
         var tanhInner = System.Math.Tanh(inner);
         var cosh = System.Math.Cosh(inner);
-        var sechSquared = cosh == 0 ? 0.0 : 1.0 / (cosh * cosh);
+        var sechSquared = System.Math.Abs(cosh) < 1e-12 ? 0.0 : 1.0 / (cosh * cosh);
         var term1 = 0.5 * (1.0 + tanhInner);
         var term2 = 0.5 * x * sechSquared * SqrtTwoOverPi * (1.0 + 3.0 * GeluCoefficient * x * x);
         return term1 + term2;
