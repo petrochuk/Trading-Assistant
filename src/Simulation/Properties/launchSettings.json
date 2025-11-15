@@ -1,12 +1,12 @@
 {
   "profiles": {
-    "Simulation": {
-      "commandName": "Project",
-      "commandLineArgs": "--train-vol-model"
-    },
     "Train": {
       "commandName": "Project",
       "commandLineArgs": "--test-vol-model spx-2025"
+    },
+    "Calibrate": {
+      "commandName": "Project",
+      "commandLineArgs": "--calibrate"
     }
   }
 }
