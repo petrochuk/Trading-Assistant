@@ -61,7 +61,7 @@ public class HestonCalibrator
             VolatilityMeanReversion = 10f,
             VolatilityOfVolatility = 0.95f,
             Correlation = -1f,
-            UseRoughHeston = true
+            UseRoughHeston = false
         };
 
         float CalculateError()
