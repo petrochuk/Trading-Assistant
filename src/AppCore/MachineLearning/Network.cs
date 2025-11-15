@@ -311,7 +311,7 @@ public class Network
                 }
             }
 
-            double avgError = totalError / (inputs.Length * _outputSize);
+            double avgError = totalError / ((double)inputs.Length * _outputSize);
             AdjustLearningRate(avgError);
 
             // Print progress every 1000 epochs
