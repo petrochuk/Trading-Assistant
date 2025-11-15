@@ -96,19 +96,19 @@ public class VolMlModel : IVolForecaster
             if (string.IsNullOrEmpty(line))
                 continue;
 
-            var colummns = line.Split([',', ';', '\t'], StringSplitOptions.RemoveEmptyEntries);
-            if (colummns.Length < 5)
+            var columns = line.Split([',', ';', '\t'], StringSplitOptions.RemoveEmptyEntries);
+            if (columns.Length < 5)
                 continue;
 
             // Trim optional double quotes from each column
-            for (int i = 0; i < colummns.Length; i++) {
-                colummns[i] = colummns[i].Trim('"');
+            for (int i = 0; i < columns.Length; i++) {
+                columns[i] = columns[i].Trim('"');
             }
 
             // Parse header
             if (lineNumber == 1) {
-                for (int i = 0; i < colummns.Length; i++) {
-                    switch (colummns[i].ToLowerInvariant()) {
+                for (int i = 0; i < columns.Length; i++) {
+                    switch (columns[i].ToLowerInvariant()) {
                         case "date":
                             dateIdx = i;
                             break;
@@ -131,16 +131,16 @@ public class VolMlModel : IVolForecaster
             }
 
             // Parse date
-            if (!DateOnly.TryParse(colummns[dateIdx], CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            if (!DateOnly.TryParse(columns[dateIdx], CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
                 throw new FormatException($"Unable to parse date on line {lineNumber}: '{rawLine}'.");
 
-            if (!double.TryParse(colummns[closeIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var close))
+            if (!double.TryParse(columns[closeIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var close))
                 throw new FormatException($"Unable to parse numeric value on line {lineNumber}: '{rawLine}'.");
 
 
-            if (!double.TryParse(colummns[openIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var open) ||
-                !double.TryParse(colummns[highIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var high) ||
-                !double.TryParse(colummns[lowIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var low)) {
+            if (!double.TryParse(columns[openIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var open) ||
+                !double.TryParse(columns[highIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var high) ||
+                !double.TryParse(columns[lowIdx], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var low)) {
                 throw new FormatException($"Unable to parse OHLC values on line {lineNumber}: '{rawLine}'.");
             }
 
