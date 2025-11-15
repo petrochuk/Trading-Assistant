@@ -170,7 +170,8 @@ internal class Program
         Console.WriteLine($"  β₂ (weekly):    {forecaster.Beta2:F6}");
         Console.WriteLine($"  β₂ (bi-weekly)  {forecaster.BetaBiWeekly:F6}");
         Console.WriteLine($"  β₃ (monthly):   {forecaster.Beta3:F6}");
-        if (forecaster.BetaLeverage != 0)
+        const double EPSILON = 1e-8;
+        if (Math.Abs(forecaster.BetaLeverage) > EPSILON)
             Console.WriteLine($"  βL (leverage):  {forecaster.BetaLeverage:F6}");
         
         var persistence = forecaster.Beta1 + forecaster.BetaShortTerm + forecaster.Beta2 + forecaster.BetaBiWeekly + forecaster.Beta3;
