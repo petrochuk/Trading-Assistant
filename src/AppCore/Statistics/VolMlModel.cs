@@ -12,8 +12,15 @@ public class VolMlModel : IVolForecaster
 
     private const int InputSize = 9;
     private readonly List<DailyData> _returns = new();
-    private Network _network = new Network(inputSize: InputSize, 
-        outputSize: MaxDaysAhead, hiddenLayers: 3, hiddenSize: 2 * InputSize, learningRate: 0.05);
+    private Network _network = new Network(
+        inputSize: InputSize,
+        outputSize: MaxDaysAhead,
+        hiddenLayers: 3,
+        hiddenSize: 2 * InputSize,
+        learningRate: 0.05,
+        useLinearOutputLayer: false,
+        hiddenActivation: Network.ActivationType.GELU,
+        outputActivation: Network.ActivationType.Softplus);
     private List<(double[] inputs, double[] outputs)> _trainingData = new();
 
     record class DailyData(DateOnly Date, double dailyReturn, double dailyVariance);

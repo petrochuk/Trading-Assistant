@@ -4,15 +4,29 @@ namespace AppCore.MachineLearning;
 
 public class Network
 {
-    private const int FileFormatVersion = 2;
+    public enum ActivationType
+    {
+        ReLU = 0,
+        ELU = 1,
+        GELU = 2,
+        Sigmoid = 3,
+        Softplus = 4,
+        Linear = 5,
+    }
+
+    private const int FileFormatVersion = 3;
     private const double MaxGradientMagnitude = 1e3;
+    private const double EluAlpha = 1.0;
+    private const double GeluCoefficient = 0.044715;
+    private const double SqrtTwoOverPi = 0.7978845608028654;
 
     private readonly int _inputSize;
     private readonly int _outputSize;
     private readonly int _hiddenLayers;
     private readonly int _hiddenSize;
     private readonly double _learningRate;
-    private readonly bool _useLinearOutputLayer = true;
+    private readonly ActivationType _hiddenActivation;
+    private readonly ActivationType _outputActivation;
     private double _currentLearningRate;
     private bool _adaptiveLearningEnabled;
     private double _minLearningRate;
@@ -47,14 +61,17 @@ public class Network
         double lrDecreaseFactor = 0.5,
         int adaptationPatience = 5,
         double improvementTolerance = 1e-4,
-        bool useLinearOutputLayer = true)
+        bool useLinearOutputLayer = true,
+        ActivationType hiddenActivation = ActivationType.ReLU,
+        ActivationType outputActivation = ActivationType.Linear)
     {
         _inputSize = inputSize;
         _outputSize = outputSize;
         _hiddenLayers = hiddenLayers;
         _hiddenSize = hiddenSize;
         _learningRate = learningRate;
-        _useLinearOutputLayer = useLinearOutputLayer;
+        _hiddenActivation = hiddenActivation;
+        _outputActivation = useLinearOutputLayer ? ActivationType.Linear : outputActivation;
         _random = new Random();
 
         if (minLearningRateMultiplier <= 0)
@@ -173,11 +190,8 @@ public class Network
 
                 _zValues[layer][neuron] = sum;
                 bool isOutputLayer = layer == _hiddenLayers;
-                if (isOutputLayer && _useLinearOutputLayer) {
-                    _activations[layer + 1][neuron] = sum;
-                } else {
-                    _activations[layer + 1][neuron] = ReLU(sum);
-                }
+                var activationType = isOutputLayer ? _outputActivation : _hiddenActivation;
+                _activations[layer + 1][neuron] = ApplyActivation(activationType, sum);
             }
         }
 
@@ -203,7 +217,7 @@ public class Network
         {
             double output = _activations[outputLayerIndex + 1][neuron];
             double error = output - expectedOutputs[neuron];
-            double derivative = _useLinearOutputLayer ? 1.0 : ReLUDerivative(_zValues[outputLayerIndex][neuron]);
+            double derivative = ActivationDerivative(_outputActivation, _zValues[outputLayerIndex][neuron]);
             deltas[outputLayerIndex][neuron] = error * derivative;
         }
 
@@ -222,7 +236,7 @@ public class Network
                     error += deltas[layer + 1][nextNeuron] * _weights[layer + 1][nextNeuron][neuron];
                 }
                 
-                deltas[layer][neuron] = error * ReLUDerivative(_zValues[layer][neuron]);
+                deltas[layer][neuron] = error * ActivationDerivative(_hiddenActivation, _zValues[layer][neuron]);
             }
         }
 
@@ -337,6 +351,34 @@ public class Network
         }
     }
 
+    private static double ApplyActivation(ActivationType type, double x)
+    {
+        return type switch
+        {
+            ActivationType.Linear => x,
+            ActivationType.ReLU => ReLU(x),
+            ActivationType.ELU => ELU(x),
+            ActivationType.GELU => Gelu(x),
+            ActivationType.Sigmoid => Sigmoid(x),
+            ActivationType.Softplus => Softplus(x),
+            _ => x,
+        };
+    }
+
+    private static double ActivationDerivative(ActivationType type, double x)
+    {
+        return type switch
+        {
+            ActivationType.Linear => 1.0,
+            ActivationType.ReLU => ReLUDerivative(x),
+            ActivationType.ELU => x >= 0 ? 1.0 : EluAlpha * System.Math.Exp(x),
+            ActivationType.GELU => GeluDerivative(x),
+            ActivationType.Sigmoid => SigmoidDerivative(x),
+            ActivationType.Softplus => Sigmoid(x),
+            _ => 1.0,
+        };
+    }
+
     private static double Sigmoid(double x)
     {
         return 1.0 / (1.0 + System.Math.Exp(-x));
@@ -348,12 +390,57 @@ public class Network
         return sigmoid * (1 - sigmoid);
     }
 
-    private static double ReLU(double x) {
+    private static double ReLU(double x)
+    {
         return x > 0 ? x : 0.0;
     }
 
-    private static double ReLUDerivative(double x) {
+    private static double ReLUDerivative(double x)
+    {
         return x > 0 ? 1.0 : 0.0;
+    }
+
+    private static double ELU(double x)
+    {
+        return x >= 0 ? x : EluAlpha * (System.Math.Exp(x) - 1.0);
+    }
+
+    private static double Softplus(double x)
+    {
+        if (x > 20)
+            return x;
+        if (x < -20)
+            return System.Math.Exp(x);
+        return System.Math.Log(1.0 + System.Math.Exp(x));
+    }
+
+    private static double Gelu(double x)
+    {
+        var inner = GeluInner(x);
+        return 0.5 * x * (1.0 + System.Math.Tanh(inner));
+    }
+
+    private static double GeluDerivative(double x)
+    {
+        var inner = GeluInner(x);
+        var tanhInner = System.Math.Tanh(inner);
+        var cosh = System.Math.Cosh(inner);
+        var sechSquared = cosh == 0 ? 0.0 : 1.0 / (cosh * cosh);
+        var term1 = 0.5 * (1.0 + tanhInner);
+        var term2 = 0.5 * x * sechSquared * SqrtTwoOverPi * (1.0 + 3.0 * GeluCoefficient * x * x);
+        return term1 + term2;
+    }
+
+    private static double GeluInner(double x)
+    {
+        return SqrtTwoOverPi * (x + GeluCoefficient * x * x * x);
+    }
+
+    private static ActivationType NormalizeActivation(int rawValue, ActivationType fallback)
+    {
+        return Enum.IsDefined(typeof(ActivationType), rawValue)
+            ? (ActivationType)rawValue
+            : fallback;
     }
 
     private double SampleGaussian(double mean, double stdDev) {
@@ -442,7 +529,9 @@ public class Network
         writer.Write(_hiddenLayers);
         writer.Write(_hiddenSize);
         writer.Write(_learningRate);
-        writer.Write(_useLinearOutputLayer);
+        writer.Write(_outputActivation == ActivationType.Linear);
+        writer.Write((int)_hiddenActivation);
+        writer.Write((int)_outputActivation);
 
         // Write weights
         for (int layer = 0; layer < _weights.Length; layer++)
@@ -505,9 +594,20 @@ public class Network
         int hiddenSize = reader.ReadInt32();
         double learningRate = reader.ReadDouble();
         bool useLinearOutputLayer = reader.ReadBoolean();
+        ActivationType hiddenActivation = ActivationType.ReLU;
+        ActivationType outputActivation = useLinearOutputLayer ? ActivationType.Linear : ActivationType.ReLU;
+
+        if (version >= 3)
+        {
+            hiddenActivation = NormalizeActivation(reader.ReadInt32(), ActivationType.ReLU);
+            outputActivation = NormalizeActivation(reader.ReadInt32(), outputActivation);
+        }
 
         // Create network with the loaded architecture
-        var network = new Network(inputSize, outputSize, hiddenLayers, hiddenSize, learningRate, useLinearOutputLayer: useLinearOutputLayer);
+        var network = new Network(inputSize, outputSize, hiddenLayers, hiddenSize, learningRate,
+            useLinearOutputLayer: useLinearOutputLayer,
+            hiddenActivation: hiddenActivation,
+            outputActivation: outputActivation);
 
         // Read weights
         for (int layer = 0; layer < network._weights.Length; layer++)
