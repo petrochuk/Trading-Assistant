@@ -61,7 +61,12 @@ public class HestonCalibrator
             VolatilityMeanReversion = 10f,
             VolatilityOfVolatility = 0.95f,
             Correlation = -1f,
-            UseRoughHeston = false
+            UseRoughHeston = false,
+            UseGaussianQuadrature = true,
+            GaussianQuadraturePanels = 100,
+            UseNonUniformGrid = true,
+            GridClusteringParameter = 0.05,
+            AdaptiveUpperBoundMultiplier = 2.5f,
         };
 
         float CalculateError()
@@ -146,9 +151,9 @@ public class HestonCalibrator
     private void CalibrateStandardHeston(HestonCalculator heston, Action<string> evaluate)
     {
         var currentVolatilities = new float[] { 0.10f};
-        var volOfVols = new float[] { 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 4.5f, 5f };
+        var volOfVols = new float[] { 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 2.0f, 2.5f, 3.0f, 3.5f };
         var longTermVols = new float[] { 0.08f, 0.10f, 0.12f, 0.14f, 0.15f, 0.16f, 0.17f, 0.18f, 0.20f, 0.22f };
-        var meanReversions = new float[] { 5f, 7f, 10f, 12f, 15f, 20f, 25f };
+        var meanReversions = new float[] { 0f, 0.5f, 1f, 1.5f, 2f, 5f };
         var correlations = new float[] { -1.0f, -0.9f, -0.8f, -0.7f, -0.6f, -0.5f, -0.4f, -0.3f };
 
         foreach (var cv in currentVolatilities)
@@ -162,7 +167,7 @@ public class HestonCalibrator
             heston.LongTermVolatility = lt;
             heston.VolatilityMeanReversion = kappa;
             heston.Correlation = rho;
-            evaluate($"cv={cv:F3} vofv={vofvol:F1} lt={lt:F2} k={kappa:F0} rho={rho:F1}");
+            evaluate($"cv={cv:F3} vofv={vofvol:F1} lt={lt:F2} k={kappa:F1} rho={rho:F1}");
         }
     }
 

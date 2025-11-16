@@ -120,6 +120,26 @@ public class HestonCalculator
     /// </summary>
     public bool EnableStrikeVarianceAdjustment { get; set; } = false;
 
+    /// <summary>
+    /// Use non-uniform grid with exponential clustering near origin (default true for better short-maturity accuracy)
+    /// </summary>
+    public bool UseNonUniformGrid { get; set; } = true;
+
+    /// <summary>
+    /// Clustering parameter for non-uniform grid (smaller = more clustering, typical 0.05-0.2)
+    /// </summary>
+    public double GridClusteringParameter { get; set; } = 0.1;
+
+    /// <summary>
+    /// Use Gaussian quadrature instead of trapezoid (slower but most accurate for challenging scenarios)
+    /// </summary>
+    public bool UseGaussianQuadrature { get; set; } = false;
+
+    /// <summary>
+    /// Number of panels for Gaussian quadrature subdivision
+    /// </summary>
+    public int GaussianQuadraturePanels { get; set; } = 50;
+
     // Rough Heston parameters
     /// <summary>
     /// Enable Rough Heston model (fractional volatility). When false, uses standard Heston.
@@ -326,10 +346,40 @@ public class HestonCalculator
     private double IntegrateProbability(double lnS, double lnK, double r, double T,
         double v0, double theta, double kappa, double sigma, double rho, Complex phiMinusI,
         double upperBound, bool isP1) {
+        
+        // Use Gaussian quadrature for highest accuracy if enabled
+        if (UseGaussianQuadrature && IntegrationMethod == HestonIntegrationMethod.Adaptive) {
+            return IntegrateGaussLegendre(lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, upperBound, isP1);
+        }
+
         int numPoints = IntegrationMethod == HestonIntegrationMethod.Adaptive ?
             DetermineOptimalQuadraturePoints(T, sigma) : FixedIntegrationPoints;
         if (numPoints < 50) numPoints = 50;
+        
         double integral = 0.0;
+
+        // Use non-uniform grid with exponential clustering if enabled
+        if (UseNonUniformGrid && IntegrationMethod == HestonIntegrationMethod.Adaptive) {
+            double alpha = GridClusteringParameter;
+            double expAlpha = System.Math.Exp(alpha);
+            double denom = expAlpha - 1.0;
+            
+            for (int i = 0; i <= numPoints; i++) {
+                double xi = (double)i / numPoints; // uniform [0,1]
+                double u = upperBound * (System.Math.Exp(alpha * xi) - 1.0) / denom;
+                
+                // Jacobian of transformation
+                double jacobian = upperBound * alpha * System.Math.Exp(alpha * xi) / denom;
+                double weight = (i == 0 || i == numPoints) ? 0.5 : 1.0;
+                
+                var integrandVal = ProbabilityIntegrand(u, lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, isP1);
+                if (!double.IsNaN(integrandVal) && !double.IsInfinity(integrandVal))
+                    integral += weight * integrandVal * jacobian / numPoints;
+            }
+            return integral;
+        }
+
+        // Standard uniform grid with trapezoid rule
         double du = upperBound / numPoints;
 
         // Full trapezoid weights (include u=0) improves low-frequency contribution and tail accuracy.
@@ -1200,16 +1250,32 @@ public class HestonCalculator
     }
 
     private int DetermineOptimalQuadraturePoints(double T, double sigma) {
-        // Increase density for very short maturities
         int basePoints = 400;
+        
+        // Improved short-maturity scaling (exponential for T < 0.05)
         if (T > 0) {
-            double shortMaturityFactor = 1.0 + 3.0 / System.Math.Max(0.02, System.Math.Sqrt(T));
-            basePoints = (int)(basePoints * shortMaturityFactor);
+            if (T < 0.05) { // less than ~2 weeks
+                // Exponential boost for very short maturities
+                double shortMaturityFactor = 2.0 + 5.0 * System.Math.Exp(-T / 0.01);
+                basePoints = (int)(basePoints * shortMaturityFactor);
+            } else {
+                double shortMaturityFactor = 1.0 + 3.0 / System.Math.Max(0.02, System.Math.Sqrt(T));
+                basePoints = (int)(basePoints * shortMaturityFactor);
+            }
         }
-        // Additional adjustment for higher sigma (vol-of-vol)
-        double sigmaFactor = 1.0 + sigma * 10.0;
+        
+        // Improved vol-of-vol scaling (quadratic for high sigma)
+        double sigmaFactor = sigma > 1.0 
+            ? 1.0 + sigma * 15.0 + sigma * sigma * 5.0  // quadratic for extreme vol-of-vol
+            : 1.0 + sigma * 10.0;
         basePoints = (int)(basePoints * sigmaFactor);
-        return (int)System.Math.Max(400, System.Math.Min(3000, basePoints));
+        
+        // Additional boost for short-maturity + high vol-of-vol combination
+        if (T < 0.1 && sigma > 0.8) {
+            basePoints = (int)(basePoints * 1.5);
+        }
+        
+        return (int)System.Math.Max(400, System.Math.Min(5000, basePoints)); // increased max to 5000
     }
 
     private void EnforcePutCallParity() {
@@ -1249,5 +1315,61 @@ public class HestonCalculator
             PutValue = CallValue - feasibleDiff;
         }
         PutValue = MathF.Min(putUpper, MathF.Max(putLower, PutValue));
+    }
+
+    /// <summary>
+    /// Gauss-Legendre 16-point quadrature nodes and weights
+    /// </summary>
+    private static readonly (double x, double w)[] GaussLegendre16 = new[] {
+        (-0.9894009349916499, 0.027152459411754095),
+        (-0.9445750230732326, 0.062253523938647894),
+        (-0.8656312023878318, 0.09515851168249279),
+        (-0.7554044083550030, 0.12462897125553388),
+        (-0.6178762444026438, 0.14959598881657674),
+        (-0.4580167776572274, 0.16915651939500254),
+        (-0.2816035507792589, 0.18260341504492358),
+        (-0.0950125098376374, 0.18945061045506850),
+        (0.0950125098376374, 0.18945061045506850),
+        (0.2816035507792589, 0.18260341504492358),
+        (0.4580167776572274, 0.16915651939500254),
+        (0.6178762444026438, 0.14959598881657674),
+        (0.7554044083550030, 0.12462897125553388),
+        (0.8656312023878318, 0.09515851168249279),
+        (0.9445750230732326, 0.062253523938647894),
+        (0.9894009349916499, 0.027152459411754095)
+    };
+
+    /// <summary>
+    /// Integrate using Gaussian-Legendre quadrature with panel subdivision
+    /// </summary>
+    private double IntegrateGaussLegendre(double lnS, double lnK, double r, double T,
+        double v0, double theta, double kappa, double sigma, double rho, Complex phiMinusI,
+        double upperBound, bool isP1) {
+        
+        double integral = 0.0;
+        int nPanels = GaussianQuadraturePanels;
+        
+        // Increase panels for short maturity
+        if (T < 0.1) {
+            nPanels = (int)(nPanels * (1.0 + 2.0 / System.Math.Max(0.02, System.Math.Sqrt(T))));
+            nPanels = System.Math.Min(nPanels, 200); // cap at 200 panels
+        }
+        
+        double panelWidth = upperBound / nPanels;
+        
+        for (int panel = 0; panel < nPanels; panel++) {
+            double a = panel * panelWidth;
+            double b = (panel + 1) * panelWidth;
+            double mid = (a + b) / 2.0;
+            double halfWidth = (b - a) / 2.0;
+            
+            foreach (var (x, w) in GaussLegendre16) {
+                double u = mid + halfWidth * x; // map [-1,1] to [a,b]
+                var integrandVal = ProbabilityIntegrand(u, lnS, lnK, r, T, v0, theta, kappa, sigma, rho, phiMinusI, isP1);
+                if (!double.IsNaN(integrandVal) && !double.IsInfinity(integrandVal))
+                    integral += w * integrandVal * halfWidth;
+            }
+        }
+        return integral;
     }
 }

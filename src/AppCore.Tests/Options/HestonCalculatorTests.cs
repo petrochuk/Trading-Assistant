@@ -420,6 +420,27 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
+    public void TestHeston_ShortTermZeroSigmaMatchesBlackScholesWithoutFallback() {
+        var heston = CreateStandardHeston(daysLeft: 3f);
+        heston.VolatilityOfVolatility = 0f;
+        heston.DisablePricingFallback = true;
+
+        heston.CalculateCallPut();
+
+        var blackScholes = new BlackNScholesCalculator {
+            StockPrice = heston.StockPrice,
+            Strike = heston.Strike,
+            RiskFreeInterestRate = heston.RiskFreeInterestRate,
+            ExpiryTime = heston.ExpiryTime,
+            ImpliedVolatility = heston.CurrentVolatility
+        };
+        blackScholes.CalculateAll();
+
+        Assert.AreEqual(blackScholes.CallValue, heston.CallValue, 1e-3f, "Call price should align with Black-Scholes for short-term deterministic variance.");
+        Assert.AreEqual(blackScholes.PutValue, heston.PutValue, 1e-3f, "Put price should align with Black-Scholes for short-term deterministic variance.");
+    }
+
+    [TestMethod]
     public void TestHeston_AnalyticalDelta_DeltaParityAlwaysHolds() {
         var strikes = new float[] { 80f, 90f, 95f, 100f, 105f, 110f, 120f };
 
@@ -614,14 +635,23 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
-    [DataRow(6770f, true, 0.6f, 5f)]
-    [DataRow(6770f, true, 0.5f, 5f)]
-    [DataRow(6770f, true, 0.4f, 5f)]
-    [DataRow(6770f, true, 0.3f, 7f)]
-    [DataRow(6770f, true, 0.2f, 5f)]
-    [DataRow(6770f, true, 0.1f, 5f)]
-    [DataRow(6770f, true, 0.0f, 5f)]
-    public void TestHeston_DeltaHedgeEffectiveness(float strike, bool isCall, float volOfVol, float volMeanRev) {
+    [DataRow(0, 6760f, true, 0.7f, 5f)]
+    [DataRow(0, 6760f, true, 0.6f, 5f)]
+    [DataRow(1, 6760f, true, 0.6f, 5f)]
+    [DataRow(2, 6760f, true, 0.6f, 5f)]
+    [DataRow(5, 6760f, true, 0.6f, 5f)]
+    [DataRow(0, 6760f, true, 0.5f, 5f)]
+    [DataRow(0, 6760f, true, 0.4f, 5f)]
+    [DataRow(0, 6760f, true, 0.3f, 7f)]
+    [DataRow(0, 6760f, true, 0.2f, 5f)]
+    [DataRow(0, 6760f, true, 0.1f, 5f)]
+    [DataRow(0, 6760f, true, 0.0f, 5f)]
+    [DataRow(0, 6760f, true, 1.0f, 0.5f)]
+    [DataRow(0, 6760f, true, 1.2f, 2f)]
+    [DataRow(0, 6760f, true, 1.2f, 0.5f)]
+    [DataRow(0, 6760f, true, 1.2f, 1f)]
+    [DataRow(0, 6760f, true, 1.2f, 1.5f)]
+    public void TestHeston_DeltaHedgeEffectiveness(float dte, float strike, bool isCall, float volOfVol, float volMeanRev) {
         // One day of price movements every 15 minutes
         var pricePath = new float[] {6672.14f, 6684.25f, 6704.34f, 6692.12f, 6715.72f, 6729.24f, 6739.54f, 6738.95f, 6761.74f, 6757.02f,
             6764.81f, 6770.82f, 6768.05f, 6765.44f, 6758.25f, 6758.17f, 6760.29f, 6748.79f, 6734.33f, 6750.10f, 6747.89f, 6757.31f,
@@ -635,11 +665,15 @@ public class HestonCalculatorTests
             VolatilityMeanReversion = volMeanRev,
             VolatilityOfVolatility = volOfVol,
             Correlation = -0.7f,
-            EnforceFellerByCappingSigma = true,
-            AdaptiveUpperBoundMultiplier = 10.0f,
+            UseGaussianQuadrature = true,
+            GaussianQuadraturePanels = 100,
+            UseNonUniformGrid = true,
+            GridClusteringParameter = 0.05,
+            AdaptiveUpperBoundMultiplier = 2.5f,
         };
+
         // Trading day with 6.5 hours
-        heston.DaysLeft = 6.5f / 24f + 1f / 96f;
+        heston.DaysLeft = dte + 6.5f / 24f + 1f / 96f;
         var blackScholes = new BlackNScholesCalculator {
             Strike = heston.Strike,
             StockPrice = heston.StockPrice,
@@ -659,7 +693,7 @@ public class HestonCalculatorTests
         cashBLS += -positionInStockBLS * blackScholes.StockPrice;
 
         heston.VolatilityOfVolatility = volOfVol;
-        //heston.CurrentVolatility = 0.3f; // Increase vol to simulate market changes
+        // heston.CurrentVolatility = 0.3f; // Increase vol to simulate market changes
         for (int i = 1; i < pricePath.Length - 1; i++) {
             heston.StockPrice = blackScholes.StockPrice = pricePath[i];
             heston.DaysLeft -= 1f / 96f; // 15 minutes
@@ -683,8 +717,12 @@ public class HestonCalculatorTests
         // Final settlement
         cash += positionInStock * pricePath[^1];
         cashBLS += positionInStockBLS * pricePath[^1];
+        if (0 < dte) {
+            cash += isCall ? heston.CallValue : heston.PutValue;
+            cashBLS += isCall ? blackScholes.CallValue : blackScholes.PutValue;
+        }
 
-        Debug.WriteLine($"Final P/L={cash:f4} BSM={cashBLS:f4} VolOfVol:{volOfVol:f2}");
+        Debug.WriteLine($"P/L,{cash:f3},dte,{dte},BSM,{cashBLS:f4},VolOfVol,{volOfVol:f2},MeanRev,{volMeanRev}");
     }
 
     [TestMethod]
