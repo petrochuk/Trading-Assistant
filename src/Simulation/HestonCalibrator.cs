@@ -1,5 +1,7 @@
 ﻿using AppCore.Options;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace Simulation;
 
@@ -56,7 +58,109 @@ public class HestonCalibrator
 
     private CalibrationResult CalibrateHestonModel(Stopwatch sw)
     {
-        var heston = new HestonCalculator 
+        float CalculateError(HestonCalculator calculator)
+        {
+            float pctTotalError = 0f;
+            foreach (var ob in _observations)
+            {
+                calculator.Strike = ob.Strike;
+                calculator.DaysLeft = ob.Days;
+                SetVolatilityForShortDTE(calculator);
+                calculator.CalculateCallPut();
+
+                var modelPrice = ob.isCall ? calculator.CallValue : calculator.PutValue;
+                var percentageError = ob.marketPrice == 0
+                    ? 0f
+                    : (modelPrice - ob.marketPrice) / ob.marketPrice * 100f;
+                pctTotalError += percentageError * percentageError;
+            }
+
+            return System.MathF.Sqrt(pctTotalError / _observations.Count); // Return RMSE
+        }
+
+        void PrintBestPutPrices(HestonCalculator calculator)
+        {
+            Console.WriteLine("Strike\tDays\tMarketPut\tModelPut");
+            foreach (var ob in _observations)
+            {
+                calculator.Strike = ob.Strike;
+                calculator.DaysLeft = ob.Days;
+                SetVolatilityForShortDTE(calculator);
+                calculator.CalculateCallPut();
+                Console.WriteLine($"{ob.Strike}\t{ob.Days}\t{ob.marketPrice:F2}\t{(ob.isCall ? calculator.CallValue : calculator.PutValue):F2}");
+            }
+        }
+
+        void SetVolatilityForShortDTE(HestonCalculator calculator)
+        {
+            if (calculator.DaysLeft <= 1)
+                calculator.CurrentVolatility = 0.1581f;
+            else
+                calculator.CurrentVolatility = 0.1385f;
+        }
+
+        var baselineCalculator = CreateBaseCalculator();
+        var baselineError = CalculateError(baselineCalculator);
+        float bestError = float.MaxValue;
+        string bestDescription = string.Empty;
+        object bestResultLock = new();
+
+        void EvaluateCurrent(HestonCalculator calculator, string desc)
+        {
+            try
+            {
+                float total = CalculateError(calculator);
+                bool isNewLocalBest = false;
+                lock (bestResultLock)
+                {
+                    if (total < bestError)
+                    {
+                        bestError = total;
+                        bestDescription = desc;
+                        isNewLocalBest = true;
+                    }
+                }
+
+                if (isNewLocalBest)
+                {
+                    PrintBestPutPrices(calculator);
+                    UpdateGlobalBest(new CalibrationResult
+                    {
+                        BaselineError = baselineError,
+                        BestError = bestError,
+                        BestDescription = bestDescription,
+                        ElapsedTime = sw.Elapsed
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error with {desc}: {ex.Message}");
+            }
+        }
+
+        CalibrateStandardHeston(parameterSet =>
+        {
+            var calculator = CreateBaseCalculator();
+            parameterSet.ApplyTo(calculator);
+            EvaluateCurrent(calculator, parameterSet.Describe());
+        });
+
+        sw.Stop();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Completed in {sw.Elapsed.TotalSeconds:F1}s - Final best error: {bestError:F2} {bestDescription}");
+
+        return new CalibrationResult
+        {
+            BaselineError = baselineError,
+            BestError = bestError,
+            BestDescription = bestDescription,
+            ElapsedTime = sw.Elapsed
+        };
+    }
+
+    private HestonCalculator CreateBaseCalculator()
+    {
+        return new HestonCalculator
         {
             IntegrationMethod = HestonIntegrationMethod.Adaptive,
             StockPrice = _stockPrice,
@@ -69,95 +173,8 @@ public class HestonCalibrator
             UseGaussianQuadrature = true,
             GaussianQuadraturePanels = 100,
             UseNonUniformGrid = true,
-            GridClusteringParameter = 0.05,
+            GridClusteringParameter = 0.05f,
             AdaptiveUpperBoundMultiplier = 2.5f,
-        };
-
-        float CalculateError()
-        {
-            float pctTotalError = 0f;
-            float priceTotalError = 0f;
-            foreach (var ob in _observations)
-            {
-                heston.Strike = ob.Strike;
-                heston.DaysLeft = ob.Days;
-                heston.CalculateCallPut();
-
-                float percentageError =
-                    ob.isCall ? 
-                    heston.CallValue - ob.marketPrice / ob.marketPrice * 100f :
-                    heston.PutValue - ob.marketPrice / ob.marketPrice * 100f;
-                float priceError =
-                    ob.isCall ?
-                    heston.CallValue - ob.marketPrice :
-                    heston.PutValue - ob.marketPrice;
-                pctTotalError += percentageError * percentageError;
-                priceTotalError += priceError * priceError;
-            }
-
-            return System.MathF.Sqrt(pctTotalError / _observations.Count); // Return RMSE
-        }
-
-        void PrintBestPutPrices()
-        {
-            Console.WriteLine("Strike\tDays\tMarketPut\tModelPut");
-            foreach (var ob in _observations)
-            {
-                heston.Strike = ob.Strike;
-                heston.DaysLeft = ob.Days;
-                if (heston.DaysLeft <= 1)
-                    heston.CurrentVolatility = 0.1581f;
-                else
-                    heston.CurrentVolatility = 0.1385f;
-                heston.CalculateCallPut();
-                Console.WriteLine($"{ob.Strike}\t{ob.Days}\t{ob.marketPrice:F2}\t{(ob.isCall ? heston.CallValue : heston.PutValue):F2}");
-            }
-        }
-
-        var baselineError = CalculateError();
-        float bestError = float.MaxValue;
-        string bestDescription = string.Empty;
-
-        void EvaluateCurrent(string desc)
-        {
-            try
-            {
-                float total = CalculateError();
-                if (total < bestError)
-                {
-                    PrintBestPutPrices();
-                    bestError = total;
-                    bestDescription = desc;
-                    
-                    // Update global best and display in real-time with thread safety
-                    UpdateGlobalBest(new CalibrationResult
-                    {
-                        BaselineError = baselineError,
-                        BestError = bestError,
-                        BestDescription = bestDescription,
-                        ElapsedTime = sw.Elapsed
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                // Skip invalid parameter combinations
-                Debug.WriteLine($"Error with {desc}: {ex.Message}");
-            }
-        }
-
-        // Define parameter grids based on model type - using smaller grids for faster testing
-        CalibrateStandardHeston(heston, EvaluateCurrent);
-
-        sw.Stop();
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Completed in {sw.Elapsed.TotalSeconds:F1}s - Final best error: {bestError:F2} {bestDescription}");
-
-        return new CalibrationResult
-        {
-            BaselineError = baselineError,
-            BestError = bestError,
-            BestDescription = bestDescription,
-            ElapsedTime = sw.Elapsed
         };
     }
 
@@ -179,7 +196,17 @@ public class HestonCalibrator
         }
     }
 
-    private void CalibrateStandardHeston(HestonCalculator heston, Action<string> evaluate)
+    private void CalibrateStandardHeston(Action<HestonParameterSet> evaluate)
+    {
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Environment.ProcessorCount
+        };
+
+        Parallel.ForEach(EnumerateStandardHestonParameterSets(), parallelOptions, evaluate);
+    }
+
+    private IEnumerable<HestonParameterSet> EnumerateStandardHestonParameterSets()
     {
         // var currentVolatilities = new float[] { 0.11f, 0.12f, 0.13f, 0.14f, 0.15f, 0.16f, 0.17f, 0.18f };
         var currentVolatilities = new float[] { 0.1665f };
@@ -202,18 +229,51 @@ public class HestonCalibrator
         foreach (var nUG in useNonUniformGrid)
         foreach (var aUBM in adaptiveUpperBoundMultiplier)
         foreach (var gcp in gridClusteringParameter)
-        foreach (var gqp in gaussianQuadraturePanels) {
-            heston.CurrentVolatility = cv;
-            heston.VolatilityOfVolatility = vofvol;
-            heston.LongTermVolatility = lt;
-            heston.VolatilityMeanReversion = kappa;
-            heston.Correlation = rho;
-            heston.UseGaussianQuadrature = gq;
-            heston.UseNonUniformGrid = nUG;
-            heston.GridClusteringParameter = gqp;
-            heston.AdaptiveUpperBoundMultiplier = aUBM;
-            heston.GaussianQuadraturePanels = gqp;
-            evaluate($"cv={cv:F3} vofv={vofvol:F1} lt={lt:F2} k={kappa:F1} rho={rho:F1} gq={gq} nUG={nUG} aUBM={aUBM:F2} gqp={gqp} gcp={gcp}");
+        foreach (var gqp in gaussianQuadraturePanels)
+        {
+            yield return new HestonParameterSet(
+                cv,
+                vofvol,
+                lt,
+                kappa,
+                rho,
+                gq,
+                nUG,
+                aUBM,
+                gqp,
+                gcp);
+        }
+    }
+
+    private readonly record struct HestonParameterSet(
+        float CurrentVolatility,
+        float VolatilityOfVolatility,
+        float LongTermVolatility,
+        float VolatilityMeanReversion,
+        float Correlation,
+        bool UseGaussianQuadrature,
+        bool UseNonUniformGrid,
+        float AdaptiveUpperBoundMultiplier,
+        int GaussianQuadraturePanels,
+        float GridClusteringParameter)
+    {
+        public void ApplyTo(HestonCalculator calculator)
+        {
+            calculator.CurrentVolatility = CurrentVolatility;
+            calculator.VolatilityOfVolatility = VolatilityOfVolatility;
+            calculator.LongTermVolatility = LongTermVolatility;
+            calculator.VolatilityMeanReversion = VolatilityMeanReversion;
+            calculator.Correlation = Correlation;
+            calculator.UseGaussianQuadrature = UseGaussianQuadrature;
+            calculator.UseNonUniformGrid = UseNonUniformGrid;
+            calculator.AdaptiveUpperBoundMultiplier = AdaptiveUpperBoundMultiplier;
+            calculator.GaussianQuadraturePanels = GaussianQuadraturePanels;
+            calculator.GridClusteringParameter = GridClusteringParameter;
+        }
+
+        public string Describe()
+        {
+            return $"cv={CurrentVolatility:F3} vofv={VolatilityOfVolatility:F1} lt={LongTermVolatility:F2} k={VolatilityMeanReversion:F1} rho={Correlation:F1} gq={UseGaussianQuadrature} nUG={UseNonUniformGrid} aUBM={AdaptiveUpperBoundMultiplier:F2} gqp={GaussianQuadraturePanels} gcp={GridClusteringParameter:F2}";
         }
     }
 
