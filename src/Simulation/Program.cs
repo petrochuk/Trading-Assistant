@@ -2,6 +2,7 @@
 using AppCore.Options;
 using AppCore.Statistics;
 using System.Text;
+using System.Diagnostics;
 
 namespace Simulation;
 
@@ -66,6 +67,10 @@ internal class Program
         Console.WriteLine("Starting Heston Model Calibration...");
         Console.WriteLine("This will calibrate multiple model types in parallel using real market data.");
         Console.WriteLine();
+
+        // Set process priority to below normal to avoid monopolizing system resources
+        using var currentProcess = Process.GetCurrentProcess();
+        currentProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
 
         try
         {
