@@ -60,7 +60,7 @@ public class HestonCalibrator
     {
         float CalculateError(HestonCalculator calculator)
         {
-            float pctTotalError = 0f;
+            var pctTotalError = 0.0;
             foreach (var ob in _observations)
             {
                 calculator.Strike = ob.Strike;
@@ -70,12 +70,12 @@ public class HestonCalibrator
 
                 var modelPrice = ob.isCall ? calculator.CallValue : calculator.PutValue;
                 var percentageError = ob.marketPrice == 0
-                    ? 0f
-                    : (modelPrice - ob.marketPrice) / ob.marketPrice * 100f;
+                    ? 0.0
+                    : Math.Log(modelPrice / ob.marketPrice);
                 pctTotalError += percentageError * percentageError;
             }
 
-            return System.MathF.Sqrt(pctTotalError / _observations.Count); // Return RMSE
+            return (float)System.Math.Sqrt(pctTotalError / _observations.Count); // Return RMSE
         }
 
         void PrintBestPutPrices(HestonCalculator calculator)
