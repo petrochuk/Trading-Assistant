@@ -614,14 +614,13 @@ public class HestonCalculatorTests
     }
 
     [TestMethod]
-    [DataRow(6770f, true, 30.0f, 20f)]
-    [DataRow(6770f, true, 20.0f, 20f)]
-    [DataRow(6770f, true, 15.0f, 20f)]
-    [DataRow(6770f, true, 5.0f, 20f)]
-    [DataRow(6770f, true, 3.0f, 20f)]
-    [DataRow(6770f, true, 2.0f, 20f)]
-    [DataRow(6770f, true, 1.0f, 20f)]
-    [DataRow(6770f, true, 0.0f, 20f)]
+    [DataRow(6770f, true, 0.6f, 5f)]
+    [DataRow(6770f, true, 0.5f, 5f)]
+    [DataRow(6770f, true, 0.4f, 5f)]
+    [DataRow(6770f, true, 0.3f, 7f)]
+    [DataRow(6770f, true, 0.2f, 5f)]
+    [DataRow(6770f, true, 0.1f, 5f)]
+    [DataRow(6770f, true, 0.0f, 5f)]
     public void TestHeston_DeltaHedgeEffectiveness(float strike, bool isCall, float volOfVol, float volMeanRev) {
         // One day of price movements every 15 minutes
         var pricePath = new float[] {6672.14f, 6684.25f, 6704.34f, 6692.12f, 6715.72f, 6729.24f, 6739.54f, 6738.95f, 6761.74f, 6757.02f,
@@ -634,8 +633,10 @@ public class HestonCalculatorTests
             CurrentVolatility = 0.15f,
             LongTermVolatility = 0.20f,
             VolatilityMeanReversion = volMeanRev,
-            VolatilityOfVolatility = 2.0f,
-            Correlation = -0.6f,
+            VolatilityOfVolatility = volOfVol,
+            Correlation = -0.7f,
+            EnforceFellerByCappingSigma = true,
+            AdaptiveUpperBoundMultiplier = 10.0f,
         };
         // Trading day with 6.5 hours
         heston.DaysLeft = 6.5f / 24f + 1f / 96f;
@@ -683,7 +684,7 @@ public class HestonCalculatorTests
         cash += positionInStock * pricePath[^1];
         cashBLS += positionInStockBLS * pricePath[^1];
 
-        Debug.WriteLine($"Final P/L={cash:f4} BLS={cashBLS:f4} VolOfVol:{volOfVol:f2}");
+        Debug.WriteLine($"Final P/L={cash:f4} BSM={cashBLS:f4} VolOfVol:{volOfVol:f2}");
     }
 
     [TestMethod]

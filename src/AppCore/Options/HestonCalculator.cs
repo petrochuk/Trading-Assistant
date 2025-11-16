@@ -92,7 +92,7 @@ public class HestonCalculator
     /// <summary>
     /// Integration method to use for characteristic function evaluation
     /// </summary>
-    public HestonIntegrationMethod IntegrationMethod { get; set; } = HestonIntegrationMethod.Approximation;
+    public HestonIntegrationMethod IntegrationMethod { get; set; } = HestonIntegrationMethod.Adaptive;
 
     // Tail-risk / numerical control toggles (new)
     /// <summary>
@@ -1196,7 +1196,7 @@ public class HestonCalculator
         var volAdjustment = System.Math.Max(1.0, sigma * System.Math.Sqrt(System.Math.Max(0.0001, T)) * 5.0);
         var baseBound = 50.0;
         var raw = baseBound * volAdjustment * shortTimeBoost * AdaptiveUpperBoundMultiplier;
-        return System.Math.Min(raw, 2000.0); // allow larger cap for better near-term capture
+        return System.Math.Min(raw, 10000.0); // allow larger cap for better near-term capture
     }
 
     private int DetermineOptimalQuadraturePoints(double T, double sigma) {
