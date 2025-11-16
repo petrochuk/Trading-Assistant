@@ -280,6 +280,12 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         VolatilityMeanReversion = underlyingContract.VolatilityMeanReversion,
                         VolatilityOfVolatility = underlyingContract.VolatilityOfVolatility,
                         Correlation = underlyingContract.Correlation,
+                        UseRoughHeston = false,
+                        UseGaussianQuadrature = true,
+                        GaussianQuadraturePanels = 100,
+                        UseNonUniformGrid = true,
+                        GridClusteringParameter = 0.05,
+                        AdaptiveUpperBoundMultiplier = 2.5f,
                     };
                     heston.CalculateAll();
 
