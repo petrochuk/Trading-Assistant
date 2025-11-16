@@ -59,13 +59,6 @@ public class BlackNScholesCalculator
     /// </summary>
     public float ExpiryTime;
 
-    /// <summary>
-    /// Get the number of working days until expired
-    /// </summary>
-    public float ExpiryTimeWorking {
-        get; set;
-    }
-
     public float DeltaCall {
         get; set;
     }
@@ -165,9 +158,7 @@ public class BlackNScholesCalculator
         }
         set {
             _dayLeft = value;
-            var dayLeft1 = _dayLeft - ((_dayLeft / 7.0f) * 2.0f);
-            ExpiryTimeWorking = (dayLeft1 / 252.0f);
-            ExpiryTime = _dayLeft / 365.0f;
+            ExpiryTime = _dayLeft / TimeExtensions.BusinessDaysPerYear;
         }
     }
     private float _dayLeft;
