@@ -8,9 +8,12 @@ public class ContractFactory : IContractFactory
 {
     private readonly Dictionary<string, ContractConfiguration> _contractConfigurations = new();
 
-    public ContractFactory(IOptions<List<ContractConfiguration>> contractConfiguration)
+    private readonly TimeProvider _timeProvider;
+
+    public ContractFactory(IOptions<List<ContractConfiguration>> contractConfiguration, TimeProvider timeProvider)
     {
         _ = contractConfiguration ?? throw new ArgumentNullException(nameof(contractConfiguration));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
 
         foreach (var config in contractConfiguration.Value)
         {

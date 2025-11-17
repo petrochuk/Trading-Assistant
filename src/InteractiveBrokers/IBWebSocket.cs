@@ -275,7 +275,7 @@ public class IBWebSocket : IDisposable
         else if (contract.AssetClass == AssetClass.Stock || contract.AssetClass == AssetClass.Future) {
             // Request market data for stocks and futures
             var request = $@"smd+{contract.Id}+{{""fields"":[""{_stockFieldsString}""]}}";
-            _logger.LogTrace($"Requesting market data for stock {contract}");
+            _logger.LogTrace($"Requesting market data for stock/future {contract}");
             _clientWebSocket?.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(request)), WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(true).GetAwaiter().GetResult();
         }
     }

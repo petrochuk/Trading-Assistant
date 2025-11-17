@@ -86,7 +86,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
-            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.DeltaTotal:f3}, Delta: {LastGreeks.DeltaHestonTotal:f3}, Theta: {LastGreeks.Theta:f3}");
+            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.DeltaTotal:f3}, Heston Delta: {LastGreeks.DeltaHestonTotal:f3}, Theta: {LastGreeks.Theta:f3}");
 
             var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Round(LastGreeks.DeltaOTM) : -MathF.Round(LastGreeks.DeltaOTM);
             var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Round(LastGreeks.DeltaITM) : -MathF.Round(LastGreeks.DeltaITM);

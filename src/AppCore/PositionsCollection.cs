@@ -49,6 +49,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
     public event EventHandler<Position>? OnPositionAdded;
     public event EventHandler<Position>? OnPositionRemoved;
+
+    public event EventHandler<UnderlyingPosition>? OnUnderlyingPositionAdded;
+    public event EventHandler<UnderlyingPosition>? OnUnderlyingPositionRemoved;
+
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -149,20 +153,31 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
             var existingUnderlying = Underlyings.FirstOrDefault(u => u.Symbol == position.Contract.Symbol);
             newUnderlyings.TryAdd(position.Contract.Symbol, position.Contract.Symbol);
 
-            switch (position.Contract.AssetClass) {
-                case AssetClass.Stock:
-                case AssetClass.Future:
-                    if (existingUnderlying == null)
-                        Underlyings.Add(new UnderlyingPosition(position.Contract.Symbol, position.Contract.AssetClass, position));
-                    break;
-                case AssetClass.Option:
-                    if (existingUnderlying == null)
-                        Underlyings.Add(new UnderlyingPosition(position.Contract.Symbol, AssetClass.Stock));
-                    break;
-                case AssetClass.FutureOption:
-                    if (existingUnderlying == null)
-                        Underlyings.Add(new UnderlyingPosition(position.Contract.Symbol, AssetClass.Future));
-                    break;
+            if (existingUnderlying == null) {
+                _rwLock.EnterWriteLock();
+                try {
+                    _logger.LogInformation($"Adding underlying {position.Contract.Symbol} for asset class {position.Contract.AssetClass}");
+                    switch (position.Contract.AssetClass) {
+                        case AssetClass.Stock:
+                        case AssetClass.Future:
+                            existingUnderlying = new UnderlyingPosition(position.Contract.Symbol, position.Contract.AssetClass, position);
+                            break;
+                        case AssetClass.Option:
+                            existingUnderlying = new UnderlyingPosition(position.Contract.Symbol, AssetClass.Stock);
+                            break;
+                        case AssetClass.FutureOption:
+                            existingUnderlying = new UnderlyingPosition(position.Contract.Symbol, AssetClass.Future);
+                            break;
+                        default:
+                            _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for underlying {position.Contract.Symbol}");
+                            throw new InvalidOperationException($"Unsupported asset class {position.Contract.AssetClass} for underlying {position.Contract.Symbol}");
+                    }
+                    Underlyings.Add(existingUnderlying);
+                }
+                finally {
+                    _rwLock.ExitWriteLock();
+                }
+                OnUnderlyingPositionAdded?.Invoke(this, existingUnderlying);
             }
         }
 
@@ -357,7 +372,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         totalVegaLong += absVega;
                     }
                     
-                    _logger.LogDebug($"{position} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):c} RV:{realizedVol:f3} mIV:{marketIV:f3} t:{daysLeft:f2} d:{deltaBls:f2} dwh:{deltaBlsHW:f2} dh:{deltaHeston:f2} t:{deltaBls * position.Size:f2}");
+                    _logger.LogTrace($"{position} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):c} RV:{realizedVol:f3} mIV:{marketIV:f3} t:{daysLeft:f2} d:{deltaBls:f2} dwh:{deltaBlsHW:f2} dh:{deltaHeston:f2} t:{deltaBls * position.Size:f2}");
                 }
                 else {
                     _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");

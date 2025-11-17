@@ -137,18 +137,18 @@ public class Account : IDisposable, INotifyPropertyChanged
                 if (item is UnderlyingPosition underlying) {
 
                     if (_deltaHedgers.ContainsKey(underlying.Symbol)) {
-                        _logger.LogInformation($"Delta hedger for {underlying.Symbol} already exists");
+                        _logger.LogInformation($"Delta hedger for {underlying.Symbol} already exists on account: {Name}");
                         continue;
                     }
 
                     if (!_deltaHedgerConfiguration.Configs.ContainsKey(underlying.Symbol)) {
-                        _logger.LogInformation($"Delta hedger configuration not found for {underlying.Symbol}. Skipping.");
+                        _logger.LogInformation($"Delta hedger configuration not found for {underlying.Symbol} on account: {Name}. Skipping.");
                         continue;
                     }
 
                     var deltaHedger = _deltaHedgerFactory.Create(_broker, Id, underlying, Positions, _deltaHedgerConfiguration);
                     if (_deltaHedgers.TryAdd(underlying.Symbol, deltaHedger)) {
-                        _logger.LogInformation($"Delta hedger added for {underlying.Symbol}");
+                        _logger.LogInformation($"Delta hedger added for {underlying.Symbol} on account: {Name}");
                     }
                 }
             }

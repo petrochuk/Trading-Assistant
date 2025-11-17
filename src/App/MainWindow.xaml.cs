@@ -151,6 +151,19 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
         App.Instance.IBWebSocket.RequestContractMarketData(position.Contract);
     }
 
+    private void OnUnderlyingPositionAdded(object? sender, UnderlyingPosition position) {
+        /*
+        if (position.FrontContract != null) {
+            _logger.LogInformation($"Requesting market data for front contract {position.FrontContract.Symbol} ID {position.FrontContract.Id}");
+            App.Instance.IBWebSocket.RequestContractMarketData(position.FrontContract);
+        }
+        else 
+        {
+            _logger.LogWarning($"Skip maket data: No front contract found for underlying {position.Symbol}");
+        }
+        */
+    }
+
     private void OnPositionRemoved(object? sender, Position position) {
         App.Instance.IBWebSocket.RequestContractMarketData(position.Contract);
     }
@@ -227,6 +240,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
                 var accountFactory = AppCore.ServiceProvider.Instance.GetRequiredService<IAccountFactory>();
                 var account = accountFactory.CreateAccount(brokerAccount.Id, brokerAccount.Name);
                 account.Positions.OnPositionAdded += OnPositionAdded;
+                account.Positions.OnUnderlyingPositionAdded += OnUnderlyingPositionAdded;
                 account.Positions.OnPositionRemoved += OnPositionRemoved;
                 account.Positions.PropertyChanged += Positions_PropertyChanged;
                 _accounts.Add(brokerAccount.Id, account);
@@ -318,6 +332,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
             foreach (var underlying in account.Positions.Underlyings) {
                 foreach (var contract in e.Contracts) {
+                    _logger.LogInformation($"Requesting market data for underlying contract {contract.Symbol} ID {contract.Id}");
                     App.Instance.IBWebSocket.RequestContractMarketData(contract);
                 }
             }
@@ -382,6 +397,7 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
             // Dispose all accounts 
             foreach (var account in _accounts.Values) {
                 account.Positions.OnPositionAdded -= OnPositionAdded;
+                account.Positions.OnUnderlyingPositionAdded -= OnUnderlyingPositionAdded;
                 account.Positions.OnPositionRemoved -= OnPositionRemoved;
                 account.Positions.PropertyChanged -= Positions_PropertyChanged;
                 account.Positions.Clear();
