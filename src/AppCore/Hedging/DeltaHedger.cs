@@ -90,7 +90,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
 
             var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Round(LastGreeks.DeltaOTM) : -MathF.Round(LastGreeks.DeltaOTM);
             var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Round(LastGreeks.DeltaITM) : -MathF.Round(LastGreeks.DeltaITM);
-            var deltaBuffer = 0.15f;
+            var deltaBuffer = 0.20f;
             var deltaHedgeSize = 0 < LastGreeks.DeltaHestonTotal ? -MathF.Round(LastGreeks.DeltaHestonTotal - deltaBuffer) : -MathF.Round(LastGreeks.DeltaHestonTotal + deltaBuffer);
             //var deltaHedgeSize = deltaOTMHedgeSize + deltaITMHedgeSize;
             if (MathF.Abs(deltaHedgeSize) < _configuration.Delta) {
