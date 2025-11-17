@@ -276,6 +276,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         _logger.LogWarning($"Position {position.Contract} has no underlying contract market price, unable to calculate Greeks.");
                         return null;
                     }
+                    if (underlyingContract.IsMarketPriceStale()) {
+                        _logger.LogWarning($"Position {position.Contract} has stale underlying contract market price, unable to calculate Greeks. Last update {underlyingContract.MarketPriceTimestamp}");
+                        return null;
+                    }
 
                     var daysLeft = _timeProvider.EstNow().BusinessDaysTo(position.Contract.Expiration.Value);
                     if (volForecaster != null) {

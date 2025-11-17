@@ -26,7 +26,7 @@ public class ContractFactory : IContractFactory
     }
 
     public Contract Create(string symbol) {
-        var contract = new Contract() { Symbol = symbol };
+        var contract = new Contract(_timeProvider) { Symbol = symbol };
 
         ApplyConfiguration(contract);
 
@@ -34,7 +34,7 @@ public class ContractFactory : IContractFactory
     }
 
     public Contract Create(IPosition position) {
-        var contract = new Contract {
+        var contract = new Contract (_timeProvider) {
             Id = position.ContractId,
             Symbol = position.Symbol,
             AssetClass = position.AssetClass,
@@ -52,7 +52,7 @@ public class ContractFactory : IContractFactory
 
     public Contract Create(string symbol, AssetClass assetClass, int contractId, int? underlyingContractId = null, 
         DateTimeOffset? expiration = null, float? strike = null, bool? isCall = null) {
-        var contract = new Contract {
+        var contract = new Contract (_timeProvider) {
             Id = contractId,
             Symbol = symbol,
             AssetClass = assetClass,

@@ -2,8 +2,10 @@
 
 public class Contract
 {
-    public Contract() {
+    private readonly TimeProvider _timeProvider;
 
+    public Contract(TimeProvider timeProvider) {
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     public string Symbol { get; set; } = string.Empty;
@@ -30,7 +32,22 @@ public class Contract
                 throw new ArgumentOutOfRangeException(nameof(value), "Market price must be greater than 0 for futures.");
             }
             _marketPrice = value;
+            MarketPriceTimestamp = _timeProvider.GetUtcNow();
         }
+    }
+
+    public DateTimeOffset MarketPriceTimestamp {
+        get => field;
+        private set => field = value;
+    } = DateTimeOffset.MinValue;
+
+    public bool IsMarketPriceStale(TimeSpan? staleThreshold = null) {
+
+        if (!staleThreshold.HasValue || staleThreshold.Value <= TimeSpan.Zero) {
+            staleThreshold = TimeSpan.FromMinutes(5);
+        }
+
+        return (_timeProvider.GetUtcNow() - MarketPriceTimestamp) > staleThreshold;
     }
 
     public bool IsDataStreaming { get; set; } = false;

@@ -28,7 +28,7 @@ internal class RequestContractDetails : Request
 
         var contract = contractsResponse.First().Value.First();
         var contractDetails = new ContractDetailsArgs {
-            Contract = new() {
+            Contract = new(TimeProvider.System) {
                 Symbol = contract.ticker,
                 AssetClass = contract.assetClass switch {
                     "STK" => AssetClass.Stock,
