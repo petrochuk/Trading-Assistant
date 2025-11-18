@@ -206,7 +206,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
     }
 
-    public Greeks? CalculateGreeks(float minIV = 0, UnderlyingPosition? underlyingPosition = null, IVolForecaster? volForecaster = null, bool useRealizedVol = true, bool addOvervaluedOptions = false) {
+    public Greeks? CalculateGreeks(float minIV = 0, UnderlyingPosition? underlyingPosition = null, IVolForecaster? volForecaster = null, 
+        bool useRealizedVol = true, bool addOvervaluedOptions = false, ILogger? logger = null) {
         if (underlyingPosition == null) {
             if (_selectedPosition == null) {
                 return null;
@@ -251,7 +252,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                 }
 
                 if (!position.Contract.MarketPrice.HasValue) {
-                    _logger.LogWarning($"Position {position.Contract} has no market price, unable to calculate Greeks.");
+                    (logger ?? _logger).LogWarning($"Position {position.Contract} has no market price, unable to calculate Greeks.");
                     return null;
                 }
 
@@ -265,19 +266,19 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
 
                     if (position.Underlying == null || position.UnderlyingContractId == null) {
-                        _logger.LogWarning($"Position {position.Contract} has no underlying, unable to calculate Greeks.");
+                        (logger ?? _logger).LogWarning($"Position {position.Contract} has no underlying, unable to calculate Greeks.");
                         return null;
                     }
                     if (!position.Underlying.ContractsById.TryGetValue(position.UnderlyingContractId.Value, out var underlyingContract)) {
-                        _logger.LogWarning($"Position {position.Contract} has no underlying contract with ID {position.UnderlyingContractId}, unable to calculate Greeks.");
+                        (logger ?? _logger).LogWarning($"Position {position.Contract} has no underlying contract with ID {position.UnderlyingContractId}, unable to calculate Greeks.");
                         return null;
                     }
                     if (!underlyingContract.MarketPrice.HasValue) {
-                        _logger.LogWarning($"Position {position.Contract} has no underlying contract market price, unable to calculate Greeks.");
+                        (logger ?? _logger).LogWarning($"Position {position.Contract} has no underlying contract market price, unable to calculate Greeks.");
                         return null;
                     }
                     if (underlyingContract.IsMarketPriceStale()) {
-                        _logger.LogWarning($"Position {position.Contract} has stale underlying contract market price, unable to calculate Greeks. Last update {underlyingContract.MarketPriceTimestamp}");
+                        (logger ?? _logger).LogWarning($"Position {position.Contract} has stale underlying contract market price, unable to calculate Greeks. Last update {underlyingContract.MarketPriceTimestamp}");
                         return null;
                     }
 
@@ -378,11 +379,11 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         totalVegaWeightedVarianceLong += variance * absVega;
                         totalVegaLong += absVega;
                     }
-                    
-                    _logger.LogTrace($"{position} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):c} RV:{realizedVol:f3} mIV:{marketIV:f3} t:{daysLeft:f2} d:{deltaBls:f2} dwh:{deltaBlsHW:f2} dh:{deltaHeston:f2} t:{deltaBls * position.Size:f2}");
+
+                    (logger ?? _logger).LogTrace($"{position} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):c} RV:{realizedVol:f3} mIV:{marketIV:f3} t:{daysLeft:f2} d:{deltaBls:f2} dwh:{deltaBlsHW:f2} dh:{deltaHeston:f2} t:{deltaBls * position.Size:f2}");
                 }
                 else {
-                    _logger.LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
+                    (logger ?? _logger).LogWarning($"Unsupported asset class {position.Contract.AssetClass} for position {position.Contract}");
                     continue;
                 }
             }
@@ -401,7 +402,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         }
 
         stopWatch.Stop();
-        _logger.LogInformation($"Calculated Greeks for {underlyingPosition.Symbol} in {stopWatch.ElapsedMilliseconds} ms");
+        (logger ?? _logger).LogInformation($"Calculated Greeks for {underlyingPosition.Symbol} in {stopWatch.ElapsedMilliseconds} ms");
 
         return greeks;
     }

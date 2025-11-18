@@ -67,11 +67,18 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     #endregion
 
     public void Hedge() {
-        if (!IsHedgeExecutionAllowed()) {
+        // Try to acquire the semaphore without blocking
+        if (!_hedgeSemaphore.Wait(0)) {
+            _logger.LogDebug($"Hedging in progress for {_underlyingPosition.Symbol}. Skipping overlapping execution.");
             return;
         }
 
         try {
+            LastGreeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true, logger: _logger);
+
+            if (!IsHedgeExecutionAllowed()) {
+                return;
+            }
 
             _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
             if (_underlyingPosition.RealizedVol != null) {
@@ -94,7 +101,7 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             var deltaHedgeSize = 0 < LastGreeks.DeltaHestonTotal ? -MathF.Round(LastGreeks.DeltaHestonTotal - deltaBuffer) : -MathF.Round(LastGreeks.DeltaHestonTotal + deltaBuffer);
             //var deltaHedgeSize = deltaOTMHedgeSize + deltaITMHedgeSize;
             if (MathF.Abs(deltaHedgeSize) < _configuration.Delta) {
-                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. Total:{LastGreeks.DeltaTotal:f3} Total Heston:{LastGreeks.DeltaHestonTotal:f3} OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");
+                _logger.LogDebug($"{_underlyingPosition.Symbol} delta is within threshold: Abs({LastGreeks.DeltaHedge - deltaHedgeSize:f3}) < {_configuration.Delta}. Total:{LastGreeks.DeltaTotal:f3} Total Heston:{LastGreeks.DeltaHestonTotal:f3} OTM:{LastGreeks.DeltaOTM:f3} ITM:{LastGreeks.DeltaITM:f3}. No hedging required.");
                 return;
             }
 
@@ -103,13 +110,11 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             // Round delta down to 0 in whole numbers
             var deltaAdjustment = deltaHedgeSize;// - LastGreeks.DeltaHedge;
             if (MathF.Abs(deltaAdjustment) < _configuration.MinDeltaAdjustment) {
-                _logger.LogDebug($"{_accountId.Mask()} {_underlyingPosition.Symbol} delta hedge adjustment {deltaAdjustment:f3} is below minimum adjustment {_configuration.MinDeltaAdjustment}. No hedging required.");
+                _logger.LogDebug($"{_underlyingPosition.Symbol} delta hedge adjustment {deltaAdjustment:f3} is below minimum adjustment {_configuration.MinDeltaAdjustment}. No hedging required.");
                 return;
             }
 
             _logger.LogDebug($"Placing delta hedge size: {deltaAdjustment} for {_underlyingPosition.Symbol}");
-            // Set a delay to prevent immediate re-hedging
-            _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(5);
             _activeOrderId = Guid.NewGuid(); // Generate a new order ID for tracking
             _broker.PlaceOrder(_accountId, _activeOrderId.Value, _underlyingPosition.FrontContract, 0 < deltaAdjustment ? 1 : -1, deltaAdjustment);
         } finally {
@@ -126,15 +131,13 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             return false;
         }
 
-        LastGreeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true);
-
         if (_activeOrderId.HasValue) {
             _logger.LogDebug($"Hedge order already in progress for {_underlyingPosition.Symbol}. Skipping.");
             return false;
         }
 
-        if (_hedgeDelay.HasValue && _timeProvider.GetUtcNow() < _hedgeDelay.Value) {
-            _logger.LogDebug($"Hedge execution delayed for {_underlyingPosition.Symbol}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.GetUtcNow():hh\\:mm\\:ss}.");
+        if (_hedgeDelay.HasValue && _timeProvider.EstNow() < _hedgeDelay.Value) {
+            _logger.LogDebug($"Hedge execution delayed for {_underlyingPosition.Symbol}. Skipping until delay expires in {_hedgeDelay.Value - _timeProvider.EstNow():hh\\:mm\\:ss}.");
             return false;
         }
 
@@ -154,12 +157,6 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             }
         }
 
-        // Try to acquire the semaphore without blocking
-        if (!_hedgeSemaphore.Wait(0)) {
-            _logger.LogDebug($"Hedging in progress for {_underlyingPosition.Symbol}. Skipping overlapping execution.");
-            return false;
-        }
-
         return true;
     }
 
@@ -177,16 +174,18 @@ public class DeltaHedger : IDeltaHedger, IDisposable
             return;
         }
 
+        // Delay next hedge attempt by 5 minutes both on success and failure
+        _hedgeDelay = _timeProvider.EstNow().AddMinutes(5);
+        _activeOrderId = null; // Reset active order ID
+        _logger.LogDebug($"Next hedge attempt delayed until {_hedgeDelay.Value}.");
+
         if (!string.IsNullOrEmpty(e.ErrorMessage)) {
             _logger.LogInformation($"Delta hedge order {_activeOrderId} failed to be placed. Delay hedging");
-            _hedgeDelay = _timeProvider.GetUtcNow().AddMinutes(5);
-            _activeOrderId = null; // Reset active order ID
             _soundPlayer?.PlaySound("CarAlarm");
             return;
         }
 
         _logger.LogInformation($"Delta hedge order {_activeOrderId} placed successfully for {_underlyingPosition.Symbol}.");
-        _activeOrderId = null; // Reset active order ID after successful placement
     }
 
     public void Dispose()

@@ -195,7 +195,7 @@ public class Account : IDisposable, INotifyPropertyChanged
                 }
             }
 
-            _logger.LogDebug("Completed executing all delta hedgers");
+            _logger.LogDebug($"Completed executing delta hedgers on '{Name}'");
         }
         catch (Exception ex)
         {
