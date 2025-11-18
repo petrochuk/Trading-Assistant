@@ -244,27 +244,22 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
         _rwLock.EnterReadLock();
         try {
+            var underlyingPrices = new Dictionary<int, float>();
+
+            // First pass: Pin underlying prices
             foreach (var position in Values) {
-                // Skip any positions that are not in the same underlying, 0 size
+                // Skip any positions that are not in the same underlying
                 if (position.Contract.Symbol != underlyingPosition.Symbol || 
                     position.Size == 0) {
                     continue;
                 }
 
-                if (!position.Contract.MarketPrice.HasValue) {
-                    (logger ?? _logger).LogWarning($"Position {position.Contract} has no market price, unable to calculate Greeks.");
-                    return null;
-                }
-
-                if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
-                    greeks.DeltaHedge += position.Size;
-                }
-                else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
+                if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) 
+                {
                     // Skip expired options
                     if (position.Contract.Expiration!.Value <= _timeProvider.EstNow()) {
                         continue;
                     }
-
                     if (position.Underlying == null || position.UnderlyingContractId == null) {
                         (logger ?? _logger).LogWarning($"Position {position.Contract} has no underlying, unable to calculate Greeks.");
                         return null;
@@ -282,7 +277,26 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         return null;
                     }
 
-                    var daysLeft = _timeProvider.EstNow().BusinessDaysTo(position.Contract.Expiration.Value);
+                    if (!underlyingPrices.ContainsKey(position.UnderlyingContractId.Value)) {
+                        underlyingPrices.Add(position.UnderlyingContractId.Value, underlyingContract.MarketPrice.Value);
+                        (logger ?? _logger).LogDebug($"Pinned underlying price for {underlyingContract}: {underlyingContract.MarketPrice.Value:c}");
+                    }
+                }
+            }
+
+            // Second pass: Calculate Greeks
+            foreach (var position in Values) {
+                // Skip any positions that are not in the same underlying, 0 size
+                if (position.Contract.Symbol != underlyingPosition.Symbol || 
+                    position.Size == 0) {
+                    continue;
+                }
+
+                if (position.Contract.AssetClass == AssetClass.Future || position.Contract.AssetClass == AssetClass.Stock) {
+                    greeks.DeltaHedge += position.Size;
+                }
+                else if (position.Contract.AssetClass == AssetClass.FutureOption || position.Contract.AssetClass == AssetClass.Option) {
+                    var daysLeft = _timeProvider.EstNow().BusinessDaysTo(position.Contract.Expiration!.Value);
                     if (volForecaster != null) {
                         // Forecast volatility to option expiration
                         realizedVol = volForecaster.Forecast(daysLeft);
@@ -295,14 +309,14 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     // [16:19:27] Completed in 98074.5s - Final best error: 0.42 cv=0.167 vofv=1.5 lt=0.22 k=6.0 rho=-0.5 gq=True nUG=True aUBM=2.00 gqp=50 gcp=0.01
 
                     var heston = new HestonCalculator() {
-                        StockPrice = underlyingContract.MarketPrice.Value,
+                        StockPrice = underlyingPrices[position.UnderlyingContractId!.Value],
                         DaysLeft = (float)daysLeft,
                         Strike = position.Contract.Strike,
                         CurrentVolatility = (float)realizedVol,
-                        LongTermVolatility = underlyingContract.LongTermVolatility,
-                        VolatilityMeanReversion = underlyingContract.VolatilityMeanReversion,
-                        VolatilityOfVolatility = underlyingContract.VolatilityOfVolatility,
-                        Correlation = underlyingContract.Correlation,
+                        LongTermVolatility = underlyingPosition.FrontContract.LongTermVolatility,
+                        VolatilityMeanReversion = underlyingPosition.FrontContract.VolatilityMeanReversion,
+                        VolatilityOfVolatility = underlyingPosition.FrontContract.VolatilityOfVolatility,
+                        Correlation = underlyingPosition.FrontContract.Correlation,
                         UseRoughHeston = false,
                         UseGaussianQuadrature = true,
                         GaussianQuadraturePanels = 50,
@@ -312,15 +326,17 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     };
                     heston.CalculateAll();
 
+                    // BSM with the same parameters
                     var bls = new BlackNScholesCalculator() {
-                        StockPrice = underlyingContract.MarketPrice.Value,
+                        StockPrice = heston.StockPrice,
                         DaysLeft = (float)daysLeft,
                         Strike = position.Contract.Strike,
-                        VolatilitySpotSlope = underlyingContract.VolatilitySpotSlope,
                     };
 
                     // Calculate market implied vol for variance-weighted IV tracking
-                    var marketIV = position.Contract.IsCall ? bls.GetCallIVFast(position.Contract.MarketPrice.Value) : bls.GetPutIVFast(position.Contract.MarketPrice.Value);
+                    float? marketIV = null;
+                    if (position.Contract.MarketPrice.HasValue)
+                        marketIV = position.Contract.IsCall ? bls.GetCallIVFast(position.Contract.MarketPrice.Value) : bls.GetPutIVFast(position.Contract.MarketPrice.Value);
                     
                     // Use realized vol for position Greeks calculation
                     bls.ImpliedVolatility = (float)realizedVol;
@@ -366,18 +382,20 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
 
                     greeks.Vanna += (position.Contract.IsCall ? bls.VannaCall * 0.01f : bls.VannaPut * 0.01f) * position.Size;
                     greeks.Charm += charm * position.Size;
-                    
-                    // Accumulate variance-weighted IV for VRP tracking
-                    // Variance = σ², so we weight by variance (IV²) * vega to get proper variance exposure
-                    var absVega = MathF.Abs(positionVega);
-                    var variance = marketIV * marketIV; // Convert IV to variance
-                    if (position.Size < 0) {
-                        totalVegaWeightedVarianceShort += variance * absVega;
-                        totalVegaShort += absVega;
-                    }
-                    else {
-                        totalVegaWeightedVarianceLong += variance * absVega;
-                        totalVegaLong += absVega;
+
+                    if (marketIV.HasValue) {
+                        // Accumulate variance-weighted IV for VRP tracking
+                        // Variance = σ², so we weight by variance (IV²) * vega to get proper variance exposure
+                        var absVega = MathF.Abs(positionVega);
+                        var variance = marketIV.Value * marketIV.Value; // Convert IV to variance
+                        if (position.Size < 0) {
+                            totalVegaWeightedVarianceShort += variance * absVega;
+                            totalVegaShort += absVega;
+                        }
+                        else {
+                            totalVegaWeightedVarianceLong += variance * absVega;
+                            totalVegaLong += absVega;
+                        }
                     }
 
                     (logger ?? _logger).LogTrace($"{position} p:{(position.Contract.IsCall ? bls.CallValue : bls.PutValue):c} RV:{realizedVol:f3} mIV:{marketIV:f3} t:{daysLeft:f2} d:{deltaBls:f2} dwh:{deltaBlsHW:f2} dh:{deltaHeston:f2} t:{deltaBls * position.Size:f2}");

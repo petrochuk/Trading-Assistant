@@ -1,5 +1,6 @@
 ﻿using AppCore.Interfaces;
 using AppCore.Models;
+using Microsoft.Extensions.Time.Testing;
 
 namespace AppCore.Tests.Fakes;
 
@@ -25,7 +26,7 @@ internal class TestContractFactory : IContractFactory
         AssetClass assetClass, int contractId, int? underlyingContractId = null, 
         DateTimeOffset? expiration = null, float? strike = null, bool? isCall = null) {
 
-        var contract = new Contract {
+        var contract = new Contract (new FakeTimeProvider()) {
             Id = contractId,
             UnderlyingContractId = underlyingContractId,
             Symbol = symbol,

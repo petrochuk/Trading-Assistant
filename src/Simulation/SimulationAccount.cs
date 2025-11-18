@@ -20,7 +20,7 @@ public class SimulationAccount
             position.Size += quantity;
             Cash -= quantity * price * position.Contract.Multiplier;
         } else {
-            var contract = new Contract { 
+            var contract = new Contract (TimeProvider.System) { 
                 Symbol = symbol, 
                 IsCall = isCall,
                 Strike = strike,
@@ -45,7 +45,7 @@ public class SimulationAccount
                 _positions.Remove(symbol);
             }
         } else {
-            var contract = new Contract { 
+            var contract = new Contract (TimeProvider.System) { 
                 Symbol = symbol, 
                 Multiplier = 50,
                 AssetClass = AssetClass.Future };

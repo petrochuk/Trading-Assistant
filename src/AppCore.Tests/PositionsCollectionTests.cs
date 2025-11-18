@@ -9,7 +9,7 @@ namespace AppCore.Tests;
 [TestClass]
 public sealed class PositionsCollectionTests
 {
-    private readonly Contract _esContract = new Contract {
+    private readonly Contract _esContract = new Contract (new FakeTimeProvider()) {
         Symbol = "ES",
         AssetClass = AssetClass.Future,
         Id = 1,
