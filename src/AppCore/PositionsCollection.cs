@@ -552,6 +552,8 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
         _rwLock.EnterReadLock();
         try {
             foreach (var underlying in Underlyings) {
+                if (contractId == 770327397)
+                    _logger.LogDebug($"{contractId} new price: {markPrice}");
                 underlying.UpdateMarketPrice(contractId, markPrice);
             }
         }

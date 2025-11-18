@@ -256,9 +256,9 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
                 ActiveAccount = _accounts.Values.FirstOrDefault();
             }
 
-            RiskGraphControl.Account = _activeAccount;
             PositionsControl.Positions = _activeAccount != null ? _activeAccount.Positions : null;
             DispatcherQueue.TryEnqueue(() => {
+                RiskGraphControl.Account = _activeAccount;
                 if (_activeAccount == null) {
                     ActiveAccountLabel = "No Accounts";
                     ActiveAccountButton.IsEnabled = false;
@@ -329,13 +329,12 @@ public sealed partial class MainWindow : Window, INotifyPropertyChanged
 
         foreach (var account in _accounts.Values) {
             account.Positions.ReconcileContracts(e.Symbol, e.AssetClass, e.Contracts);
+        }
 
-            foreach (var underlying in account.Positions.Underlyings) {
-                foreach (var contract in e.Contracts) {
-                    _logger.LogInformation($"Requesting market data for underlying contract {contract.Symbol} ID {contract.Id}");
-                    App.Instance.IBWebSocket.RequestContractMarketData(contract);
-                }
-            }
+        // Request market data for each contract found
+        foreach (var contract in e.Contracts) {
+            _logger.LogInformation($"Requesting market data for underlying contract {contract} ID {contract.Id}");
+            App.Instance.IBWebSocket.RequestContractMarketData(contract);
         }
     }
 
