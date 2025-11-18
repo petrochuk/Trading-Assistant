@@ -59,6 +59,7 @@ public class DeltaHedgerFactory : IDeltaHedgerFactory
             .Enrich.WithProperty("AccountId", accountId)
             .Enrich.WithProperty("Symbol", symbol)
             .Enrich.FromLogContext()
+            .WriteTo.Trace(outputTemplate: "{Timestamp:HH:mm:ss} [{Level:w3}] {SourceContext:l} {Account:l} {Message}{NewLine}{Exception}")
             .WriteTo.RollingFile(Path.Combine(AppContext.BaseDirectory, @$"..\..\logs\{Safe(accountId)}\{Safe(symbol)}\{{Date}}.log"), shared: true);
 
         var serilogLogger = loggerConfig.CreateLogger();

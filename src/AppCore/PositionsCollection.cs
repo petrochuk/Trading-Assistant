@@ -290,6 +290,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         }
                     }
 
+                    //    ↳ cv=0.167 vofv=1.5 lt=0.22 k=6.0 rho=-0.5 gq=True nUG=True aUBM=2.00 gqp=50 gcp=0.01
+                    // [16:19:27] Completed in 98074.5s - Final best error: 0.42 cv=0.167 vofv=1.5 lt=0.22 k=6.0 rho=-0.5 gq=True nUG=True aUBM=2.00 gqp=50 gcp=0.01
+
                     var heston = new HestonCalculator() {
                         StockPrice = underlyingContract.MarketPrice.Value,
                         DaysLeft = (float)daysLeft,
@@ -301,10 +304,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         Correlation = underlyingContract.Correlation,
                         UseRoughHeston = false,
                         UseGaussianQuadrature = true,
-                        GaussianQuadraturePanels = 100,
+                        GaussianQuadraturePanels = 50,
                         UseNonUniformGrid = true,
-                        GridClusteringParameter = 0.05,
-                        AdaptiveUpperBoundMultiplier = 2.5f,
+                        GridClusteringParameter = 0.01,
+                        AdaptiveUpperBoundMultiplier = 2f,
                     };
                     heston.CalculateAll();
 
