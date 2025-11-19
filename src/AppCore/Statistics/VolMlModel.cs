@@ -321,17 +321,34 @@ public class VolMlModel : IVolForecaster
         }
         inputs[(int)Inputs.Variance100] = System.Math.Log(1 + daysBackVariance);
 
-        var output = _network.Predict(inputs);
+        var rawOutputs = _network.Predict(inputs);
 
-        // Interpret output as cumulative variance for (horizon) days ahead; index 0 => 1 day ahead
-        var horizon = (int)System.Math.Clamp(System.Math.Round(daysAhead), 1, output.Length);
-        var varianceForecast = System.Math.Max(0.0, output[horizon - 1]);
+        // Helper to compute annualized vol for integer horizon h (1-based)
+        double VolAt(int h) {
+            h = System.Math.Clamp(h, 1, rawOutputs.Length);
+            var varianceForecast = System.Math.Max(0.0, System.Math.Exp(System.Math.Max(0.0, rawOutputs[h - 1])) - 1.0);
+            return System.Math.Sqrt(varianceForecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / h);
+        }
 
-        // Convert log variance back to variance
-        varianceForecast = System.Math.Exp(varianceForecast) - 1.0;
+        if (daysAhead <= 1.0)
+            return VolAt(1);
 
-        // Return annualized volatility
-        return System.Math.Sqrt(varianceForecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / horizon);
+        // Clamp upper bound to model capacity
+        if (daysAhead >= rawOutputs.Length)
+            return VolAt(rawOutputs.Length);
+
+        var lower = (int)System.Math.Floor(daysAhead);
+        var upper = (int)System.Math.Ceiling(daysAhead);
+        var frac = daysAhead - lower;
+
+        if (lower == upper || frac <= 0.0)
+            return VolAt(lower);
+
+        var volLower = VolAt(lower);
+        var volUpper = VolAt(upper);
+
+        // Linear interpolation between adjacent integer horizons (example: 3.5 => 0.5*day[3] + 0.5*day[4])
+        return volLower * (1.0 - frac) + volUpper * frac;
     }
 
     private static double ComputeYangZhangVariance(double previousClose, double open, double high, double low, double close) {
