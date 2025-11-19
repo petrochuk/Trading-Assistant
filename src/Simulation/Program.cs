@@ -137,31 +137,30 @@ internal class Program
     }
 
     private static void RunTestVolModel(string symbol) {
-        VolMlModel? volModelTest = null;
         var volModelLatest = new VolMlModel();
-        var dataTestFile = @$"c:\temp\{symbol}_Test.csv";
+        var volModelTests = new Dictionary<string, VolMlModel>();
 
-        if (!System.IO.File.Exists(dataTestFile)) {
-            Console.WriteLine($"Error: Test data file not found: {dataTestFile}");
-        } else {
-            volModelTest = new VolMlModel();
+        foreach (var dataTestFile in System.IO.Directory.GetFiles(@"c:\temp\", $"{symbol}_Test*.csv")) { 
+            var volModelTest = new VolMlModel();
             volModelTest.Load(dataTestFile, @$"c:\temp\{symbol}.nn", forTraining: false);
+            volModelTests[Path.GetFileNameWithoutExtension(dataTestFile)] = volModelTest;
         }
         volModelLatest.Load(@$"c:\temp\{symbol}.csv", @$"c:\temp\{symbol}.nn", forTraining: false);
 
         for (int day = 20; day > 0; day--) {
-            if (volModelTest != null) {
-                Console.WriteLine();
-                var volForecastTest = volModelTest.Forecast(day);
-                Console.WriteLine($"{day}-day Tst forecast: {volForecastTest:p2}");
+            foreach (var kvp in volModelTests) {
+                var volForecastTest = kvp.Value.Forecast(day);
+                Console.WriteLine($"{day}-day {kvp.Key} forecast: {volForecastTest:p2}");
             }
+
             var volForecast = volModelLatest.Forecast(day);
             Console.WriteLine($"{day}-day Lts forecast: {volForecast:p2}");
+            Console.WriteLine();
         }
 
-        Console.WriteLine();
-        if (volModelTest != null)
-            Console.WriteLine($"RMSE on Test data: {volModelTest.ForecastingError():P6}");
+        foreach (var kvp in volModelTests) {
+            Console.WriteLine($"RMSE on {kvp.Key} data: {kvp.Value.ForecastingError():P6}");
+        }
         Console.WriteLine($"RMSE on training data: {volModelLatest.ForecastingError():P6}");
     }
 

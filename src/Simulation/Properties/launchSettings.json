@@ -2,7 +2,7 @@
   "profiles": {
     "Train": {
       "commandName": "Project",
-      "commandLineArgs": "--test-vol-model spx-2025"
+      "commandLineArgs": "--test-vol-model spx"
     },
     "Calibrate": {
       "commandName": "Project",
