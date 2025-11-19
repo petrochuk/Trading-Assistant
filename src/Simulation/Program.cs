@@ -140,18 +140,16 @@ internal class Program
         VolMlModel? volModelTest = null;
         var volModelLatest = new VolMlModel();
         var dataTestFile = @$"c:\temp\{symbol}_Test.csv";
+
         if (!System.IO.File.Exists(dataTestFile)) {
             Console.WriteLine($"Error: Test data file not found: {dataTestFile}");
         } else {
             volModelTest = new VolMlModel();
             volModelTest.Load(dataTestFile, @$"c:\temp\{symbol}.nn", forTraining: false);
-            Console.WriteLine($"RMSE on Tst data: {volModelTest.ForecastingError():P6}");
         }
         volModelLatest.Load(@$"c:\temp\{symbol}.csv", @$"c:\temp\{symbol}.nn", forTraining: false);
 
-        Console.WriteLine($"RMSE on training data: {volModelLatest.ForecastingError():P6}");
-
-        for (int day = 1; day <= 20; day++) {
+        for (int day = 20; day > 0; day--) {
             if (volModelTest != null) {
                 Console.WriteLine();
                 var volForecastTest = volModelTest.Forecast(day);
@@ -160,6 +158,11 @@ internal class Program
             var volForecast = volModelLatest.Forecast(day);
             Console.WriteLine($"{day}-day Lts forecast: {volForecast:p2}");
         }
+
+        Console.WriteLine();
+        if (volModelTest != null)
+            Console.WriteLine($"RMSE on Test data: {volModelTest.ForecastingError():P6}");
+        Console.WriteLine($"RMSE on training data: {volModelLatest.ForecastingError():P6}");
     }
 
     private static void PrintResults(HarRvForecaster forecaster) {

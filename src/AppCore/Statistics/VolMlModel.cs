@@ -2,7 +2,6 @@
 using AppCore.Interfaces;
 using AppCore.MachineLearning;
 using System.Globalization;
-using System.Linq;
 
 namespace AppCore.Statistics;
 
@@ -15,8 +14,8 @@ public class VolMlModel : IVolForecaster
     private Network _network = new Network(
         inputSize: InputSize,
         outputSize: MaxDaysAhead,
-        hiddenLayers: 3,
-        hiddenSize: 2 * InputSize,
+        hiddenLayers: 2,
+        hiddenSize: 5 * InputSize,
         learningRate: 0.05,
         useLinearOutputLayer: false,
         hiddenActivation: Network.ActivationType.GELU,
@@ -175,7 +174,7 @@ public class VolMlModel : IVolForecaster
                 for (int k = 0; k < j; k++) {
                     daysBackVariance += _returns[i - k].dailyVariance; // was i - 1 - k
                 }
-                inputs[(int)Inputs.Variance0 + j - 1] = daysBackVariance;
+                inputs[(int)Inputs.Variance0 + j - 1] = System.Math.Log(1 + daysBackVariance);
             }
 
             // 10 days back variance (include current day i)
@@ -183,35 +182,35 @@ public class VolMlModel : IVolForecaster
             for (int j = 1; j <= 10; j++) {
                 daysBackVariance += _returns[i - (j - 1)].dailyVariance; // was i - 1 - (j - 1)
             }
-            inputs[(int)Inputs.Variance10] = daysBackVariance;
+            inputs[(int)Inputs.Variance10] = System.Math.Log(1 + daysBackVariance);
 
             // 15 days back variance
             daysBackVariance = 0.0;
             for (int j = 1; j <= 15; j++) {
                 daysBackVariance += _returns[i - (j - 1)].dailyVariance; // was i - 1 - (j - 1)
             }
-            inputs[(int)Inputs.Variance15] = daysBackVariance;
+            inputs[(int)Inputs.Variance15] = System.Math.Log(1 + daysBackVariance);
 
             // 25 days back variance
             daysBackVariance = 0.0;
             for (int j = 1; j <= 25; j++) {
                 daysBackVariance += _returns[i - (j - 1)].dailyVariance; // was i - 1 - (j - 1)
             }
-            inputs[(int)Inputs.Variance25] = daysBackVariance;
+            inputs[(int)Inputs.Variance25] = System.Math.Log(1 + daysBackVariance);
 
             // 100 days back variance
             daysBackVariance = 0.0;
             for (int j = 1; j <= 100; j++) {
                 daysBackVariance += _returns[i - (j - 1)].dailyVariance; // was i - 1 - (j - 1)
             }
-            inputs[(int)Inputs.Variance100] = daysBackVariance;
+            inputs[(int)Inputs.Variance100] = System.Math.Log(1 + daysBackVariance);
 
             // Outputs: forward cumulative variance starting AFTER current day (i+1)
             var outputs = new double[MaxDaysAhead];
             var daysAheadVariance = 0.0;
             for (int j = 0; j < MaxDaysAhead; j++) {
                 daysAheadVariance += _returns[i + 1 + j].dailyVariance; // was i + j
-                outputs[j] = daysAheadVariance; // index j => cumulative variance for (j+1) days ahead
+                outputs[j] = System.Math.Log(1 + daysAheadVariance); // index j => cumulative variance for (j+1) days ahead
             }
             _trainingData.Add((inputs, outputs));
         }
@@ -231,7 +230,7 @@ public class VolMlModel : IVolForecaster
 
             for (int idx = 0; idx < indices.Length; idx++) {
                 var sample = _trainingData[indices[idx]];
-                var error = _network.Train(sample.inputs, sample.outputs);
+                var error = _network.Train(sample.inputs, sample.outputs, Network.LossFunction.QLIKE);
                 totalSquaredError += error;
             }
 
@@ -288,45 +287,48 @@ public class VolMlModel : IVolForecaster
             throw new ArgumentOutOfRangeException(nameof(dayNumber), $"Invalid day number for prediction: {dayNumber}");
 
         var inputs = new double[_network.InputSize];
-        inputs[(int)Inputs.Variance0] = _returns[dayNumber].dailyVariance;
-        inputs[(int)Inputs.Variance1] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance;
-        inputs[(int)Inputs.Variance3] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance;
-        inputs[(int)Inputs.Variance4] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance;
-        inputs[(int)Inputs.Variance5] = _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance + _returns[dayNumber - 4].dailyVariance;
+        inputs[(int)Inputs.Variance0] = System.Math.Log(1 + _returns[dayNumber].dailyVariance);
+        inputs[(int)Inputs.Variance1] = System.Math.Log(1 + _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance);
+        inputs[(int)Inputs.Variance3] = System.Math.Log(1 + _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance);
+        inputs[(int)Inputs.Variance4] = System.Math.Log(1 + _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance);
+        inputs[(int)Inputs.Variance5] = System.Math.Log(1 + _returns[dayNumber].dailyVariance + _returns[dayNumber - 1].dailyVariance + _returns[dayNumber - 2].dailyVariance + _returns[dayNumber - 3].dailyVariance + _returns[dayNumber - 4].dailyVariance);
 
         // Add 10 days back variance
         var daysBackVariance = 0.0;
         for (int j = 0; j < 10; j++) {
             daysBackVariance += _returns[dayNumber - j].dailyVariance;
         }
-        inputs[(int)Inputs.Variance10] = daysBackVariance;
+        inputs[(int)Inputs.Variance10] = System.Math.Log(1 + daysBackVariance);
 
         // Add 15 days back variance
         daysBackVariance = 0.0;
         for (int j = 0; j < 15; j++) {
             daysBackVariance += _returns[dayNumber - j].dailyVariance;
         }
-        inputs[(int)Inputs.Variance15] = daysBackVariance;
+        inputs[(int)Inputs.Variance15] = System.Math.Log(1 + daysBackVariance);
 
         // Add 25 days back variance
         daysBackVariance = 0.0;
         for (int j = 0; j < 25; j++) {
             daysBackVariance += _returns[dayNumber - j].dailyVariance;
         }
-        inputs[(int)Inputs.Variance25] = daysBackVariance;
+        inputs[(int)Inputs.Variance25] = System.Math.Log(1 + daysBackVariance);
 
         // Add 100 days back variance
         daysBackVariance = 0.0;
         for (int j = 0; j < 100; j++) {
             daysBackVariance += _returns[dayNumber - j].dailyVariance;
         }
-        inputs[(int)Inputs.Variance100] = daysBackVariance;
+        inputs[(int)Inputs.Variance100] = System.Math.Log(1 + daysBackVariance);
 
         var output = _network.Predict(inputs);
 
         // Interpret output as cumulative variance for (horizon) days ahead; index 0 => 1 day ahead
         var horizon = (int)System.Math.Clamp(System.Math.Round(daysAhead), 1, output.Length);
         var varianceForecast = System.Math.Max(0.0, output[horizon - 1]);
+
+        // Convert log variance back to variance
+        varianceForecast = System.Math.Exp(varianceForecast) - 1.0;
 
         // Return annualized volatility
         return System.Math.Sqrt(varianceForecast) * System.Math.Sqrt(TimeExtensions.BusinessDaysPerYear / horizon);

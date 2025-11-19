@@ -14,11 +14,19 @@ public class Network
         Linear = 5,
     }
 
+    public enum LossFunction
+    {
+        RMSE = 0,
+        MSE = 1,
+        QLIKE = 2,
+    }
+
     private const int FileFormatVersion = 3;
     private const double MaxGradientMagnitude = 1e3;
     private const double EluAlpha = 1.0;
     private const double GeluCoefficient = 0.044715;
     private const double SqrtTwoOverPi = 0.7978845608028654;
+    private const double QLikeEpsilon = 1e-12;
 
     private readonly int _inputSize;
     private readonly int _outputSize;
@@ -268,7 +276,7 @@ public class Network
         }
     }
 
-    internal double Train(double[] inputs, double[] expectedOutputs) {
+    internal double Train(double[] inputs, double[] expectedOutputs, LossFunction lossFunction = LossFunction.RMSE) {
         if (inputs.Length != _inputSize)
             throw new ArgumentOutOfRangeException(nameof(inputs), $"Input size must be {_inputSize}");
         if (expectedOutputs.Length != _outputSize)
@@ -277,17 +285,10 @@ public class Network
         var outputs = Forward(inputs);
         Backward(expectedOutputs);
 
-        // Calculate error for this sample
-        double totalError = 0;
-        for (int i = 0; i < outputs.Length; i++) {
-            double error = outputs[i] - expectedOutputs[i];
-            totalError += error * error;
-        }
-
-        return System.Math.Sqrt(totalError / outputs.Length);
+        return CalculateLoss(outputs, expectedOutputs, lossFunction);
     }
 
-    public void Train(double[][] inputs, double[][] expectedOutputs, int epochs)
+    public void Train(double[][] inputs, double[][] expectedOutputs, int epochs, LossFunction lossFunction = LossFunction.RMSE)
     {
         if (inputs.Length != expectedOutputs.Length)
             throw new ArgumentException("Input and output arrays must have the same length");
@@ -300,18 +301,10 @@ public class Network
 
             for (int sample = 0; sample < inputs.Length; sample++)
             {
-                double[] outputs = Forward(inputs[sample]);
-                Backward(expectedOutputs[sample]);
-
-                // Calculate error for this sample
-                for (int i = 0; i < outputs.Length; i++)
-                {
-                    double error = outputs[i] - expectedOutputs[sample][i];
-                    totalError += error * error;
-                }
+                totalError += Train(inputs[sample], expectedOutputs[sample], lossFunction);
             }
 
-            double avgError = totalError / ((double)inputs.Length * _outputSize);
+            double avgError = totalError / inputs.Length;
             AdjustLearningRate(avgError);
 
             // Print progress every 1000 epochs
@@ -434,6 +427,46 @@ public class Network
     private static double GeluInner(double x)
     {
         return SqrtTwoOverPi * (x + GeluCoefficient * x * x * x);
+    }
+
+    private static double CalculateLoss(double[] outputs, double[] expectedOutputs, LossFunction lossFunction)
+    {
+        if (outputs.Length != expectedOutputs.Length)
+            throw new ArgumentException("Outputs and expectedOutputs must have the same length.");
+
+        switch (lossFunction)
+        {
+            case LossFunction.MSE:
+            case LossFunction.RMSE:
+            {
+                double totalSquaredError = 0;
+                for (int i = 0; i < outputs.Length; i++)
+                {
+                    double diff = outputs[i] - expectedOutputs[i];
+                    totalSquaredError += diff * diff;
+                }
+
+                double mse = totalSquaredError / outputs.Length;
+                return lossFunction == LossFunction.RMSE
+                    ? System.Math.Sqrt(mse)
+                    : mse;
+            }
+            case LossFunction.QLIKE:
+            {
+                double totalLoss = 0;
+                for (int i = 0; i < outputs.Length; i++)
+                {
+                    double actual = System.Math.Max(expectedOutputs[i], QLikeEpsilon);
+                    double forecast = System.Math.Max(outputs[i], QLikeEpsilon);
+                    double ratio = actual / forecast;
+                    totalLoss += ratio - System.Math.Log(ratio) - 1.0;
+                }
+
+                return totalLoss / outputs.Length;
+            }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(lossFunction), lossFunction, "Unsupported loss function.");
+        }
     }
 
     private static ActivationType NormalizeActivation(int rawValue, ActivationType fallback)
