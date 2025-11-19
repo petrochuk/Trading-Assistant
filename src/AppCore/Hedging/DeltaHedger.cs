@@ -69,31 +69,33 @@ public class DeltaHedger : IDeltaHedger, IDisposable
     public void Hedge() {
         // Try to acquire the semaphore without blocking
         if (!_hedgeSemaphore.Wait(0)) {
-            _logger.LogDebug($"Hedging in progress for {_underlyingPosition.Symbol}. Skipping overlapping execution.");
+            _logger.LogDebug($"Hedging in progress. Skipping overlapping execution.");
             return;
         }
 
         try {
             LastGreeks = _positions.CalculateGreeks(_configuration.MinIV, _underlyingPosition, _volForecaster, addOvervaluedOptions: true, logger: _logger);
+            if (LastGreeks != null) {
+                _logger.LogInformation($"Greeks Delta: {LastGreeks.DeltaTotal:f3}, Heston Delta: {LastGreeks.DeltaHestonTotal:f3}, Theta: {LastGreeks.Theta:f3}");
+            }
 
             if (!IsHedgeExecutionAllowed()) {
                 return;
             }
 
-            _logger.LogDebug($"Executing delta hedger for {_underlyingPosition.Symbol}");
+            _logger.LogDebug($"Executing delta hedger");
             if (_underlyingPosition.RealizedVol != null) {
                 if (_underlyingPosition.RealizedVol.TryGetValue(out var realizedVol))
-                    _logger.LogDebug($"Realized Vol for {_underlyingPosition.Symbol}: {realizedVol:f4}");
+                    _logger.LogDebug($"Realized Vol: {realizedVol:f4}");
                 if (_underlyingPosition.RealizedVol.TryGetVolatilityOfVolatility(out var volOfVol))
-                    _logger.LogDebug($"Vol of Vol for {_underlyingPosition.Symbol}: {volOfVol:f4}");
+                    _logger.LogDebug($"Vol of Vol: {volOfVol:f4}");
             } else
-                _logger.LogDebug($"Vol of Vol: N/A for {_underlyingPosition.Symbol}");
+                _logger.LogDebug($"Vol of Vol: N/A");
 
             if (LastGreeks == null || !LastGreeks.IsDeltaValid) {
                 _logger.LogWarning($"No greeks available for contract {_underlyingPosition.Symbol} or NaN. Cannot hedge.");
                 return;
             }
-            _logger.LogInformation($"Greeks for {_underlyingPosition.Symbol}: Delta: {LastGreeks.DeltaTotal:f3}, Heston Delta: {LastGreeks.DeltaHestonTotal:f3}, Theta: {LastGreeks.Theta:f3}");
 
             var deltaOTMHedgeSize = 0 < LastGreeks.DeltaOTM ? -MathF.Round(LastGreeks.DeltaOTM) : -MathF.Round(LastGreeks.DeltaOTM);
             var deltaITMHedgeSize = 0 < LastGreeks.DeltaITM ? -MathF.Round(LastGreeks.DeltaITM) : -MathF.Round(LastGreeks.DeltaITM);
