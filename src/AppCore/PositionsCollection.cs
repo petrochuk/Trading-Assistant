@@ -331,7 +331,7 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
                     else {
                         // Intensionally overstate realized vol to account for vol of vol
-                        heston.CurrentVolatility = (float)(realizedVol * (1.0 + 0.50 / System.Math.Sqrt(daysLeft + 1)));
+                        heston.CurrentVolatility = (float)(realizedVol * (1.0 + 0.5 / System.Math.Sqrt(daysLeft + 0.75)));
                         // Invert correlation for short positions
                         heston.Correlation = -underlyingPosition.FrontContract.Correlation;
                     }
