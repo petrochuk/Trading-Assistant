@@ -312,11 +312,10 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         StockPrice = underlyingPrices[position.UnderlyingContractId!.Value],
                         DaysLeft = (float)daysLeft,
                         Strike = position.Contract.Strike,
-                        CurrentVolatility = (float)realizedVol,
                         LongTermVolatility = underlyingPosition.FrontContract.LongTermVolatility,
                         VolatilityMeanReversion = underlyingPosition.FrontContract.VolatilityMeanReversion,
                         VolatilityOfVolatility = underlyingPosition.FrontContract.VolatilityOfVolatility,
-                        Correlation = underlyingPosition.FrontContract.Correlation,
+
                         UseRoughHeston = false,
                         UseGaussianQuadrature = true,
                         GaussianQuadraturePanels = 50,
@@ -324,6 +323,18 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                         GridClusteringParameter = 0.01,
                         AdaptiveUpperBoundMultiplier = 2f,
                     };
+
+                    // Set current vol and correlation based on position side
+                    if (position.Size > 0) {
+                        heston.CurrentVolatility = (float)realizedVol;
+                        heston.Correlation = underlyingPosition.FrontContract.Correlation;
+                    }
+                    else {
+                        // Intensionally overstate realized vol to account for vol of vol
+                        heston.CurrentVolatility = (float)(realizedVol * (1.0 + 0.50 / System.Math.Sqrt(daysLeft + 1)));
+                        // Invert correlation for short positions
+                        heston.Correlation = -underlyingPosition.FrontContract.Correlation;
+                    }
                     heston.CalculateAll();
 
                     // BSM with the same parameters
@@ -337,9 +348,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     float? marketIV = null;
                     if (position.Contract.MarketPrice.HasValue)
                         marketIV = position.Contract.IsCall ? bls.GetCallIVFast(position.Contract.MarketPrice.Value) : bls.GetPutIVFast(position.Contract.MarketPrice.Value);
-                    
-                    // Use realized vol for position Greeks calculation
-                    bls.ImpliedVolatility = (float)realizedVol;
+
+                    // Use same vol as Heston for BLS greeks
+                    bls.ImpliedVolatility = heston.CurrentVolatility;
                     bls.CalculateAll();
 
                     var charm = (position.Contract.IsCall ? bls.CharmCall : bls.CharmPut);
@@ -357,8 +368,9 @@ public class PositionsCollection : ConcurrentDictionary<int, Position>, INotifyC
                     }
 
                     //_logger.LogInformation($"{position.Contract.Strike} {position.Contract.Expiration} {(position.Contract.IsCall ? "call": "put")} {position.Size}, D: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut)} DSZ: {(position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut) * position.Size}");
-                    float deltaBlsHW = position.Contract.IsCall ? bls.HullWhiteDeltaCall : bls.HullWhiteDeltaPut;
-                    float deltaBls = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
+                    var deltaBlsHW = position.Contract.IsCall ? bls.HullWhiteDeltaCall : bls.HullWhiteDeltaPut;
+                    var deltaBls = position.Contract.IsCall ? bls.DeltaCall : bls.DeltaPut;
+                    greeks.DeltaBMS += deltaBls * position.Size;
                     var deltaHeston = position.Contract.IsCall ? heston.DeltaCall : heston.DeltaPut;
                     greeks.DeltaHeston += deltaHeston * position.Size;
                     if (position.Contract.IsCall) {

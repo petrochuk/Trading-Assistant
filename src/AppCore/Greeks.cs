@@ -8,9 +8,11 @@ public class Greeks
     public float DeltaITM;
     public float DeltaOTM;
     public float DeltaHedge;
+    public float DeltaBMS;
     public float DeltaHeston;
     public float DeltaTotal => DeltaITM + DeltaOTM + DeltaHedge;
     public float DeltaHestonTotal => DeltaHeston + DeltaHedge;
+    public float DeltaBMSTotal => DeltaBMS + DeltaHedge;
     public float Gamma;
     public float Theta;
     public float Vega;
